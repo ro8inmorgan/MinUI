@@ -18,6 +18,7 @@
 typedef struct Settings {
 	int version; // future proofing
 	int brightness;
+	int colortemperature;
 	int headphones;
 	int speaker;
 	int unused[2]; // for future use
@@ -28,6 +29,7 @@ typedef struct Settings {
 static Settings DefaultSettings = {
 	.version = SETTINGS_VERSION,
 	.brightness = 2,
+	.colortemperature = 20,
 	.headphones = 4,
 	.speaker = 8,
 	.jack = 0,
@@ -154,7 +156,9 @@ static inline void SaveSettings(void) {
 		sync();
 	}
 }
-
+int GetColortemp(void) { // 0-10
+	return settings->colortemperature;
+}
 int GetBrightness(void) { // 0-10
 	return settings->brightness;
 }

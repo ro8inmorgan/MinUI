@@ -285,7 +285,7 @@ static int _;
 SDL_Surface* PLAT_initVideo(void) {
 	SDL_Init(SDL_INIT_VIDEO);
 	SDL_ShowCursor(0);
-	SDL_SetVideoMode(0,0,FIXED_DEPTH,0);
+	// SDL_SetVideoMode(0,0,FIXED_DEPTH,0);
 	
 	vid.fd_fb = open("/dev/fb0", O_RDWR);
 	vid.fd_ion = open("/dev/ion", O_RDWR);

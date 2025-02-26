@@ -3,7 +3,7 @@
 
 void InitSettings(void);
 void QuitSettings(void);
-
+int GetColortemp(void);
 int GetBrightness(void);
 int GetVolume(void);
 
