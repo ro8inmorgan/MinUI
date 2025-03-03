@@ -20,6 +20,7 @@ RUN apt-get -y update && apt-get -y install \
 	libsdl2-dev \
 	libsdl2-image-dev \
 	libsdl2-ttf-dev \
+	libsamplerate-dev \
 	locales \
 	make \
 	rsync \
