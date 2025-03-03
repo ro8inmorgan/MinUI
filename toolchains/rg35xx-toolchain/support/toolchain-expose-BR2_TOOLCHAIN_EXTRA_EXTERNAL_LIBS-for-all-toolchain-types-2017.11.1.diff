@@ -1,0 +1,89 @@
+diff --git a/Config.in.legacy b/Config.in.legacy
+index d4f3d04062..b3086300e6 100644
+--- a/Config.in.legacy
++++ b/Config.in.legacy
+@@ -147,6 +147,17 @@ endif
+ 
+ comment "Legacy options removed in 2017.11"
+ 
++config BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS
++	string "toolchain-external extra libs option has been renamed"
++	help
++	  The option BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS has
++	  been renamed to BR2_TOOLCHAIN_EXTRA_LIBS.
++
++config BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS_WRAP
++	bool
++	default y if BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS != ""
++	select BR2_LEGACY
++
+ config BR2_PACKAGE_RFKILL
+ 	bool "rfkill package removed"
+ 	select BR2_LEGACY
+diff --git a/package/gcc/gcc-final/gcc-final.mk b/package/gcc/gcc-final/gcc-final.mk
+index 30fb87856c..24d034b720 100644
+--- a/package/gcc/gcc-final/gcc-final.mk
++++ b/package/gcc/gcc-final/gcc-final.mk
+@@ -187,6 +187,8 @@ ifeq ($(BR2_GCC_ENABLE_OPENMP),y)
+ HOST_GCC_FINAL_USR_LIBS += libgomp
+ endif
+ 
++HOST_GCC_FINAL_USR_LIBS += $(call qstrip,$(BR2_TOOLCHAIN_EXTRA_LIBS))
++
+ ifneq ($(HOST_GCC_FINAL_USR_LIBS),)
+ define HOST_GCC_FINAL_INSTALL_STATIC_LIBS
+ 	for i in $(HOST_GCC_FINAL_USR_LIBS) ; do \
+diff --git a/toolchain/Config.in b/toolchain/Config.in
+index c9aa95985f..8f990cacb9 100644
+--- a/toolchain/toolchain-common.in
++++ b/toolchain/toolchain-common.in
+@@ -82,6 +82,19 @@ config BR2_TOOLCHAIN_GLIBC_GCONV_LIBS_LIST
+ 
+ 	  Note: the full set of gconv libs are ~8MiB (on ARM).
+ 
++config BR2_TOOLCHAIN_EXTRA_LIBS
++	string "Extra toolchain libraries to be copied to target"
++	default ""
++	help
++	  If your toolchain provides extra libraries that need to be
++	  copied to the target filesystem, enter them here, separated
++	  by spaces.
++
++	  NOTE: The library name should not include a suffix or wildcard.
++
++	  Examples where this can be useful is for adding debug libraries
++	  to the target like the GCC libsanitizer (libasan/liblsan/...).
++
+ # This boolean is true if the toolchain provides a built-in full
+ # featured gettext implementation (glibc), and false if only a stub
+ # gettext implementation is provided (uclibc, musl)
+diff --git a/toolchain/toolchain-external/pkg-toolchain-external.mk b/toolchain/toolchain-external/pkg-toolchain-external.mk
+index 5147da0104..e339773a96 100644
+--- a/toolchain/toolchain-external/pkg-toolchain-external.mk
++++ b/toolchain/toolchain-external/pkg-toolchain-external.mk
+@@ -156,7 +156,7 @@ ifeq ($(BR2_TOOLCHAIN_HAS_DLANG),y)
+ TOOLCHAIN_EXTERNAL_LIBS += libgdruntime.so* libgphobos.so*
+ endif
+ 
+-TOOLCHAIN_EXTERNAL_LIBS += $(call qstrip,$(BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS))
++TOOLCHAIN_EXTERNAL_LIBS += $(call qstrip,$(BR2_TOOLCHAIN_EXTRA_LIBS))
+ 
+ 
+ #
+diff --git a/toolchain/toolchain-external/toolchain-external-custom/Config.in.options b/toolchain/toolchain-external/toolchain-external-custom/Config.in.options
+index a36747f490..fd95f8201b 100644
+--- a/toolchain/toolchain-external/toolchain-external-custom/Config.in.options
++++ b/toolchain/toolchain-external/toolchain-external-custom/Config.in.options
+@@ -438,12 +438,4 @@ config BR2_TOOLCHAIN_EXTERNAL_OPENMP
+ 	  support. If you don't know, leave the default value,
+ 	  Buildroot will tell you if it's correct or not.
+ 
+-config BR2_TOOLCHAIN_EXTRA_EXTERNAL_LIBS
+-	string "Extra toolchain libraries to be copied to target"
+-	help
+-	  If your external toolchain provides extra libraries that
+-	  need to be copied to the target filesystem, enter them
+-	  here, separated by spaces. They will be copied to the
+-	  target's /lib directory.
+-
+ endif
