@@ -1,0 +1,99 @@
+diff --git forkSrcPrefix/src/video/fbcon/SDL_fbkeys.h forkDstPrefix/src/video/fbcon/SDL_fbkeys.h
+index 2b01b6b2e3588426e50dbf109e09e0fdb8755091..4acd13df4302185d27964859a58f8b09c25f13f3 100644
+--- forkSrcPrefix/src/video/fbcon/SDL_fbkeys.h
++++ forkDstPrefix/src/video/fbcon/SDL_fbkeys.h
+@@ -114,6 +114,15 @@
+ #define SCANCODE_F11			87
+ #define SCANCODE_F12			88
+ 
++/* RG35XX */
++#define SCANCODE_KATAKANA		90
++#define SCANCODE_HIRAGANA		91
++#define SCANCODE_HENKAN			92
++#define SCANCODE_KATAKANAHIRAGANA	93
++#define SCANCODE_MUHENKAN		94
++#define SCANCODE_KPJPCOMMA		95
++#define SCANCODE_POWER			116
++
+ #define SCANCODE_KEYPADENTER		96
+ #define SCANCODE_RIGHTCONTROL		97
+ #define SCANCODE_CONTROL		97
+diff --git forkSrcPrefix/include/SDL_keysym.h forkDstPrefix/include/SDL_keysym.h
+index f2ad12b81ef5725e3d975c9ad3a775fa50aa6cb6..7c348322a4d0434f4cd7349fdbd62026d4e65911 100644
+--- forkSrcPrefix/include/SDL_keysym.h
++++ forkDstPrefix/include/SDL_keysym.h
+@@ -296,6 +296,19 @@ typedef enum {
+ 	SDLK_UNDO		= 322,		/**< Atari keyboard has Undo */
+         /*@}*/
+ 
++	/** @name RG35XX keys */
++        /*@{*/
++	SDLK_KATAKANA			= 323,
++	SDLK_HIRAGANA			= 324,
++	SDLK_HENKAN				= 325,
++	SDLK_KATAKANAHIRAGANA	= 326,
++	SDLK_MUHENKAN			= 327,
++	SDLK_KP_JPCOMMA			= 328,
++	SDLK_KP_SLASH			= 329,
++	SDLK_CURSORBLOCKUP		= 330,
++	SDLK_CURSORBLOCKDOWN	= 331,
++        /*@}*/
++
+ 	/* Add any other keys here */
+ 
+ 	SDLK_LAST
+diff --git forkSrcPrefix/src/video/fbcon/SDL_fbevents.c forkDstPrefix/src/video/fbcon/SDL_fbevents.c
+index 5e369a4a89c3157206abed1f4c4b8e27aef17024..c15d1b85b7f06757b24fb7f17dc73e6bab1c2148 100644
+--- forkSrcPrefix/src/video/fbcon/SDL_fbevents.c
++++ forkDstPrefix/src/video/fbcon/SDL_fbevents.c
+@@ -1133,6 +1133,41 @@ void FB_InitOSKeymap(_THIS)
+ 	  case 127:
+ 	    keymap[i] = SDLK_MENU;
+ 	    break;
++		
++	  /* RG35XX */
++	  case SCANCODE_KATAKANA:
++	  	keymap[i] = SDLK_KATAKANA;
++		break;
++	  case SCANCODE_HIRAGANA:
++	  	keymap[i] = SDLK_HIRAGANA;
++		break;
++	  case SCANCODE_HENKAN:
++	  	keymap[i] = SDLK_HENKAN;
++		break;
++	  case SCANCODE_KATAKANAHIRAGANA:
++	  	keymap[i] = SDLK_KATAKANAHIRAGANA;
++		break;
++	  case SCANCODE_MUHENKAN:
++	  	keymap[i] = SDLK_MUHENKAN;
++		break;
++	  case SCANCODE_KPJPCOMMA:
++	  	keymap[i] = SDLK_KP_JPCOMMA;
++		break;
++	  case SCANCODE_KEYPADENTER:
++	  	keymap[i] = SDLK_KP_ENTER;
++		break;
++	  case SCANCODE_CURSORBLOCKUP:
++	  	keymap[i] = SDLK_CURSORBLOCKUP;
++		break;
++	  case SCANCODE_CURSORBLOCKDOWN:
++	  	keymap[i] = SDLK_CURSORBLOCKDOWN;
++		break;
++	  case SCANCODE_POWER: // this doesn't stick so we override below
++	  	keymap[i] = SDLK_POWER; // leaving this in just in case
++		break;
++			
++		
++		
+ 	  /* this should take care of all standard ascii keys */
+ 	  default:
+ 	    keymap[i] = KVAL(vga_keymap[0][i]);
+@@ -1208,6 +1243,8 @@ void FB_InitOSKeymap(_THIS)
+ 	    default: break;
+ 	  }
+ 	}
++	
++	keymap[116] = SDLK_POWER; // requires hard override for some reason
+ }
+ 
+ static SDL_keysym *TranslateKey(int scancode, SDL_keysym *keysym)
