@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -96,17 +95,6 @@ static SDL_Rect asset_rects[ASSET_COUNT];
 static uint32_t asset_rgbs[ASSET_COLORS];
 static SDL_Rect input_rects[INPUT_COUNT];
 GFX_Fonts font;
-
-///////////////////////////////
-
-static inline int GFX_needsBitmapBlendCompat(void)
-{
-#ifdef PLATFORM
-	return strcmp(PLATFORM, "h700") == 0;
-#else
-	return 0;
-#endif
-}
 
 ///////////////////////////////
 
@@ -466,25 +454,6 @@ SDL_Surface *GFX_init(int mode)
 	if (!exists(asset_path))
 		LOG_info("missing assets, you're about to segfault dummy!\n");
 	gfx.assets = IMG_Load(asset_path);
-	if (!gfx.assets)
-	{
-		LOG_error("failed to load assets %s: %s\n", asset_path, IMG_GetError());
-	}
-	else if (GFX_needsBitmapBlendCompat())
-	{
-		uint32_t format = gfx.screen && gfx.screen->format ? gfx.screen->format->format : SDL_PIXELFORMAT_ARGB8888;
-		SDL_Surface *converted = SDL_ConvertSurfaceFormat(gfx.assets, format, 0);
-		if (converted)
-		{
-			SDL_FreeSurface(gfx.assets);
-			gfx.assets = converted;
-		}
-		else
-		{
-			LOG_warn("failed to normalize H700 assets %s: %s\n", asset_path, SDL_GetError());
-		}
-		SDL_SetSurfaceBlendMode(gfx.assets, SDL_BLENDMODE_BLEND);
-	}
 
 	input_rects[INPUT_BUTTON_A] = (SDL_Rect){SCALE4(0, 0, BUTTON_SIZE, BUTTON_SIZE)};
 	input_rects[INPUT_BUTTON_B] = (SDL_Rect){SCALE4(20, 0, BUTTON_SIZE, BUTTON_SIZE)};
@@ -1729,53 +1698,6 @@ void GFX_ApplyRoundedCorners_8888(SDL_Surface *surface, SDL_Rect *rect, int radi
 
 void GFX_blitSurfaceColor(SDL_Surface *src, SDL_Rect *src_rect, SDL_Surface *dst, SDL_Rect *dst_rect, uint32_t asset_color)
 {
-	if (GFX_needsBitmapBlendCompat())
-	{
-		uint32_t tint = asset_color;
-		if (asset_color != RGB_WHITE)
-		{
-			if (asset_color == THEME_COLOR1)
-				tint = THEME_COLOR1_255;
-			else if (asset_color == THEME_COLOR2)
-				tint = THEME_COLOR2_255;
-			else if (asset_color == THEME_COLOR3)
-				tint = THEME_COLOR3_255;
-			else if (asset_color == THEME_COLOR4)
-				tint = THEME_COLOR4_255;
-			else if (asset_color == THEME_COLOR5)
-				tint = THEME_COLOR5_255;
-			else if (asset_color == THEME_COLOR6)
-				tint = THEME_COLOR6_255;
-			else if (asset_color == THEME_COLOR7)
-				tint = THEME_COLOR7_255;
-		}
-
-		Uint8 r = 255;
-		Uint8 g = 255;
-		Uint8 b = 255;
-		if (asset_color != RGB_WHITE)
-		{
-			r = (tint >> 16) & 0xFF;
-			g = (tint >> 8) & 0xFF;
-			b = tint & 0xFF;
-		}
-
-		SDL_Color restore;
-		Uint8 restore_a;
-		SDL_BlendMode restore_blend;
-		SDL_GetSurfaceColorMod(src, &restore.r, &restore.g, &restore.b);
-		SDL_GetSurfaceAlphaMod(src, &restore_a);
-		SDL_GetSurfaceBlendMode(src, &restore_blend);
-		SDL_SetSurfaceColorMod(src, r, g, b);
-		SDL_SetSurfaceAlphaMod(src, 255);
-		SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_BLEND);
-		SDL_BlitSurface(src, src_rect, dst, dst_rect);
-		SDL_SetSurfaceColorMod(src, restore.r, restore.g, restore.b);
-		SDL_SetSurfaceAlphaMod(src, restore_a);
-		SDL_SetSurfaceBlendMode(src, restore_blend);
-		return;
-	}
-
 	// This could be a RAII
 	if (asset_color != RGB_WHITE)
 	{
