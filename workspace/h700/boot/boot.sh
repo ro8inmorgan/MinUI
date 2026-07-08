@@ -17,7 +17,9 @@ mount_tf2() {
 	if mountpoint -q "$TF2_PATH"; then
 		return 0
 	fi
-	mount -t vfat -o rw,utf8,noatime /dev/mmcblk1p1 "$TF2_PATH" 2>/dev/null
+	mount -t vfat -o rw,utf8,noatime /dev/mmcblk1p1 "$TF2_PATH" 2>/dev/null ||
+		mount -t exfat -o rw,noatime /dev/mmcblk1p1 "$TF2_PATH" 2>/dev/null ||
+		mount -o rw,noatime /dev/mmcblk1p1 "$TF2_PATH" 2>/dev/null
 }
 
 ensure_compat_path() {
@@ -34,9 +36,28 @@ extract_payload() {
 	LINE=$(($(grep -na '^BINARY' "$0" | cut -d ':' -f 1 | tail -1) + 1))
 	tail -n +"$LINE" "$0" > /tmp/nextui-h700-data.tar.gz
 	mkdir -p /tmp/nextui-h700
-	tar -xzf /tmp/nextui-h700-data.tar.gz -C /tmp/nextui-h700 >/dev/null 2>&1 || return 1
+	if ! tar -xzf /tmp/nextui-h700-data.tar.gz -C /tmp/nextui-h700 >> "$LOG_PATH" 2>&1; then
+		log "embedded unzip extraction failed"
+		return 1
+	fi
 	cp /tmp/nextui-h700/unzip /tmp/nextui-h700-unzip
 	chmod +x /tmp/nextui-h700-unzip
+}
+
+find_unzip() {
+	for unzip_path in /usr/bin/unzip /bin/unzip /mnt/vendor/bin/unzip /tmp/nextui-h700-unzip; do
+		if [ -x "$unzip_path" ]; then
+			echo "$unzip_path"
+			return 0
+		fi
+	done
+
+	if extract_payload; then
+		echo /tmp/nextui-h700-unzip
+		return 0
+	fi
+
+	return 1
 }
 
 fallback_stock() {
@@ -60,8 +81,15 @@ ensure_compat_path
 
 if [ -f "$UPDATE_PATH" ]; then
 	log "install/update zip detected"
-	extract_payload || fallback_stock
-	/tmp/nextui-h700-unzip -o "$UPDATE_PATH" -d "$TF2_PATH" >> "$LOG_PATH" 2>&1
+	UNZIP_CMD=$(find_unzip)
+	if [ -z "$UNZIP_CMD" ]; then
+		log "unzip helper unavailable"
+		fallback_stock
+	fi
+	if ! "$UNZIP_CMD" -o "$UPDATE_PATH" -d "$TF2_PATH" >> "$LOG_PATH" 2>&1; then
+		log "MinUI.zip extraction failed"
+		fallback_stock
+	fi
 	rm -f "$UPDATE_PATH"
 
 	if [ -x "$TF2_PATH/.tmp_update/$PLATFORM.sh" ]; then
