@@ -31,6 +31,146 @@ int is_rg34xx = 0;
 int is_cube = 0;
 static int wake_fd = -1;
 
+#define H700_INPUT_COUNT 12
+#define EV_KEY 0x01
+#define EV_ABS 0x03
+
+// From the old rg35xxplus platform: built-in controls expose evdev raw codes,
+// while SDL joystick enumeration is unreliable on stock H700 images.
+#define RAW_HATY 17
+#define RAW_HATX 16
+#define RAW_LSY  3
+#define RAW_LSX  2
+#define RAW_RSY  5
+#define RAW_RSX  4
+
+struct input_event {
+	struct timeval time;
+	uint16_t type;
+	uint16_t code;
+	int32_t value;
+};
+
+static int input_fds[H700_INPUT_COUNT];
+static uint32_t last_input_scan = 0;
+
+static void close_evdev_input(int i) {
+	if (i < 0 || i >= H700_INPUT_COUNT || input_fds[i] < 0)
+		return;
+	close(input_fds[i]);
+	input_fds[i] = -1;
+}
+
+static void open_evdev_input(int i) {
+	char path[64];
+	snprintf(path, sizeof(path), "/dev/input/event%i", i);
+
+	input_fds[i] = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+	if (input_fds[i] < 0)
+		return;
+
+	char name_path[128];
+	char name[256] = {0};
+	snprintf(name_path, sizeof(name_path), "/sys/class/input/event%i/device/name", i);
+	getFile(name_path, name, sizeof(name));
+	if (name[0])
+		LOG_info("Opening input event%i: %s\n", i, name);
+	else
+		LOG_info("Opening input event%i\n", i);
+}
+
+static void scan_evdev_inputs(void) {
+	uint32_t now = SDL_GetTicks();
+	if (last_input_scan && now - last_input_scan < 2000)
+		return;
+	last_input_scan = now;
+
+	for (int i = 0; i < H700_INPUT_COUNT; i++) {
+		char path[64];
+		snprintf(path, sizeof(path), "/dev/input/event%i", i);
+		int connected = exists(path);
+		if (input_fds[i] < 0 && connected)
+			open_evdev_input(i);
+		else if (input_fds[i] >= 0 && !connected)
+			close_evdev_input(i);
+	}
+}
+
+static void apply_button_state(int btn, int id, int pressed, uint32_t tick) {
+	if (btn == BTN_NONE || id < 0)
+		return;
+
+	if (!pressed) {
+		if (pad.is_pressed & btn) {
+			pad.is_pressed &= ~btn;
+			pad.just_repeated &= ~btn;
+			pad.just_released |= btn;
+		}
+	}
+	else if ((pad.is_pressed & btn) == BTN_NONE) {
+		pad.just_pressed |= btn;
+		pad.just_repeated |= btn;
+		pad.is_pressed |= btn;
+		pad.repeat_at[id] = tick + PAD_REPEAT_DELAY;
+	}
+}
+
+static int button_from_code(int code, int *id) {
+	     if (code == CODE_UP)       { *id = BTN_ID_DPAD_UP;    return BTN_DPAD_UP; }
+	else if (code == CODE_DOWN)     { *id = BTN_ID_DPAD_DOWN;  return BTN_DPAD_DOWN; }
+	else if (code == CODE_LEFT)     { *id = BTN_ID_DPAD_LEFT;  return BTN_DPAD_LEFT; }
+	else if (code == CODE_RIGHT)    { *id = BTN_ID_DPAD_RIGHT; return BTN_DPAD_RIGHT; }
+	else if (code == CODE_A)        { *id = BTN_ID_A;          return BTN_A; }
+	else if (code == CODE_B)        { *id = BTN_ID_B;          return BTN_B; }
+	else if (code == CODE_X)        { *id = BTN_ID_X;          return BTN_X; }
+	else if (code == CODE_Y)        { *id = BTN_ID_Y;          return BTN_Y; }
+	else if (code == CODE_START)    { *id = BTN_ID_START;      return BTN_START; }
+	else if (code == CODE_SELECT)   { *id = BTN_ID_SELECT;     return BTN_SELECT; }
+	else if (code == CODE_MENU)     { *id = BTN_ID_MENU;       return BTN_MENU; }
+	else if (code == CODE_MENU_ALT) { *id = BTN_ID_MENU;       return BTN_MENU; }
+	else if (code == CODE_L1)       { *id = BTN_ID_L1;         return BTN_L1; }
+	else if (code == CODE_L2)       { *id = BTN_ID_L2;         return BTN_L2; }
+	else if (code == CODE_L3)       { *id = BTN_ID_L3;         return BTN_L3; }
+	else if (code == CODE_R1)       { *id = BTN_ID_R1;         return BTN_R1; }
+	else if (code == CODE_R2)       { *id = BTN_ID_R2;         return BTN_R2; }
+	else if (code == CODE_R3)       { *id = BTN_ID_R3;         return BTN_R3; }
+	else if (code == CODE_PLUS)     { *id = BTN_ID_PLUS;       return BTN_PLUS; }
+	else if (code == CODE_MINUS)    { *id = BTN_ID_MINUS;      return BTN_MINUS; }
+	else if (code == CODE_POWER)    { *id = BTN_ID_POWER;      return BTN_POWER; }
+	return BTN_NONE;
+}
+
+static int button_from_joy(int joy, int *id) {
+	     if (joy == JOY_UP)       { *id = BTN_ID_DPAD_UP;    return BTN_DPAD_UP; }
+	else if (joy == JOY_DOWN)     { *id = BTN_ID_DPAD_DOWN;  return BTN_DPAD_DOWN; }
+	else if (joy == JOY_LEFT)     { *id = BTN_ID_DPAD_LEFT;  return BTN_DPAD_LEFT; }
+	else if (joy == JOY_RIGHT)    { *id = BTN_ID_DPAD_RIGHT; return BTN_DPAD_RIGHT; }
+	else if (joy == JOY_A)        { *id = BTN_ID_A;          return BTN_A; }
+	else if (joy == JOY_B)        { *id = BTN_ID_B;          return BTN_B; }
+	else if (joy == JOY_X)        { *id = BTN_ID_X;          return BTN_X; }
+	else if (joy == JOY_Y)        { *id = BTN_ID_Y;          return BTN_Y; }
+	else if (joy == JOY_START)    { *id = BTN_ID_START;      return BTN_START; }
+	else if (joy == JOY_SELECT)   { *id = BTN_ID_SELECT;     return BTN_SELECT; }
+	else if (joy == JOY_MENU)     { *id = BTN_ID_MENU;       return BTN_MENU; }
+	else if (joy == JOY_MENU_ALT) { *id = BTN_ID_MENU;       return BTN_MENU; }
+	else if (joy == JOY_MENU_ALT2){ *id = BTN_ID_MENU;       return BTN_MENU; }
+	else if (joy == JOY_L1)       { *id = BTN_ID_L1;         return BTN_L1; }
+	else if (joy == JOY_L2)       { *id = BTN_ID_L2;         return BTN_L2; }
+	else if (joy == JOY_L3)       { *id = BTN_ID_L3;         return BTN_L3; }
+	else if (joy == JOY_R1)       { *id = BTN_ID_R1;         return BTN_R1; }
+	else if (joy == JOY_R2)       { *id = BTN_ID_R2;         return BTN_R2; }
+	else if (joy == JOY_R3)       { *id = BTN_ID_R3;         return BTN_R3; }
+	else if (joy == JOY_PLUS)     { *id = BTN_ID_PLUS;       return BTN_PLUS; }
+	else if (joy == JOY_MINUS)    { *id = BTN_ID_MINUS;      return BTN_MINUS; }
+	else if (joy == JOY_POWER)    { *id = BTN_ID_POWER;      return BTN_POWER; }
+	return BTN_NONE;
+}
+
+static void apply_hat_axis(int neg_id, int pos_id, int value, uint32_t tick) {
+	apply_button_state(1 << neg_id, neg_id, value < 0, tick);
+	apply_button_state(1 << pos_id, pos_id, value > 0, tick);
+}
+
 static void detect_device(void) {
 	char *device = getenv("DEVICE");
 	char *model = getenv("RGXX_MODEL");
@@ -49,8 +189,13 @@ static SDL_Joystick **joysticks = NULL;
 static int num_joysticks = 0;
 void PLAT_initInput(void) {
 	detect_device();
+	for (int i = 0; i < H700_INPUT_COUNT; i++)
+		input_fds[i] = -1;
+	last_input_scan = 0;
+
 	if(SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0)
 		LOG_error("Failed initializing joysticks: %s\n", SDL_GetError());
+	SDL_JoystickEventState(SDL_ENABLE);
 	num_joysticks = SDL_NumJoysticks();
     if (num_joysticks > 0) {
         joysticks = (SDL_Joystick **)malloc(sizeof(SDL_Joystick *) * num_joysticks);
@@ -59,9 +204,13 @@ void PLAT_initInput(void) {
 			LOG_info("Opening joystick %d: %s\n", i, SDL_JoystickName(joysticks[i]));
         }
     }
+	scan_evdev_inputs();
 }
 
 void PLAT_quitInput(void) {
+	for (int i = 0; i < H700_INPUT_COUNT; i++)
+		close_evdev_input(i);
+
 	if (joysticks) {
         for (int i = 0; i < num_joysticks; i++) {
             if (SDL_JoystickGetAttached(joysticks[i])) {
@@ -78,6 +227,158 @@ void PLAT_quitInput(void) {
 		wake_fd = -1;
 	}
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+}
+
+static void poll_sdl_input(uint32_t tick) {
+	SDL_Event event;
+	while (SDL_PollEvent(&event)) {
+		int btn = BTN_NONE;
+		int pressed = 0;
+		int id = -1;
+
+		if (event.type == SDL_JOYBUTTONDOWN || event.type == SDL_JOYBUTTONUP) {
+			pressed = event.type == SDL_JOYBUTTONDOWN;
+			btn = button_from_joy(event.jbutton.button, &id);
+		}
+		else if (event.type == SDL_JOYHATMOTION) {
+			int hat = event.jhat.value;
+			apply_button_state(BTN_DPAD_UP, BTN_ID_DPAD_UP, hat & SDL_HAT_UP, tick);
+			apply_button_state(BTN_DPAD_DOWN, BTN_ID_DPAD_DOWN, hat & SDL_HAT_DOWN, tick);
+			apply_button_state(BTN_DPAD_LEFT, BTN_ID_DPAD_LEFT, hat & SDL_HAT_LEFT, tick);
+			apply_button_state(BTN_DPAD_RIGHT, BTN_ID_DPAD_RIGHT, hat & SDL_HAT_RIGHT, tick);
+			continue;
+		}
+		else if (event.type == SDL_JOYAXISMOTION) {
+			int axis = event.jaxis.axis;
+			int val = event.jaxis.value;
+
+			if (axis == AXIS_L2) {
+				btn = BTN_L2;
+				id = BTN_ID_L2;
+				pressed = val > 0;
+			}
+			else if (axis == AXIS_R2) {
+				btn = BTN_R2;
+				id = BTN_ID_R2;
+				pressed = val > 0;
+			}
+			else if (axis == AXIS_LX) {
+				pad.laxis.x = val;
+				PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, val, tick + PAD_REPEAT_DELAY);
+				continue;
+			}
+			else if (axis == AXIS_LY) {
+				pad.laxis.y = val;
+				PAD_setAnalog(BTN_ID_ANALOG_UP, BTN_ID_ANALOG_DOWN, val, tick + PAD_REPEAT_DELAY);
+				continue;
+			}
+			else if (axis == AXIS_RX) {
+				pad.raxis.x = val;
+				continue;
+			}
+			else if (axis == AXIS_RY) {
+				pad.raxis.y = val;
+				continue;
+			}
+
+			if (!pressed && btn != BTN_NONE && !(pad.is_pressed & btn))
+				btn = BTN_NONE;
+		}
+		else if (event.type == SDL_QUIT) {
+			PWR_powerOff(0);
+			continue;
+		}
+		else if (event.type == SDL_JOYDEVICEADDED || event.type == SDL_JOYDEVICEREMOVED) {
+			PAD_update(&event);
+			continue;
+		}
+
+		apply_button_state(btn, id, pressed, tick);
+	}
+}
+
+static void poll_evdev_input(uint32_t tick) {
+	struct input_event event;
+
+	for (int i = 0; i < H700_INPUT_COUNT; i++) {
+		int input = input_fds[i];
+		if (input < 0)
+			continue;
+
+		errno = 0;
+		while (read(input, &event, sizeof(event)) == sizeof(event)) {
+			if (event.type != EV_KEY && event.type != EV_ABS)
+				continue;
+
+			int btn = BTN_NONE;
+			int pressed = 0;
+			int id = -1;
+			int code = event.code;
+			int value = event.value;
+
+			if (event.type == EV_KEY) {
+				if (value > 1)
+					continue;
+				pressed = value;
+				btn = button_from_code(code, &id);
+			}
+			else if (event.type == EV_ABS) {
+				if (code == RAW_HATY) {
+					apply_hat_axis(BTN_ID_DPAD_UP, BTN_ID_DPAD_DOWN, value, tick);
+					continue;
+				}
+				else if (code == RAW_HATX) {
+					apply_hat_axis(BTN_ID_DPAD_LEFT, BTN_ID_DPAD_RIGHT, value, tick);
+					continue;
+				}
+				else if (code == RAW_LSX) {
+					pad.laxis.x = (value * 32767) / 4096;
+					PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, pad.laxis.x, tick + PAD_REPEAT_DELAY);
+					continue;
+				}
+				else if (code == RAW_LSY) {
+					pad.laxis.y = (value * 32767) / 4096;
+					PAD_setAnalog(BTN_ID_ANALOG_UP, BTN_ID_ANALOG_DOWN, pad.laxis.y, tick + PAD_REPEAT_DELAY);
+					continue;
+				}
+				else if (code == RAW_RSX) {
+					pad.raxis.x = (value * 32767) / 4096;
+					continue;
+				}
+				else if (code == RAW_RSY) {
+					pad.raxis.y = (value * 32767) / 4096;
+					continue;
+				}
+			}
+
+			apply_button_state(btn, id, pressed, tick);
+		}
+
+		if (errno && errno != EAGAIN && errno != EWOULDBLOCK)
+			close_evdev_input(i);
+	}
+}
+
+void PLAT_pollInput(void) {
+	pad.just_pressed = BTN_NONE;
+	pad.just_released = BTN_NONE;
+	pad.just_repeated = BTN_NONE;
+
+	uint32_t tick = SDL_GetTicks();
+	for (int i = 0; i < BTN_ID_COUNT; i++) {
+		int btn = 1 << i;
+		if ((pad.is_pressed & btn) && (tick >= pad.repeat_at[i])) {
+			pad.just_repeated |= btn;
+			pad.repeat_at[i] += PAD_REPEAT_INTERVAL;
+		}
+	}
+
+	scan_evdev_inputs();
+	poll_sdl_input(tick);
+	poll_evdev_input(tick);
+
+	if (lid.has_lid && PLAT_lidChanged(NULL))
+		pad.just_released |= BTN_SLEEP;
 }
 
 void PLAT_updateInput(const SDL_Event *event) {
@@ -250,14 +551,6 @@ void PLAT_powerOff(int reboot) {
 int PLAT_supportsDeepSleep(void) { return 1; }
 
 #define LID_PATH "/sys/class/power_supply/axp2202-battery/hallkey"
-#define EV_KEY 0x01
-
-struct input_event {
-	struct timeval time;
-	uint16_t type;
-	uint16_t code;
-	int32_t value;
-};
 
 void PLAT_initLid(void) {
 	lid.has_lid = exists(LID_PATH);

@@ -145,7 +145,7 @@ if [ -f /mnt/vendor/muos1.ini ] || [ -f /mnt/vendor/muos2.ini ]; then
 fi
 
 killall brightCtrl.bin cexpert 2>/dev/null || true
-if [ -f "$DEBUG_KEEP_NETWORK_PATH" ]; then
+if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] || [ -f "$DEBUG_WIFI_CONF" ]; then
 	start_debug_network
 else
 	systemctl stop NetworkManager 2>/dev/null || true
@@ -186,7 +186,7 @@ else
 fi
 
 wifion=$(nextval.elf wifi | sed -n 's/.*"wifi": \([0-9]*\).*/\1/p')
-if [ -f "$DEBUG_KEEP_NETWORK_PATH" ]; then
+if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] || [ -f "$DEBUG_WIFI_CONF" ]; then
 	echo "launch: skipping NextUI wifi init for debug" >> "$LAUNCH_LOG"
 elif [ "$wifion" = "0" ]; then
 	"$SYSTEM_PATH/etc/wifi/wifi_init.sh" stop > /dev/null 2>&1 &
