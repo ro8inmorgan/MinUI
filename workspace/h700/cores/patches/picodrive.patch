@@ -20,10 +20,9 @@ index 0d1dc08f81a11cef6b3b7238367b1ff27fcf1ead..1f87c76c3242023c4095f0c9087c5276
 +	-falign-functions=1 -falign-jumps=1 -falign-loops=1 \
 +	-fno-unwind-tables -fno-asynchronous-unwind-tables -fno-unroll-loops \
 +	-fmerge-all-constants -fno-math-errno
-+	CFLAGS += -fPIC -flto
++	CFLAGS += -fPIC
 +	CFLAGS += -fomit-frame-pointer -ffast-math -D__GCW0__
 +	CFLAGS += -mtune=cortex-a53 -mcpu=cortex-a53 -march=armv8-a
-+	LDFLAGS += -flto
 +	HAVE_NEON = 1
 +	BUILTIN_GPU = neon
 +   ARCH = aarch64
@@ -34,3 +33,15 @@ index 0d1dc08f81a11cef6b3b7238367b1ff27fcf1ead..1f87c76c3242023c4095f0c9087c5276
  # Windows MSVC 2017 all architectures
  else ifneq (,$(findstring windows_msvc2017,$(platform)))
  	NO_GCC := 1
+@@ -725,6 +750,11 @@ PLATFORM_ZLIB ?= 1
+ 
+ include Makefile
+ 
++ifeq ($(platform), h700)
++	CFLAGS := $(filter-out -flto -flto=4 -fuse-linker-plugin -fwhole-program,$(CFLAGS))
++	LDFLAGS := $(filter-out -flto -flto=4 -fuse-linker-plugin -fwhole-program,$(LDFLAGS))
++endif
++
+ ifeq ($(platform), osx)
+ pico/cd/libchdr/src/libchdr_chd.o: CFLAGS += -D__MACTYPES__=1
+ endif
