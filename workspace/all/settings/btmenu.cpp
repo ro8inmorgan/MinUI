@@ -181,7 +181,7 @@ void Menu::updater()
                     items.clear();
                     items.push_back(toggleItem);
                     items.push_back(diagItem);
-                    items.push_back(rateItem);
+                    if (rateItem) items.push_back(rateItem);
                     layout_called = false;
 
                     for (auto &[s, r] : scanMap)
@@ -230,7 +230,7 @@ void Menu::updater()
             items.clear();
             items.push_back(toggleItem);
             items.push_back(diagItem);
-            items.push_back(rateItem);
+            if (rateItem) items.push_back(rateItem);
             layout_called = false;
             selectionDirty = true;
             pollSecs = 15;

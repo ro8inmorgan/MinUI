@@ -18,6 +18,7 @@ REQUIRES_SDL2=other/sdl2
 SDL2_COMMIT=d4a7d7503524cc469fe775242f3f925d4dd56c88
 FILEMGR_PATCH=patches/NextCommander-h700.patch
 FILEMGR_STAMP=.patched-h700-v2
+SDL2_STAMP=.configured-nextui-h700-v2
 
 all: readmes
 
@@ -26,7 +27,8 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart unzip
-	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-power --enable-filesystem --disable-sensor --disable-locale --enable-loadso --enable-shared --disable-static
+	cd $(REQUIRES_SDL2) && ([ -f $(SDL2_STAMP) ] || ([ ! -f Makefile ] || make clean))
+	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --disable-alsa-shared --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-libudev --disable-power --enable-filesystem --disable-sensor --disable-locale --enable-loadso --enable-shared --disable-static --disable-libsamplerate-shared && touch $(SDL2_STAMP)
 	grep -q '^#define SDL_VIDEO_DRIVER_MALI 1' $(REQUIRES_SDL2)/include/SDL_config.h
 	cd $(REQUIRES_SDL2) && make -j && make install
 	mkdir -p $(REQUIRES_SDL2)/output

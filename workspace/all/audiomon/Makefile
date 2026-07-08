@@ -40,7 +40,7 @@ all: $(PREFIX_LOCAL)/include/msettings.h $(PRODUCT)
 build/$(PLATFORM):
 	mkdir -p $@
 
-$(PRODUCT): build/$(PLATFORM) $(OBJS)
+$(PRODUCT): build/$(PLATFORM) $(OBJS) Makefile ../../$(PLATFORM)/platform/makefile.env
 	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
 $(PREFIX_LOCAL)/include/msettings.h:
@@ -49,7 +49,7 @@ $(PREFIX_LOCAL)/include/msettings.h:
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-build/$(PLATFORM)/%.o: %.cpp
+build/$(PLATFORM)/%.o: %.cpp Makefile ../../$(PLATFORM)/platform/makefile.env
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:

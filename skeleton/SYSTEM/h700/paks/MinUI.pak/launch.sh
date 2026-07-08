@@ -32,12 +32,15 @@ export HOOKS_PATH="$USERDATA_PATH/.hooks"
 export DATETIME_PATH="$SHARED_USERDATA_PATH/datetime.txt"
 export HOME="$USERDATA_PATH"
 DEBUG_KEEP_NETWORK_PATH="$USERDATA_PATH/debug-keep-network"
+DEBUG_WIFI_CONF="$USERDATA_PATH/debug-wifi.conf"
 LAUNCH_LOG="$LOGS_PATH/launch.txt"
 
 export PATH="$SYSTEM_PATH/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export LD_LIBRARY_PATH="$SYSTEM_PATH/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 export SDL_VIDEODRIVER="mali"
 export SDL_AUDIODRIVER="alsa"
+export SDL_JOYSTICK_DISABLE_UDEV=1
+export SDL_HIDAPI_JOYSTICK_DISABLE_UDEV=1
 
 for egl_path in /usr/lib/libEGL.so /usr/lib/libEGL.so.1 /usr/lib/libEGL.so.1.4.0 /usr/lib/aarch64-linux-gnu/libEGL.so /usr/lib/aarch64-linux-gnu/libEGL.so.1; do
 	if [ -e "$egl_path" ]; then
@@ -52,12 +55,48 @@ for gles_path in /usr/lib/libGLESv2.so /usr/lib/libGLESv2.so.2 /usr/lib/libGLESv
 	fi
 done
 
+read_debug_wifi_value() {
+	key="$1"
+	[ -f "$DEBUG_WIFI_CONF" ] || return 0
+	sed -n "s/^$key=//p" "$DEBUG_WIFI_CONF" | tail -n 1 | sed 's/^"//;s/"$//' | tr -d '\r'
+}
+
+connect_debug_wifi() {
+	[ -f "$DEBUG_WIFI_CONF" ] || return 0
+	DEBUG_WIFI_SSID="$(read_debug_wifi_value SSID)"
+	DEBUG_WIFI_PASSWORD="$(read_debug_wifi_value PASSWORD)"
+	DEBUG_WIFI_IFACE="$(read_debug_wifi_value INTERFACE)"
+	[ -n "$DEBUG_WIFI_IFACE" ] || DEBUG_WIFI_IFACE="wlan0"
+	if [ -z "$DEBUG_WIFI_SSID" ]; then
+		echo "launch: debug-wifi.conf present without SSID=" >> "$LAUNCH_LOG"
+		return 0
+	fi
+
+	echo "launch: connecting debug wifi SSID=$DEBUG_WIFI_SSID IFACE=$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG"
+	for attempt in 1 2 3; do
+		nmcli dev wifi rescan ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 || true
+		if [ -n "$DEBUG_WIFI_PASSWORD" ]; then
+			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" password "$DEBUG_WIFI_PASSWORD" ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 && return 0
+		else
+			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 && return 0
+		fi
+		echo "launch: debug wifi attempt $attempt failed" >> "$LAUNCH_LOG"
+		sleep 2
+	done
+}
+
 start_debug_network() {
 	echo "launch: starting stock network services for debug" >> "$LAUNCH_LOG"
 	rfkill.elf unblock wifi >> "$LAUNCH_LOG" 2>&1 || rfkill unblock wifi >> "$LAUNCH_LOG" 2>&1 || true
 	systemctl start NetworkManager >> "$LAUNCH_LOG" 2>&1 || true
 	nmcli networking on >> "$LAUNCH_LOG" 2>&1 || true
 	nmcli radio wifi on >> "$LAUNCH_LOG" 2>&1 || true
+	if [ -f "$DEBUG_WIFI_CONF" ]; then
+		connect_debug_wifi
+	elif [ -s "$USERDATA_PATH/wifi/wpa_supplicant.conf" ] && [ -x "$SYSTEM_PATH/etc/wifi/wifi_init.sh" ]; then
+		echo "launch: starting NextUI wpa_supplicant config for debug" >> "$LAUNCH_LOG"
+		"$SYSTEM_PATH/etc/wifi/wifi_init.sh" start >> "$LAUNCH_LOG" 2>&1 || true
+	fi
 	systemctl start ssh >> "$LAUNCH_LOG" 2>&1 ||
 		systemctl start sshd >> "$LAUNCH_LOG" 2>&1 ||
 		/usr/sbin/sshd >> "$LAUNCH_LOG" 2>&1 ||
