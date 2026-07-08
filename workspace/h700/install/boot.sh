@@ -8,11 +8,15 @@ UPDATE_PATH="$SDCARD_PATH/MinUI.zip"
 PAKZ_PATH="$SDCARD_PATH/*.pakz"
 SYSTEM_PATH="$SDCARD_PATH/.system"
 
-if [ ! -e "$SDCARD_PATH" ]; then
-	ln -s "$REAL_SDCARD_PATH" "$SDCARD_PATH" 2>/dev/null || true
+if ! mountpoint -q "$SDCARD_PATH" && [ ! -L "$SDCARD_PATH" ]; then
+	if [ -e "$SDCARD_PATH" ]; then
+		mount --bind "$REAL_SDCARD_PATH" "$SDCARD_PATH" 2>/dev/null || true
+	else
+		ln -s "$REAL_SDCARD_PATH" "$SDCARD_PATH" 2>/dev/null || true
+	fi
 fi
 
-export LD_LIBRARY_PATH="$SYSTEM_PATH/$PLATFORM/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$SYSTEM_PATH/$PLATFORM/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 export PATH="$SYSTEM_PATH/$PLATFORM/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 cd "$(dirname "$0")/$PLATFORM" || exit 1

@@ -1,0 +1,51 @@
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -11,3 +11,35 @@ CXXFLAGS := -Os
+-# platform dependant stuff - tg5040 and tg5050
+-ifneq (,$(findstring tg50,$(PLATFORM)))
++# platform dependant stuff - h700
++ifeq ($(PLATFORM),h700)
++SDCARD_ROOT := /mnt/SDCARD
++NEXTUI_SYSTEM_PATH := $(SDCARD_ROOT)/.system
++
++CXXFLAGS += -DPATH_DEFAULT=\"$(SDCARD_ROOT)\"
++CXXFLAGS += -DPATH_DEFAULT_RIGHT=\"$(SDCARD_ROOT)\"
++CXXFLAGS += -DFILE_SYSTEM=\"/dev/mmcblk1p1\"
++
++# Keys
++# Joys for Anbernic RG XX H700
++CXXFLAGS += -DCMDR_KEY_UP=SDLK_UP
++CXXFLAGS += -DCMDR_KEY_RIGHT=SDLK_RIGHT
++CXXFLAGS += -DCMDR_KEY_DOWN=SDLK_DOWN
++CXXFLAGS += -DCMDR_KEY_LEFT=SDLK_LEFT
++CXXFLAGS += -DCMDR_KEY_OPEN=0		# A
++CXXFLAGS += -DCMDR_KEY_PARENT=1		# B
++CXXFLAGS += -DCMDR_KEY_OPERATION=3	# X
++CXXFLAGS += -DCMDR_KEY_SYSTEM=2		# Y
++CXXFLAGS += -DCMDR_KEY_PAGEUP=4		# L1
++CXXFLAGS += -DCMDR_KEY_PAGEDOWN=5	# R1
++CXXFLAGS += -DCMDR_KEY_SELECT=6		# SELECT
++CXXFLAGS += -DCMDR_KEY_TRANSFER=7	# START
++CXXFLAGS += -DCMDR_KEY_MENU=8		# MENU
++
++# Screen
++CXXFLAGS += -DAUTOSCALE=1
++CXXFLAGS += -DAUTOSCALE_DPI=0
++CXXFLAGS += -DPPU_X=2
++CXXFLAGS += -DPPU_Y=2
++CXXFLAGS += -DSCREEN_BPP=32
++
++# platform dependant stuff - tg5040 and tg5050
++else ifneq (,$(findstring tg50,$(PLATFORM)))
+ SDCARD_ROOT := /mnt/SDCARD
+@@ -86,2 +118,8 @@ endif
+ SDL := SDL2
+-CXXFLAGS += -I$(PREFIX)/include/$(SDL) -DUSE_$(SDL)
++ifeq ($(PLATFORM),h700)
++CXXFLAGS += -I$(PREFIX_LOCAL)/include/$(SDL)
++LINKFLAGS += -L$(PREFIX_LOCAL)/lib
++else
++CXXFLAGS += -I$(PREFIX)/include/$(SDL) -DUSE_$(SDL)
++endif
++CXXFLAGS += -DUSE_$(SDL)

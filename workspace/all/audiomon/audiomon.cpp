@@ -39,6 +39,17 @@ void log(const std::string& msg) {
     else std::cout << msg << std::endl;
 }
 
+bool commandExists(const char *command) {
+    std::string cmd = "command -v ";
+    cmd += command;
+    cmd += " >/dev/null 2>&1";
+    return std::system(cmd.c_str()) == 0;
+}
+
+bool bluetoothAudioAvailable() {
+    return commandExists("bluealsa");
+}
+
 void ensureDirExists(const std::string& path) {
     mkdir(path.c_str(), 0755);
 }
@@ -202,6 +213,10 @@ bool hasUUID(DBusConnection* conn, const std::string& path, const std::string& u
 void handleDeviceConnected(DBusConnection* conn, const std::string& path) {
     std::string mac = pathToMac(path);
     if (hasUUID(conn, path, UUID_A2DP)) {
+        if (!bluetoothAudioAvailable()) {
+            log("Audio device connected but bluealsa is unavailable: " + mac);
+            return;
+        }
         log("Audio device connected: " + mac);
         writeAudioFile(mac, DEVICE_BLUETOOTH);
         SetAudioSink(AUDIO_SINK_BLUETOOTH);

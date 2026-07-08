@@ -36,6 +36,14 @@ TRIMUI SMART PRO / TRIMUI BRICK
 
 Copy the "trimui" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
+ANBERNIC RG XX H700 (BETA)
+
+For RG40XXV/RG40XXH-style two-card stock OS setups, copy "MinUI.zip" (without unzipping) to the root of the TF2 card that contains your Roms.
+
+Then copy "h700/dmenu.bin" to the root of the stock TF1 card's user-visible ROMs partition. Removing that "dmenu.bin" file uninstalls the boot hijack and returns the device to stock boot.
+
+If your stock card has a stockmod or muOS boot selector, choose the stock frontend target before testing NextUI. muOS override files can prevent the stock dmenu hijack from running.
+
 MIYOO FLIP
 
 Copy the "miyoo355" folder and "MinUI.zip" (without unzipping) to the root of the SD card. Put the SD card into the right slot (beneath the power button).

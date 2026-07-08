@@ -15,27 +15,32 @@ REQUIRES_JSTEST=other/jstest
 REQUIRES_UNZIP60=other/unzip60
 REQUIRES_FILEMGR=other/NextCommander
 REQUIRES_SDL2=other/sdl2
+SDL2_COMMIT=d4a7d7503524cc469fe775242f3f925d4dd56c88
+FILEMGR_PATCH=patches/NextCommander-h700.patch
 
 all: readmes
 
 early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR) $(REQUIRES_SDL2)
 	mkdir -p other
-	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=tg5040
+	cd $(REQUIRES_FILEMGR) && ([ -f .patched-h700 ] || (git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch .patched-h700))
+	cd $(REQUIRES_FILEMGR) && ([ -f output/.platform-h700 ] || make clean PLATFORM=h700)
+	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=h700 && touch output/.platform-h700
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart unzip
-	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-power --disable-filesystem --disable-sensor --disable-locale --disable-loadso --enable-shared --disable-static && make -j && make install
+	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-power --enable-filesystem --disable-sensor --disable-locale --enable-loadso --enable-shared --disable-static
+	grep -q '^#define SDL_VIDEO_DRIVER_MALI 1' $(REQUIRES_SDL2)/include/SDL_config.h
+	cd $(REQUIRES_SDL2) && make -j && make install
 	mkdir -p $(REQUIRES_SDL2)/output
 	cp -a $(PREFIX_LOCAL)/lib/libSDL2*.so* $(REQUIRES_SDL2)/output/
 	cp -a $(PREFIX)/lib/libSDL2_image*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -a $(PREFIX)/lib/libSDL2_ttf*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
-	cp -a $(PREFIX)/lib/libUMP.so* $(REQUIRES_SDL2)/output/
-	cp -a $(PREFIX)/lib/libtinyalsa.so* $(REQUIRES_SDL2)/output/
-	cp -a $(PREFIX)/lib/libasound.so* $(REQUIRES_SDL2)/output/
+	cp -L $(PREFIX)/lib/libUMP.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
+	cp -L $(PREFIX)/lib/libtinyalsa.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cd boot && sh build.sh
 
 clean:
-	cd $(REQUIRES_FILEMGR) && make clean PLATFORM=tg5040
+	cd $(REQUIRES_FILEMGR) && make clean PLATFORM=h700
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart clean
 	if [ -f $(REQUIRES_SDL2)/Makefile ]; then cd $(REQUIRES_SDL2) && make clean; fi
 	rm -rf boot/output
@@ -55,6 +60,7 @@ $(REQUIRES_UNZIP60):
 	git clone --depth 1 https://github.com/shauninman/unzip60.git $(REQUIRES_UNZIP60)
 
 $(REQUIRES_SDL2):
-	git clone --depth 1 https://github.com/JohnnyonFlame/SDL-malifbdev-rot.git $(REQUIRES_SDL2)
+	git clone https://github.com/JohnnyonFlame/SDL-malifbdev-rot.git $(REQUIRES_SDL2)
+	cd $(REQUIRES_SDL2) && git checkout $(SDL2_COMMIT)
 
 include ../all/readmes/makefile

@@ -89,15 +89,15 @@ extern int is_cube;
 
 #define JOY_L1			4
 #define JOY_R1			5
-#define JOY_L2			9
-#define JOY_R2			10
-#define JOY_L3			(is_rg34xx || is_rg28xx ? JOY_NA : 11)
+#define JOY_L2			10
+#define JOY_R2			11
+#define JOY_L3			(is_rg34xx || is_rg28xx ? JOY_NA : 9)
 #define JOY_R3			(is_rg34xx || is_rg28xx ? JOY_NA : 12)
 
 #define JOY_MENU		8
 #define JOY_POWER		JOY_NA
-#define JOY_PLUS		18
-#define JOY_MINUS		17
+#define JOY_PLUS		16
+#define JOY_MINUS		15
 
 ///////////////////////////////
 

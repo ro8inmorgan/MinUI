@@ -42,8 +42,15 @@ after() {
 	>&2 echo "Resumed from suspend."
 	echo 0 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
 
-	# Run post-resume hooks in background immediately after wake.
-	( "$SYSTEM_PATH/bin/run_hooks.sh" post-resume.d ) >/dev/null 2>&1 &
+	if [ -f "$asound_state_dir/asound.state.pre" ]; then
+		>&2 echo "Restoring mixer state..."
+		alsactl --file "$asound_state_dir/asound.state.pre" restore || true
+	fi
+
+	if [ -x "$SYSTEM_PATH/bin/syncsettings.elf" ]; then
+		>&2 echo "Restoring display settings..."
+		"$SYSTEM_PATH/bin/syncsettings.elf" || true
+	fi
 
 	if [ -n "$wifid_running" ]; then
 		>&2 echo "Starting wpa_supplicant..."
@@ -55,9 +62,8 @@ after() {
 		"$SYSTEM_PATH/etc/bluetooth/bt_init.sh" start || true
 	fi
 
-	# >&2 echo "Restoring mixer state..."
-	# alsactl --file "$asound_state_dir/asound.state.post" store || true
-	# alsactl --file "$asound_state_dir/asound.state.pre" restore || true
+	# Run post-resume hooks after core services and display state are restored.
+	( "$SYSTEM_PATH/bin/run_hooks.sh" post-resume.d ) >/dev/null 2>&1 &
 }
 
 before
@@ -97,7 +103,6 @@ for i in $(seq 1 $sleep_max_tries); do
 	sleep 3
 done
 
-# Resume services in background to reduce UI latency
-after &
+after
 
 exit $sleep_retval

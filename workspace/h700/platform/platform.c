@@ -29,6 +29,7 @@
 int is_rg28xx = 0;
 int is_rg34xx = 0;
 int is_cube = 0;
+static int wake_fd = -1;
 
 static void detect_device(void) {
 	char *device = getenv("DEVICE");
@@ -70,7 +71,11 @@ void PLAT_quitInput(void) {
         free(joysticks);
         joysticks = NULL;
         num_joysticks = 0;
-    }
+	}
+	if (wake_fd >= 0) {
+		close(wake_fd);
+		wake_fd = -1;
+	}
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 }
 
@@ -140,11 +145,18 @@ void PLAT_getCPUSpeed()
 }
 
 void PLAT_getGPUTemp() {
-	perf.gpu_temp = getInt("/sys/devices/virtual/thermal/thermal_zone2/temp")/1000;
+	perf.gpu_temp = getInt("/sys/devices/virtual/thermal/thermal_zone1/temp")/1000;
 }
 
 void PLAT_getGPUSpeed() {
-	perf.gpu_speed = 660; // MHz
+	int speed = getInt("/sys/devices/platform/soc@03000000/1800000.gpu/devfreq/1800000.gpu/cur_freq");
+	if (speed <= 0)
+		speed = getInt("/sys/devices/platform/soc/1800000.gpu/devfreq/1800000.gpu/cur_freq");
+	if (speed <= 0)
+		speed = getInt("/sys/kernel/debug/clk/gpu0/clk_rate");
+	if (speed <= 0)
+		speed = getInt("/sys/kernel/debug/clk/pll_gpu/clk_rate");
+	perf.gpu_speed = speed > 0 ? speed / 1000000 : 660; // MHz
 }
 
 static struct WIFI_connection connection = {
@@ -200,12 +212,14 @@ void PLAT_getBatteryStatusFine(int *is_charging, int *charge)
 
 void PLAT_enableBacklight(int enable) {
 	if (enable) {
+		putInt("/sys/class/power_supply/axp2202-battery/work_led", 0);
 		putInt("/sys/class/graphics/fb0/blank", 0);
 		SetBrightness(GetBrightness());
 	}
 	else {
 		SetRawBrightness(0);
 		putInt("/sys/class/graphics/fb0/blank", 1);
+		putInt("/sys/class/power_supply/axp2202-battery/work_led", 1);
 	}
 }
 
@@ -267,12 +281,14 @@ int PLAT_shouldWake(void) {
 	if (lid.has_lid && PLAT_lidChanged(&lid_open) && lid_open)
 		return 1;
 
-	int fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-	if (fd < 0) return 0;
+	if (wake_fd < 0)
+		wake_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+	if (wake_fd < 0) return 0;
 
 	struct input_event event;
 	int should_wake = 0;
-	while (read(fd, &event, sizeof(event)) == sizeof(event)) {
+	errno = 0;
+	while (read(wake_fd, &event, sizeof(event)) == sizeof(event)) {
 		if (event.type == EV_KEY && event.code == CODE_POWER && event.value == 0) {
 			if (lid.has_lid && !lid.is_open) {
 				should_wake = 0;
@@ -281,7 +297,10 @@ int PLAT_shouldWake(void) {
 			should_wake = 1;
 		}
 	}
-	close(fd);
+	if (errno && errno != EAGAIN && errno != EWOULDBLOCK) {
+		close(wake_fd);
+		wake_fd = -1;
+	}
 	return should_wake;
 }
 
@@ -393,8 +412,12 @@ void PLAT_overrideMute(int mute) {
 }
 
 char* PLAT_getModel(void) {
+	static char model_buf[64];
 	char* model = getenv("RGXX_MODEL");
-	if (model) return model;
+	if (model) {
+		snprintf(model_buf, sizeof(model_buf), "%s", model);
+		return model_buf;
+	}
 	return "Anbernic RG XX";
 }
 
@@ -472,7 +495,8 @@ void PLAT_clearTurbo() {
 
 int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	char cmd[512];
-	sprintf(cmd, "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
+	int n = snprintf(cmd, sizeof(cmd), "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
+	if (n < 0 || n >= (int)sizeof(cmd)) return -1;
 	system(cmd);
 	return 0; // why does this return an int?
 }

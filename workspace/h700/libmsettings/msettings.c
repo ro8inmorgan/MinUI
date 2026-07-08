@@ -625,6 +625,12 @@ int GetAudioSink(void) {
 }
 
 int GetHDMI(void) { 
+	if (getInt("/sys/class/extcon/hdmi/state") > 0)
+		return 1;
+	if (getInt("/sys/class/extcon/hdmi/cable.0/state") > 0)
+		return 1;
+	if (getInt("/sys/class/extcon/hdmi/cable.1/state") > 0)
+		return 1;
 	return 0;
 };
 
@@ -782,20 +788,16 @@ void SetVolume(int value) // 0-20
 }
 // monitored and set by thread in keymon
 void SetJack(int value) {
-	printf("SetJack(%i)\n", value); fflush(stdout);
-	
 	settings->jack = value;
 	SetVolume(GetVolume());
 }
 // monitored and set by thread in audiomon
 void SetAudioSink(int value) {
-	printf("SetAudioSink(%i)\n", value); fflush(stdout);
-	
 	settings->audiosink = value;
 	SetVolume(GetVolume());
 }
 
-void SetHDMI(int value){};
+void SetHDMI(int value){}
 
 void SetMute(int value) {
 	settings->mute = value;
@@ -1015,6 +1017,7 @@ int scaleColortemp(int value) {
 		case 38: raw=180; break;		// 24
 		case 39: raw=190; break;		// 32
 		case 40: raw=200; break;		// 32
+		default: raw=0; break;
 	}
 	return raw;
 }
@@ -1033,6 +1036,7 @@ int scaleContrast(int value) {
 		case 3: raw=80; break;
 		case 4: raw=90; break;
 		case 5: raw=100; break;
+		default: raw=50; break;
 	}
 	return raw;
 }
@@ -1051,6 +1055,7 @@ int scaleSaturation(int value) {
 		case 3: raw=80; break;
 		case 4: raw=90; break;
 		case 5: raw=100; break;
+		default: raw=50; break;
 	}
 	return raw;
 }
@@ -1069,6 +1074,7 @@ int scaleExposure(int value) {
 		case 3: raw=80; break;
 		case 4: raw=90; break;
 		case 5: raw=100; break;
+		default: raw=50; break;
 	}
 	return raw;
 }
@@ -1077,8 +1083,6 @@ int scaleExposure(int value) {
 
 #define DISP_LCD_SET_BRIGHTNESS  0x102
 void SetRawBrightness(int val) { // 0 - 255
-	printf("SetRawBrightness(%i)\n", val); fflush(stdout);
-
     int fd = open("/dev/disp", O_RDWR);
 	if (fd >= 0) {
 	    unsigned long param[4]={0,val,0,0};
@@ -1087,8 +1091,6 @@ void SetRawBrightness(int val) { // 0 - 255
 	}
 }
 void SetRawColortemp(int val) { // 0 - 255
-	printf("SetRawColortemp(%i)\n", val); fflush(stdout);
-
 	FILE *fd = fopen("/sys/class/disp/disp/attr/color_temperature", "w");
 	if (fd) {
 		fprintf(fd, "%i", val);
@@ -1262,8 +1264,6 @@ void SetRawVolume(int val) { // in: 0-100
 }
 
 void SetRawContrast(int val){
-	printf("SetRawContrast(%i)\n", val); fflush(stdout);
-
 	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_contrast", "w");
 	if (fd) {
 		fprintf(fd, "%i", val);
@@ -1271,8 +1271,6 @@ void SetRawContrast(int val){
 	}
 }
 void SetRawSaturation(int val){
-	printf("SetRawSaturation(%i)\n", val); fflush(stdout);
-
 	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_saturation", "w");
 	if (fd) {
 		fprintf(fd, "%i", val);
@@ -1280,8 +1278,6 @@ void SetRawSaturation(int val){
 	}
 }
 void SetRawExposure(int val){
-	printf("SetRawExposure(%i)\n", val); fflush(stdout);
-
 	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_bright", "w");
 	if (fd) {
 		fprintf(fd, "%i", val);
@@ -1289,8 +1285,6 @@ void SetRawExposure(int val){
 	}
 }
 void SetRawDisplayCal(int enabled, int red_gain, int green_gain, int blue_gain) {
-	printf("SetRawDisplayCal(%i,%i,%i,%i)\n", enabled, red_gain, green_gain, blue_gain); fflush(stdout);
-
 	int ret = enabled
 		? DisplayCal_enableWithValues(red_gain, green_gain, blue_gain)
 		: DisplayCal_disable();
