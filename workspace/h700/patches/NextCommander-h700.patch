@@ -43,8 +43,8 @@ diff --git a/Makefile b/Makefile
  SDL := SDL2
 -CXXFLAGS += -I$(PREFIX)/include/$(SDL) -DUSE_$(SDL)
 +ifeq ($(PLATFORM),h700)
-+CXXFLAGS += -I$(PREFIX_LOCAL)/include/$(SDL)
-+LINKFLAGS += -L$(PREFIX_LOCAL)/lib
++CXXFLAGS += -I$(PREFIX_LOCAL)/include/$(SDL) -I$(PREFIX)/include/$(SDL)
++LINKFLAGS += -L$(PREFIX_LOCAL)/lib -L$(PREFIX)/lib
 +else
 +CXXFLAGS += -I$(PREFIX)/include/$(SDL) -DUSE_$(SDL)
 +endif

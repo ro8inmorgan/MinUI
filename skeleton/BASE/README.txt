@@ -44,6 +44,8 @@ Then copy "h700/dmenu.bin" to the root of the stock TF1 card's user-visible ROMs
 
 If your stock card has a stockmod or muOS boot selector, choose the stock frontend target before testing NextUI. muOS override files can prevent the stock dmenu hijack from running.
 
+This H700 beta includes Bluetooth controller pairing. Bluetooth audio is not enabled in this beta package.
+
 MIYOO FLIP
 
 Copy the "miyoo355" folder and "MinUI.zip" (without unzipping) to the root of the SD card. Put the SD card into the right slot (beneath the power button).

@@ -42,6 +42,7 @@ static void detect_device(void) {
 
 void PLAT_initPlatform(void) {
 	detect_device();
+	should_rotate = is_rg28xx;
 }
 
 static SDL_Joystick **joysticks = NULL;
@@ -401,7 +402,7 @@ void PLAT_setRumble(int strength) {
 
 int PLAT_pickSampleRate(int requested, int max) {
 	// bluetooth: allow limiting the maximum to improve compatibility
-	if(PLAT_bluetoothConnected())
+	if(GetAudioSink() == AUDIO_SINK_BLUETOOTH && PLAT_bluetoothConnected())
 		return MIN(requested, CFG_getBluetoothSamplingrateLimit());
 
 	return MIN(requested, max);

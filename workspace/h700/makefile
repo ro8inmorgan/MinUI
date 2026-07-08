@@ -17,14 +17,12 @@ REQUIRES_FILEMGR=other/NextCommander
 REQUIRES_SDL2=other/sdl2
 SDL2_COMMIT=d4a7d7503524cc469fe775242f3f925d4dd56c88
 FILEMGR_PATCH=patches/NextCommander-h700.patch
+FILEMGR_STAMP=.patched-h700-v2
 
 all: readmes
 
 early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR) $(REQUIRES_SDL2)
 	mkdir -p other
-	cd $(REQUIRES_FILEMGR) && ([ -f .patched-h700 ] || (git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch .patched-h700))
-	cd $(REQUIRES_FILEMGR) && ([ -f output/.platform-h700 ] || make clean PLATFORM=h700)
-	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=h700 && touch output/.platform-h700
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart unzip
@@ -37,6 +35,9 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cp -a $(PREFIX)/lib/libSDL2_ttf*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -L $(PREFIX)/lib/libUMP.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -L $(PREFIX)/lib/libtinyalsa.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
+	cd $(REQUIRES_FILEMGR) && ([ -f $(FILEMGR_STAMP) ] || (git checkout -- Makefile && git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch $(FILEMGR_STAMP)))
+	cd $(REQUIRES_FILEMGR) && ([ -f output/.platform-h700 ] || make clean PLATFORM=h700)
+	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=h700 && touch output/.platform-h700
 	cd boot && sh build.sh
 
 clean:
