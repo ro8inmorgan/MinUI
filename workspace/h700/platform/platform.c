@@ -695,7 +695,9 @@ void PLAT_setRumble(int strength) {
 
 int PLAT_pickSampleRate(int requested, int max) {
 	// bluetooth: allow limiting the maximum to improve compatibility
-	if(GetAudioSink() == AUDIO_SINK_BLUETOOTH && PLAT_bluetoothConnected())
+	// NOTE: called from SND_init before InitSettings, so msettings shared
+	// memory (GetAudioSink) must not be touched here
+	if(PLAT_bluetoothConnected())
 		return MIN(requested, CFG_getBluetoothSamplingrateLimit());
 
 	return MIN(requested, max);

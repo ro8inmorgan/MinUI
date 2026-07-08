@@ -1187,7 +1187,7 @@ void SetRawVolume(int val) { // in: 0-100
         if (get_a2dp_simple_control_name(ctl_name, sizeof(ctl_name))) {
 			char cmd[256];
             // Update volume on the device
-            snprintf(cmd, sizeof(cmd), "amixer sset \"%s\" -M %d%% &> /dev/null", ctl_name, val);
+            snprintf(cmd, sizeof(cmd), "amixer sset \"%s\" -M %d%% > /dev/null 2>&1", ctl_name, val);
             system(cmd);
 			//printf("Set '%s' to %d%%\n", ctl_name, val); fflush(stdout);
         }
