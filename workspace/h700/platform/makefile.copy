@@ -12,6 +12,9 @@ $(PLATFORM):
 	cp ./workspace/all/show2/build/$@/show2.elf ./build/BOOT/common/$@/
 	cp ./workspace/$@/other/unzip60/unzip ./build/BOOT/common/$@/
 	cp -a ./workspace/$@/other/sdl2/output/libSDL2*.so* ./build/SYSTEM/$@/lib/
+	cp -a ./workspace/$@/other/sdl2/output/libUMP.so* ./build/SYSTEM/$@/lib/
+	cp -a ./workspace/$@/other/sdl2/output/libtinyalsa.so* ./build/SYSTEM/$@/lib/
+	cp -a ./workspace/$@/other/sdl2/output/libasound.so* ./build/SYSTEM/$@/lib/
 	# rfkill
 	cp ./workspace/$@/rfkill/rfkill.elf ./build/SYSTEM/$@/bin/
 

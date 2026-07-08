@@ -29,6 +29,9 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cp -a $(PREFIX_LOCAL)/lib/libSDL2*.so* $(REQUIRES_SDL2)/output/
 	cp -a $(PREFIX)/lib/libSDL2_image*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -a $(PREFIX)/lib/libSDL2_ttf*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
+	cp -a $(PREFIX)/lib/libUMP.so* $(REQUIRES_SDL2)/output/
+	cp -a $(PREFIX)/lib/libtinyalsa.so* $(REQUIRES_SDL2)/output/
+	cp -a $(PREFIX)/lib/libasound.so* $(REQUIRES_SDL2)/output/
 	cd boot && sh build.sh
 
 clean:
