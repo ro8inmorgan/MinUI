@@ -33,7 +33,6 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cp -a $(PREFIX_LOCAL)/lib/libSDL2*.so* $(REQUIRES_SDL2)/output/
 	cp -a $(PREFIX)/lib/libSDL2_image*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -a $(PREFIX)/lib/libSDL2_ttf*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
-	cp -L $(PREFIX)/lib/libUMP.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cp -L $(PREFIX)/lib/libtinyalsa.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
 	cd $(REQUIRES_FILEMGR) && ([ -f $(FILEMGR_STAMP) ] || (git checkout -- Makefile && git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch $(FILEMGR_STAMP)))
 	cd $(REQUIRES_FILEMGR) && ([ -f output/.platform-h700 ] || make clean PLATFORM=h700)

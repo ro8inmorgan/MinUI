@@ -72,7 +72,7 @@ log_runtime_state() {
 	echo "launch: LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "$LAUNCH_LOG"
 	ldd "$SYSTEM_PATH/bin/nextui.elf" >> "$LAUNCH_LOG" 2>&1 || true
 	ldd "$SYSTEM_PATH/lib/libSDL2-2.0.so.0" >> "$LAUNCH_LOG" 2>&1 || true
-	ls -l /usr/lib/libEGL.so* /usr/lib/libGLESv2.so* /usr/lib/aarch64-linux-gnu/libEGL.so* /usr/lib/aarch64-linux-gnu/libGLESv2.so* "$SYSTEM_PATH/lib"/libUMP.so* >> "$LAUNCH_LOG" 2>&1 || true
+	ls -l /usr/lib/libEGL.so* /usr/lib/libGLESv2.so* /usr/lib/aarch64-linux-gnu/libEGL.so* /usr/lib/aarch64-linux-gnu/libGLESv2.so* >> "$LAUNCH_LOG" 2>&1 || true
 }
 
 if [ -f "/tmp/poweroff" ]; then
@@ -190,9 +190,10 @@ while [ -f "$EXEC_PATH" ]; do
 	echo "launch: nextui.elf exited $EXIT_CODE $(date)" >> "$LAUNCH_LOG"
 	if [ "$EXIT_CODE" != "0" ]; then
 		CRASH_COUNT=$((CRASH_COUNT + 1))
-		if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] && [ "$CRASH_COUNT" -ge 5 ]; then
-			echo "launch: debug crash limit reached; keeping system up" >> "$LAUNCH_LOG"
+		if [ "$CRASH_COUNT" -ge 5 ]; then
+			echo "launch: crash limit reached; keeping system up for diagnostics" >> "$LAUNCH_LOG"
 			rm -f "$EXEC_PATH"
+			start_debug_network
 			sleep 300
 			continue
 		fi
