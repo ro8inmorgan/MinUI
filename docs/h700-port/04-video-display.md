@@ -26,14 +26,14 @@ The stack:
 | Device | Panel | FIXED_W×H | Status |
 |---|---|---|---|
 | RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
-| RG34XXSP | 720×480 3:2 | 720×480 | wired (`is_rg34xx`), untested |
+| RG34XXSP | 720×480 3:2 | 720×480 | ✅ user-tested; works like RG40XXV |
 | RG28XX | 480×640 portrait | 640×480 logical | rotation plumbed, untested (below) |
 | RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
 
 ### 480p UI — mostly fine, polish pass pending
 These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
-rendered at 480p for ~2 years. Real-use verdict on RG40XXV: **no systemic breakage —
-OK for alpha**. Known concrete issue: in some paks (e.g. the Battery pak) the
+rendered at 480p for ~2 years. Real-use verdict on RG40XXV and RG34XXSP: **no systemic
+breakage — OK for alpha**. Known concrete issue: in some paks (e.g. the Battery pak) the
 button-hint pills are large enough to overlap each other. A full audit of every
 shipped-by-default UI surface at 640×480/720×480 is still owed before release
 (09-roadmap). Related but distinct: several shared UI pieces hardcode Brick-era

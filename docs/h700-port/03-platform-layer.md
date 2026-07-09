@@ -69,7 +69,7 @@ open/closed per poll and could drop the wake press between polls.
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
 | LEDs | `MAX_LIGHTS 0`, all `PLAT_setLed*` stubs — hardware has no RGB LEDs. `work_led` used only as sleep/backlight indicator |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
-| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid-close → sleep, power-key swallowed while closed. **Untested — no RG34XXSP hardware yet** |
+| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); intended behavior is lid-close → sleep and power-key swallowed while closed. **Tested on RG34XXSP: not working yet; the screen stays on when the lid closes.** |
 | Model | `PLAT_getModel` → "Anbernic " + `RGXX_MODEL` (copied into a static buffer, not a raw getenv pointer) |
 | Date/time | `timedatectl` / `hwclock` / `date` via snprintf-bounded commands; timezones via `timedatectl set-timezone`/`list-timezones`, NTP via `set-ntp` (systemd-timesyncd) — much cleaner than tg5040's uci |
 | Turbo | `PLAT_canTurbo()=false`, no-ops (tg5040's turbo rides trimui_inputd; no H700 equivalent wired) |

@@ -29,9 +29,11 @@ Ordered by impact within each section.
 
 ## P1 — Feature completeness
 
-5. **RG34XXSP bring-up** — mostly config already wired (`is_rg34xx` 720×480, lid).
-   Needs hardware in hand: hallkey semantics, lid sleep/wake, 720×480 UI pass, and
-   per-Emu `default-rg34xx.cfg` device cfgs (none exist yet — only `default.cfg`).
+5. **RG34XXSP lid fix + polish** — general bring-up is now user-tested and works like
+   RG40XXV, including the 720×480 UI path. Remaining SP-specific work: fix lid
+   sleep/wake (currently the screen stays on), probe hallkey semantics/polarity, verify
+   power-key-while-closed behavior, and decide whether per-Emu `default-rg34xx.cfg`
+   device cfgs are needed (none exist yet — only `default.cfg`).
 6. **RG28XX rotation validation** — plumbing exists on both layers (SDL_ROTATION=1
    env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
    patch covers GL contexts and that the two layers don't double-rotate; add
@@ -61,8 +63,8 @@ Ordered by impact within each section.
    reversible (drop a `bluealsa` binary in `.system/h700/bin` and the path lights
    up). Building bluez-alsa in the toolchain is the last piece of tg5040 feature
    parity. If dropped instead, remove the dormant bt_init/audiomon plumbing.
-10. **480p UI polish pass** (04) — verdict from real use: **mostly fine, OK for
-    alpha**. No systemic layout breakage; known concrete issue: in some paks
+10. **480p UI polish pass** (04) — verdict from real use on RG40XXV/RG34XXSP:
+    **mostly fine, OK for alpha**. No systemic layout breakage; known concrete issue: in some paks
     (e.g. the Battery pak) the button-hint pills are large enough to overlap each
     other. Before release, audit every shipped-by-default UI surface at 640×480
     and 720×480 and fix pill/hint sizing where cramped.
@@ -100,7 +102,8 @@ Ordered by impact within each section.
 ## What "9.5/10" looks like
 
 - Sleep/wake solid across a 20-cycle soak + overnight drain ≤ stock + 1% (P0 #1)
-- Every 08-matrix row ✅ on RG40XXV, and the functional set ✅ on RG34XXSP + RG28XX
+- Every 08-matrix row ✅ on RG40XXV, lid fixed on RG34XXSP, and the functional set ✅
+  on RG34XXSP + RG28XX
 - BT audio shipped or explicitly descoped in README
 - No debug behaviors in the release path; docs (README.txt) match actual behavior
 - CI: h700 + tg5040 both build on every PR touching shared code, with the ldd check

@@ -59,14 +59,15 @@ Two layers, as on tg5040:
   event0; lid gate below. Generic autosleep (`PWR_*` in api.c: idle timeout, disabled
   while charging/HDMI) works unchanged on top.
 
-## Lid (RG34XXSP) — implemented, untested
+## Lid (RG34XXSP) — implemented, broken
 
 `LID_PATH = axp2202-battery/hallkey`; `PLAT_initLid` sets `has_lid` if the file exists
-(absent on RG40XXV, so the code has *never run against real hardware*).
-Lid close → sleep; while closed, power-key wake is swallowed (only lid-open wakes).
-To verify on first RG34XXSP contact: hallkey polarity/values, whether the kernel
-already suspends on hall-close by itself (would double-handle), and power-key-while-
-closed behavior.
+(absent on RG40XXV). RG34XXSP hardware has now been tested: the rest of the H700 port
+works like RG40XXV, but lid sleep/wake does not. Closing the lid leaves the screen on.
+
+Next debug targets: `hallkey` polarity/values, whether `PLAT_initLid` sees the path and
+sets `has_lid`, whether the kernel already emits/handles any lid action before NextUI,
+and power-key-while-closed behavior.
 
 ## Battery
 

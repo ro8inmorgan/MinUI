@@ -4,12 +4,13 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Status (2026-07-09): working beta on RG40XXV.** Boot, video (custom Mali SDL2 +
-full GLES shader pipeline), audio, input, games at full speed, brightness/colortemp/
-displaycal, WiFi, and rumble are all tested-good on hardware. Known open items: sleep
-wake is unreliable (the #1 defect), BT audio is gated off, RG34XXSP/RG28XX/cube are
-wired but untested. Full status in [08](08-testing-status.md), path to done in
-[09](09-roadmap.md).
+**Status (2026-07-09): working beta on RG40XXV and RG34XXSP.** Boot, video (custom
+Mali SDL2 + full GLES shader pipeline), audio, input, games at full speed,
+brightness/colortemp/displaycal, WiFi, and rumble are all tested-good on RG40XXV
+hardware. RG34XXSP has also been user-tested and behaves the same as RG40XXV, except
+lid wake/sleep does not work yet (the screen stays on). Known open items: sleep wake is
+unreliable (the #1 defect), BT audio is gated off, RG28XX/cube are wired but untested.
+Full status in [08](08-testing-status.md), path to done in [09](09-roadmap.md).
 
 These docs began as the implementation plan and were restructured after the
 implementation landed (branch `h700`, 17 commits) into reference documentation:
@@ -54,7 +55,7 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
 | **BT audio** | build + ship bluealsa | **Deviation:** gated off this beta (`NO_BT_AUDIO`); re-enable path documented (05/07) |
 | Sleep | `echo mem` + tg5040-style wrapper | ✅ implemented incl. resume restore — ⚠️ wake unreliable, open (06) |
-| Lid | hallkey → PLAT lid API | ✅ wired; untested (no 34XXSP yet) |
+| Lid | hallkey → PLAT lid API | ⚠️ wired, but RG34XXSP lid wake/sleep does not work yet (screen stays on) |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |
 | Rumble / LEDs | moto sysfs; MAX_LIGHTS 0 | ✅ as planned; rumble tested-good |
 | Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
@@ -66,7 +67,8 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 ## Top open risks
 
 1. **Sleep/wake hangs** — headline feature not yet trustworthy ([06](06-power-sleep-battery.md), roadmap P0).
-2. **Untested device matrix** — 34XXSP/28XX/cube code paths have never met hardware.
+2. **Partially tested device matrix** — RG34XXSP broadly works, but lid handling is
+   broken; RG28XX/cube code paths have never met hardware.
 3. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
    Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
 4. **Brick-era assumptions in shared UI** — Input tester shows Brick's layout, an

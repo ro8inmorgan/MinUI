@@ -2,12 +2,12 @@
 
 ## Test fleet
 
-| Device | IP | Login | Role |
-|---|---|---|---|
-| RG40XXV | 192.168.34.55 | root/root | Primary — all testing to date happened here |
-| RG34XXSP | — | — | Untested (lid, 720×480) |
-| RG28XX | — | — | Untested (rotation) |
-| TrimUI Brick TG5040 | 192.168.34.81 | root/tina | Regression reference (behavioral 1:1 comparisons) |
+| Device | Evidence | Role |
+|---|---|---|
+| RG40XXV | Probed live | Primary bring-up device |
+| RG34XXSP | User-tested | General parity with RG40XXV; lid wake/sleep broken |
+| RG28XX | Not yet tested | Rotation validation target |
+| TrimUI Brick TG5040 | Probed live | Regression reference (behavioral 1:1 comparisons) |
 
 **Dev-loop tips:**
 - The stock OS runs sshd with a full Ubuntu userland — iterate by `scp`ing freshly
@@ -44,7 +44,8 @@
 | BT controller pairing + input | ⬜ |
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
-| RG34XXSP: lid sleep/wake, 720×480 UI | ⬜ (no hardware tested; code wired) |
+| RG34XXSP: general H700 port + 720×480 UI | ✅ user-tested; works like RG40XXV |
+| RG34XXSP: lid sleep/wake | ⚠️ tested, broken — lid does not sleep/wake; screen stays on |
 | RG28XX: rotated UI + games | ⬜ (plumbing in place, unvalidated — 04) |
 | RGcubexx: 720×720 | ⬜ |
 
@@ -82,5 +83,7 @@
 - **Re-run the 00-device-facts probes after each Anbernic stock-firmware update.**
   Paths have been stable historically, but `dmenu_ln`/muOS hooks are
   stockmod-version-dependent, and the model-string detector reads a stock binary.
-- When adding a device (34XXSP/28XX/cube): walk this matrix top to bottom on that
-  device; the ⬜ rows above are the backlog for RG40XXV too.
+- When adding or promoting a device (34XXSP/28XX/cube): walk this matrix top to
+  bottom on that device; the ⬜ rows above are the backlog for RG40XXV too. For
+  RG34XXSP specifically, the next targeted probes are `hallkey` polarity/values and
+  whether the kernel/stock stack handles any lid action before NextUI sees it.

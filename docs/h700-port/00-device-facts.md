@@ -8,12 +8,12 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 
 ## Devices
 
-| Device | IP | Login | Role |
-|---|---|---|---|
-| TrimUI Brick (TG5040, A133P) | 192.168.34.81 | root / tina | Reference — NextUI runs perfectly |
-| Anbernic RG40XXV (H700) | 192.168.34.55 | root / root | Port target #1 (was running stockmod) — **primary tested device** |
-| Anbernic RG34XXSP (H700) | — | — | Port target #2 (clamshell, lid sensor) — untested |
-| Anbernic RG28XX (H700) | — | — | Port target #3 (rotated 480×640 panel) — untested |
+| Device | Evidence | Role |
+|---|---|---|
+| TrimUI Brick (TG5040, A133P) | Probed live | Reference — NextUI runs perfectly |
+| Anbernic RG40XXV (H700) | Probed live | Port target #1 (was running stockmod) — **primary tested device** |
+| Anbernic RG34XXSP (H700) | User-tested | Port target #2 (clamshell, lid sensor) — general parity with RG40XXV, lid wake/sleep broken |
+| Anbernic RG28XX (H700) | Not yet tested | Port target #3 (rotated 480×640 panel) |
 
 ## RG40XXV (H700) — probed live
 
@@ -100,7 +100,8 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   - `work_led` — power LED (0=on, 1=off) — used by the port around backlight off/on
   - `workled_sleep` — LED behavior during sleep
   - `lowpwr_led`, `led_test`
-  - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — wired but unverified
+  - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — wired, but lid
+    wake/sleep is broken on RG34XXSP (screen stays on); polarity/values still need probing
   - `brightness`, `display_id` (panel variant id), `spk_state`, `mcu_esckey`, `nds_esckey`, `boot_mode`
 - `/sys/class/pwm/pwmchip0` exists (alternative rumble path; `moto` is simpler)
 
@@ -199,7 +200,8 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
   clone base.
 
 ## Facts still unverified (need hardware/testing)
-1. `hallkey` presence + semantics on an actual RG34XXSP (lid code is written, untested).
+1. `hallkey` semantics on RG34XXSP: polarity/values, whether `has_lid` is set, and why
+   lid close does not sleep/blank the screen.
 2. RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path end-to-end.
 3. Headphone jack detection on 2026 firmware (old note: `jack_state` never changes).
 4. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
