@@ -142,7 +142,12 @@ target), with the picodrive LTO/patch-hygiene fixes noted in 01.
 ## What disappeared vs tg5040 (as planned)
 - `btmanager/` (BlueZ-upgrade pakz — H700 Ubuntu has BlueZ 5.64)
 - `poweroff_next/`, `reboot_next` (systemd poweroff/reboot work fine)
-- LED animation wiring (`led_anim`), ledcontrol.elf, bootlogo (gated to tg50x0 in `workspace/makefile`)
+- LED animation wiring (`led_anim`), ledcontrol.elf (gated to tg50x0 in `workspace/makefile`)
+  — bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`
+  builds for h700 with resolution-keyed preset folders (`640x480`, `720x480`,
+  `480x640`, `720x720`) selected via `$DEVICE`, writes `bootlogo.bmp` to `mmcblk0p2`
+  (`BOOTLOGO_PARTITION` in `platform.h`), and backs up the stock logo as
+  `original.bmp` on first apply (see 02 for the TF1-write-policy exception)
 - `trimui_inputd` interactions (turbo, gpio 5V export)
 
 New vs tg5040: `rfkill/` — a minimal from-scratch `/dev/rfkill` ioctl tool (~120

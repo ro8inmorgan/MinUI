@@ -25,25 +25,39 @@ static void sigHandler(int sig)
     }
 }
 
+// the stock OS reads bootlogo.bmp from this vfat partition at power-on
+#ifndef BOOTLOGO_PARTITION
+#define BOOTLOGO_PARTITION "/dev/mmcblk0p1"
+#endif
+
 static SDL_Surface *screen;
 
 SDL_Surface** images;
 char **image_paths;
+static char basepath[MAX_PATH];
 static int selected = 0;
 static int count = 0;
 
 int loadImages()
 {
     char* device = getenv("DEVICE");
+#ifdef BOOTLOGO_RESOLUTION_DIRS
+    // presets are shared between devices with the same panel resolution
+    char* folder = "640x480"; // rg35xx, rg40xx
+    if (exactMatch("rg28xx", device)) folder = "480x640";
+    else if (exactMatch("rg34xx", device)) folder = "720x480";
+    else if (exactMatch("cube", device)) folder = "720x720";
+    snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/%s/", TOOLS_PATH, folder);
+#else
     // This needs to get a bit more flexible down the line, but for now we either expect the files
     // in the pak root directory or in the "brick" subfolder.
-    char basepath[MAX_PATH];
     if(exactMatch("brick", device) || exactMatch("brickpro", device)) {
         snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/brick/", TOOLS_PATH);
     }
     else {
         snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/smartpro/", TOOLS_PATH);
     }
+#endif
 
     // grab all bmp files in the directory and load them with IMG_Load, 
     // keep them in an array of SDL_Surface pointers
@@ -142,8 +156,13 @@ int main(int argc, char *argv[])
                 // reboot
                 char* boot_path = "/mnt/boot/";
                 char* logo_path = image_paths[selected];
-                char cmd[256]; 
-                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p1 %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
+                char cmd[1024];
+#ifdef BOOTLOGO_RESOLUTION_DIRS
+                // back up the stock logo as a restorable preset before the first overwrite
+                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat " BOOTLOGO_PARTITION " %s && ([ -f \"%soriginal.bmp\" ] || cp %sbootlogo.bmp \"%soriginal.bmp\"; cp \"%s\" %sbootlogo.bmp && sync && umount %s && reboot)", boot_path, boot_path, basepath, boot_path, basepath, logo_path, boot_path, boot_path);
+#else
+                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat " BOOTLOGO_PARTITION " %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
+#endif
                 system(cmd);
             }
             else if (PAD_justPressed(BTN_B))
@@ -171,12 +190,29 @@ int main(int argc, char *argv[])
             if(count > 0) {
                 // render the selected image, centered on screen
                 SDL_Surface *image = images[selected];
-                SDL_Rect image_rect = {
-                    screen->w /2 - image->w /2,
-                    screen->h /2 - image->h / 2,
-                    image->w,
-                    image->h};
-                SDL_BlitSurface(image, NULL, screen, &image_rect);
+                if (image->w > screen->w || image->h > screen->h) {
+                    // aspect-fit oversized presets (e.g. rg28xx portrait logos on a landscape UI)
+                    int fit_w = screen->w;
+                    int fit_h = image->h * screen->w / image->w;
+                    if (fit_h > screen->h) {
+                        fit_h = screen->h;
+                        fit_w = image->w * screen->h / image->h;
+                    }
+                    SDL_Rect image_rect = {
+                        screen->w / 2 - fit_w / 2,
+                        screen->h / 2 - fit_h / 2,
+                        fit_w,
+                        fit_h};
+                    SDL_BlitScaled(image, NULL, screen, &image_rect);
+                }
+                else {
+                    SDL_Rect image_rect = {
+                        screen->w /2 - image->w /2,
+                        screen->h /2 - image->h / 2,
+                        image->w,
+                        image->h};
+                    SDL_BlitSurface(image, NULL, screen, &image_rect);
+                }
             }
 
             GFX_blitButtonGroup((char *[]){"L/R", "SCROLL", NULL}, 0, screen, 0);

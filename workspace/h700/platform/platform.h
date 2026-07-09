@@ -144,6 +144,11 @@ extern int is_cube;
 #define SCREEN_FPS 60.0
 #define MAX_LIGHTS 0
 
+// stock Anbernic boot logo: bootlogo.bmp on the vfat boot-resource partition
+#define BOOTLOGO_PARTITION "/dev/mmcblk0p2"
+// presets are keyed by panel resolution, not device name
+#define BOOTLOGO_RESOLUTION_DIRS 1
+
 ///////////////////////////////
 
 #endif

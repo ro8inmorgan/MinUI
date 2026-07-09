@@ -56,6 +56,8 @@ endif
 	cd ./all/settings/ && make
 ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
 	cd ./all/ledcontrol/ && make
+endif
+ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
 	cd ./all/bootlogo/ && make
 endif
 	cd ./all/audiomon && make all
@@ -83,6 +85,8 @@ ifneq ($(PLATFORM), desktop)
 	cd ./all/syncsettings/ && make clean
 ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
 	cd ./all/ledcontrol/ && make clean
+endif
+ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
 	cd ./all/bootlogo/ && make clean
 endif
 	cd ./all/show2/ && make clean

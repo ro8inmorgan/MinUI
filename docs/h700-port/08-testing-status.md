@@ -47,6 +47,7 @@
 | Pak Store install | ⬜ |
 | OTA update flow | ⬜ |
 | BT controller pairing + input | ⬜ |
+| Bootlogo pak: preset carousel, apply (writes `mmcblk0p2`), first-apply `original.bmp` backup, restore | ⬜ (ported 2026-07-09; needs one apply/restore cycle on hardware) |
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
 | RG34XXSP: general H700 port + 720×480 UI | ✅ user-tested; works like RG40XXV |
@@ -81,7 +82,7 @@
   6. `workspace/all/settings/makefile` — h700 block (`-DHAS_BTAGENT -DNO_BT_AUDIO`, btagent, glib)
   7. `workspace/all/settings/settings.cpp` — Anbernic vendor/models, h700 platform + capability flags
   8. `workspace/all/syncsettings/syncsettings.c` — also restore colortemp/contrast/saturation/exposure/displaycal on resume
-  9. `workspace/makefile` — rfkill for h700; ledcontrol/bootlogo gated to tg50x0
+  9. `workspace/makefile` — rfkill for h700; ledcontrol gated to tg50x0, bootlogo to tg50x0+h700
   10. Root `makefile` + `makefile.toolchain` — h700 platform + tg5040-image reuse
   11. `workspace/all/common/api.c`/`api.h` — `PWR_requestSleep()` (lid sleep) and
   `SND_quit()` in `PWR_enterSleep` (close ALSA before suspend; see 06). Both are

@@ -84,6 +84,13 @@ Ordered by impact within each section.
     displaycal.h; confirm exact `RGXX_MODEL` strings for RG35xx family / RG40xxH
     while at it).
 
+13a. **~~Bootlogo pak~~ Ported (2026-07-09)** — `Bootlogo.pak` now builds and ships
+    for h700: full tg5040 preset catalog regenerated as 24-bit BMPs per panel
+    resolution (`640x480`, `720x480`, `480x640` rotated for RG28XX, `720x720`),
+    folder picked via `$DEVICE`; writes `bootlogo.bmp` to `mmcblk0p2` and backs up
+    the stock logo as `original.bmp` on first apply (02, 03). **Untested on
+    hardware** — needs one apply/restore cycle on a real device before release.
+
 ## P2 — Cleanup / refactors / simplifications
 
 14. **~~Remove the crash-loop network behavior~~ Done (2026-07-09)** — after 5

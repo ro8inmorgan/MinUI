@@ -32,6 +32,13 @@ the user must switch the boot target back to "stock" (or delete the ini) themsel
   Panel-Fix writes, no apt installs. Both writers of that file (`install/update.sh` and
   the launch.sh self-heal) guard with `mountpoint -q /mnt/mmc` **and** `cmp -s` so they
   only touch TF1 when it's genuinely mounted and the content actually differs.
+  - **One sanctioned exception**: the optional `Bootlogo.pak` tool (EXTRAS, see 03)
+    writes `bootlogo.bmp` on the vfat boot-resource partition `mmcblk0p2` — the same
+    mechanism the old port used at install time, but here only on an explicit user
+    action inside the pak, never automatically. Before the first overwrite it copies
+    the stock logo into the pak's preset folder as `original.bmp`, so the stock look
+    is always restorable from within the pak. The installer/boot shim remain
+    write-free on p1–p7.
 - **TF2 = NextUI's card** (`/dev/mmcblk1p1`): `.system`, `.tmp_update`, `.userdata`,
   Bios, Roms, Saves. FAT32 recommended; the shim also tries exfat and `-t auto` as
   fallbacks (kernel 4.9 has no native exfat — exfat works only if the stock OS has a

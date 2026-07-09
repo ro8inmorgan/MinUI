@@ -117,7 +117,8 @@ more external deps (e.g. shipping bluealsa, see 07/09-roadmap), not before.
 `make PLATFORM=h700 all` produces in `build/`:
 - `.system/h700/bin/*` — nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf,
   gametimectl.elf, syncsettings.elf, nextval.elf, show2.elf, settings.elf, clock, …
-  (tg5040 list minus ledcontrol/bootlogo, which are gated to tg50x0) plus `rfkill`
+  (tg5040 list minus ledcontrol, which is gated to tg50x0; bootlogo.elf builds for
+  h700 too and ships in `EXTRAS/Tools/h700/Bootlogo.pak`) plus `rfkill`
   (h700 builds its own minimal `/dev/rfkill` ioctl tool — stock rfkill may be absent)
 - `.system/h700/lib/` — libmsettings.so, libbatmondb.so, libgametimedb.so, …
   plus the bundled SDL2/tinyalsa/libpng12 set above
