@@ -95,6 +95,8 @@ open/closed per poll and could drop the wake press between polls.
 - **Volume**: tinyalsa on card 0. `digital volume` is a 0–63 **attenuator** — the code
   writes `mixer_ctl_set_percent(digital, 0, 100 - val)` (reversed mapping, confirmed
   correct by ear; the control's TLV metadata is garbage). `lineout volume` secondary.
+  Tested on RG40XXV and RG34XXSP: UI and audible levels are correct from mute through
+  100%, with no current volume-control issues.
 - **Mute**: `SPK` switch off + store/restore volume (no `/sys/class/speaker/mute` on
   H700). h700 is included in `hasMuteToggle()` in settings.cpp.
 - **Color temperature**: `/sys/class/disp/disp/attr/color_temperature` — works

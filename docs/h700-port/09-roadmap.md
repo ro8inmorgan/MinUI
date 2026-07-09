@@ -22,10 +22,9 @@ Ordered by impact within each section.
    recents/box art, RetroAchievements, Pak Store, OTA update. Each is implemented;
    none has been exercised. OTA especially — a broken update path is the worst
    post-release bug class.
-4. **Document-or-fix the `digital volume` inversion** (`msettings.c` `100 - val`):
-   it's confirmed correct by ear, but the only in-tree explanation is a terse
-   comment. One paragraph in the code explaining the attenuator semantics + garbage
-   TLV prevents a future "cleanup" from re-breaking audio.
+4. **~~Document the `digital volume` inversion~~ Done (2026-07-09)** — `100 - val`
+   is intentional because the control is an attenuator. Volume UI and levels are
+   tested-good on RG40XXV and RG34XXSP from mute through 100% (05).
 
 ## P1 — Feature completeness
 

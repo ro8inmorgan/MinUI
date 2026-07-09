@@ -30,7 +30,7 @@
 | MENU short-tap → shortcuts overlay vs. hold → brightness (compound-tap fix, see 00/03) | ✅ tested on RG34XXSP; firmware quirk is common to the H700 line, expected fine on all RG XX |
 | Displaycal RGB gains: act, persist, survive sleep + game launch | ✅ |
 | Shaders (all shipped .glsl), overlays, effects on Mali-G31 | ✅ |
-| Volume 0–20 + mute | ✅ |
+| Volume UI + levels, mute through 100% | ✅ tested on RG40XXV and RG34XXSP; no known issues |
 | Rumble (moto on/off) | ✅ |
 | WiFi scan/connect/forget | ✅ |
 | WiFi survives sleep; NTP sync | ✅ |

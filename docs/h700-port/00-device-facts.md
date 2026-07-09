@@ -54,7 +54,7 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 ### Audio
 - ALSA cards: `0 audiocodec` (speaker/lineout/headphone), `1 ahubdam`, `2 ahubhdmi` (HDMI audio)
 - amixer simple controls on card 0: `'digital volume'`, `'lineout volume'`, `'LINEOUT'`, `'SPK'`, `'OutputL/R Mixer DACL/R'`, `'tx hub mode'`
-- `digital volume` is an **attenuator with a reversed scale** (range 0–63; larger raw value = quieter). The shipped msettings writes `100 - val` percent — confirmed correct by listening on device.
+- `digital volume` is an **attenuator with a reversed scale** (range 0–63; larger raw value = quieter). The shipped msettings writes `100 - val` percent — confirmed correct by listening on device. Volume control has no known issues on RG40XXV or RG34XXSP; the UI and audible levels are correct from mute through 100%.
 - Codec supports 48000/44100 natively.
 - **Stock libasound quirk (critical):** the device's `/usr/lib/libasound.so` exports both
   versioned symbols and legacy unversioned `ALSA_0.9` value-semantic `snd_pcm_hw_params_set_*`

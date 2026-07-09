@@ -4,7 +4,7 @@
 
 `SND_init` (shared `api.c`) → SDL audio → **ALSA backend → card 0 `audiocodec`**.
 `SDL_AUDIODRIVER=alsa` exported by launch.sh. GBA/SNES/PS1 run full speed with clean
-audio, no underruns, on RG40XXV.
+audio, no underruns, on RG40XXV; RG34XXSP behaves the same in user testing.
 
 ```
 card 0: audiocodec   ← speaker / lineout / headphone (the one we use)
@@ -39,6 +39,8 @@ for libraries that exist on the target.
   garbage, so don't trust `amixer` ranges here. `lineout volume` secondary.
 - Mute: `SPK` switch off + saved/restored volume (H700 has no
   `/sys/class/speaker/mute`). Mute toggle enabled for h700 in settings. Tested ✅.
+- Validation: no known issues on RG40XXV or RG34XXSP. The volume UI behaves correctly,
+  and audible levels are as expected across the full range from mute through 100%.
 - Suspend: the `suspend` script saves the full mixer state (`alsactl store`) in
   `before()` and **restores it in `after()`** on resume (an early version had the
   restore commented out; it's live now).
