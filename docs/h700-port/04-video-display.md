@@ -18,27 +18,27 @@ The stack:
 - GLES linked directly (`-lGLESv2 -lEGL`), **not** via the SDK's pkg-config (libUMP
   trap, see 01). `generic_video.c` gained hard error checks: SDL init / window /
   renderer / GL-context failures now `exit(1)` instead of limping on — on a device
-  with no display fallback, failing loudly into the crash-restart loop (which brings
-  up SSH) beats a black screen.
+  with no display fallback, failing loudly into the bounded crash-restart loop beats
+  a black screen; the release path powers off after the crash limit.
 
 ## Per-device geometry
 
 | Device | Panel | FIXED_W×H | Status |
 |---|---|---|---|
 | RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
-| RG34XXSP | 720×480 3:2 | 720×480 | ✅ user-tested; works like RG40XXV |
+| RG34XXSP | 720×480 3:2 | 720×480 | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus tested-good; resolution-specific overlays untested |
 | RG28XX | 480×640 portrait | 640×480 logical | rotation plumbed, untested (below) |
 | RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
 
 ### 480p UI — mostly fine, polish pass pending
 These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
 rendered at 480p for ~2 years. Real-use verdict on RG40XXV and RG34XXSP: **no systemic
-breakage — OK for alpha**. Known concrete issue: in some paks (e.g. the Battery pak) the
-button-hint pills are large enough to overlap each other. A full audit of every
-shipped-by-default UI surface at 640×480/720×480 is still owed before release
-(09-roadmap). Related but distinct: several shared UI pieces hardcode Brick-era
-hardware assumptions (Input tester layout, Fn switch, dead display controls) — see
-09-roadmap #8.
+breakage — OK for alpha**. The broad 720×480 surface sweep is now clean, including the
+keyboard used for RetroAchievements credentials. Screenshots and resolution-specific
+overlays remain untested; no suitable 720×480 overlay asset was available. Related but
+distinct: the Input tester is now device-aware, the dead
+display controls are hidden/verified, and Fn-switch settings are gated off on h700.
+The broader capability sweep remains a useful regression check (09-roadmap #8).
 
 ## RG28XX rotation — implemented, unvalidated
 
@@ -95,7 +95,8 @@ displaycal.h only. Default brightness on h700 is 4 (tg5040 Brick keeps 2).
 white-point correction (displaycal), RGB tuning. The `enhance_*` display controls
 (contrast/saturation/exposure) **do nothing on RG XX** — the sysfs attrs exist (00)
 yet have no visible effect — so since 2026-07-09 they are hidden on h700 via the
-`DeviceInfo` capability gates in settings.cpp (including the mute-toggle variants).
+`DeviceInfo` capability gates in settings.cpp (including the mute-toggle variants),
+visually verified on RG40XXV.
 The libmsettings plumbing remains (harmless no-ops; the shared API keeps the
 symbols), and syncsettings still "restores" them on resume — a cosmetic cleanup at
 most.
@@ -110,10 +111,18 @@ pre-alpha graphics stack. **The real root cause turned out to be the missing 64-
 and the silent dlopen failure corrupted image loading (fixed in `510d3bb1`, see
 pitfall #2 in 01). The alpha-blending code on main was never at fault.
 
-Consequence: the h700 branch has been **rebased onto current main, alpha-blending
-work included** (done 2026-07-09). `workspace/all/` carried zero net change from the
-reverted experiment, so the rebase was clean on that front. Closing check still open:
-verify rendering on device with the rebased build (09-roadmap #7).
+Consequence: the h700 branch was **rebased onto main with the alpha-blending work
+included** (done 2026-07-09). `workspace/all/` carried zero net change from the
+reverted experiment, so the rebase was clean on that front. Game switcher and box-art
+rendering are clean at 720×480; screenshots and resolution-specific overlays remain to
+be checked. Upstream main has since advanced, so rebase once more before final merge.
+
+## Bootlogo preset previews
+
+The 640×480 catalog works on RG40XXV. On RG34XXSP the pak opens but renders no preset
+images from `720x480/`. The source BMPs are valid 720×480×24 files and direct inspection
+shows non-black content, so this is a runtime path/loading/rendering problem rather than
+blank generated assets. Applying/restoring a logo was not attempted on RG34XXSP.
 
 ## Boot splash
 

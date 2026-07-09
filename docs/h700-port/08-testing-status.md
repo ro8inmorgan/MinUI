@@ -7,6 +7,7 @@
 | RG40XXV | Probed live | Primary bring-up device |
 | RG34XXSP | User-tested | General parity with RG40XXV; sleep/wake + lid validated here |
 | RG28XX | Not yet tested | Rotation validation target |
+| RGcubexx | No device available | External alpha-validation target |
 | TrimUI Brick TG5040 | Probed live | Regression reference (behavioral 1:1 comparisons) |
 
 **Dev-loop tips:**
@@ -16,9 +17,9 @@
 - Repeated `nextui.elf` crashes now log the crash limit and power off. Use TF2 logs
   for crash-loop debugging; the release runtime powers off instead of starting SSH.
 
-## Validation matrix (status as of 2026-07-09, RG40XXV unless noted)
+## Validation matrix (status as of 2026-07-10, RG40XXV unless noted)
 
-✅ tested & passed ⚠️ tested, has issues ⬜ untested ✖ not implemented
+✅ tested & passed ⚠️ tested, has issues ⬜ untested ➖ explicitly out of alpha scope ✖ not implemented
 
 ### Functional
 | Item | Status |
@@ -29,39 +30,78 @@
 | Brightness 0–10 + colortemp ramps; persist across reboot | ✅ |
 | MENU short-tap → shortcuts overlay vs. hold → brightness (compound-tap fix, see 00/03) | ✅ tested on RG34XXSP; firmware quirk is common to the H700 line, expected fine on all RG XX |
 | Displaycal RGB gains: act, persist, survive sleep + game launch | ✅ |
-| Displaycal survives reboot (was clobbered to defaults every boot; fixed 2026-07-09) | ✅ verified on RG40XXV by patching msettings.bin + reboot |
+| Displaycal survives reboot (was clobbered to defaults every boot; fixed 2026-07-09) | ✅ verified on RG40XXV and RG34XXSP |
 | Fresh-install defaults: brightness 4, displaycal off/neutral | ✅ verified on RG40XXV (deleted msettings.bin + reboot) |
-| Dead enhance controls (contrast/saturation/exposure) hidden on h700 | ✅ code-gated 2026-07-09; visual check on device pending |
+| Dead enhance controls (contrast/saturation/exposure) hidden on h700 | ✅ code-gated and visually verified on RG40XXV 2026-07-09 |
+| Fn-switch settings hidden on h700 | ✅ capability-gated; RG XX devices have no Fn switch |
 | Shaders (all shipped .glsl), overlays, effects on Mali-G31 | ✅ |
 | Volume UI + levels, mute through 100% | ✅ tested on RG40XXV and RG34XXSP; no known issues |
 | Rumble (moto on/off) | ✅ |
 | WiFi scan/connect/forget | ✅ |
 | WiFi survives sleep; NTP sync | ✅ |
-| Deep sleep (auto/manual) + wake | ✅ fixed & user-tested on RG34XXSP 2026-07-09 (4 stacked bugs — see 06); in-game (minarch) path shares the code but untested; RG40XXV re-test pending |
-| Files app (NextCommander): input, scaling, first-frame render | ✅ fixed & user-tested on RG40XXV 2026-07-09 (SDL joystick classification patch, button index remap, square-window + oversize-window fixes, startup warmup render, PPU 2 — see 01/03) |
-| Input pak: per-device stick layout (L3/R3 pills only where sticks exist; RG40XXV shows L3 only) | ⬜ (code-gated 2026-07-10 via `dev_has_lstick/rstick` — see 03; needs on-device check + `RGXX_MODEL` string capture on RG35xx family / RG40xxH) |
-| Screenshots, Recently Played, game switcher, box art | ⬜ |
+| Deep sleep (auto/manual) + wake | ⚠️ core paths work on RG34XXSP and RG40XXV, including in-game resume and power-off auto-resume. RG34XXSP POWER can wake the device while the lid is closed; charging intentionally prevents deep sleep in shared code (06) |
+| Files app (NextCommander): input, scaling, first-frame render | ✅ tested on RG40XXV and RG34XXSP; PPU 2 retained for alpha |
+| Input pak: per-device stick layout | ✅ RG40XXV shows working L3 only; RG34XXSP shows working L3/R3. Analog movement is not visualized by the existing Input pak and is out of scope for this port |
+| Recently Played + game switcher | ✅ tested on RG40XXV and RG34XXSP |
+| Screenshots | ⬜ testing planned |
+| Box art | ✅ tested at 720×480 on RG34XXSP |
 | Clean uninstall (delete dmenu.bin → pristine stock) | ⬜ |
-| Battery % accuracy vs stock; charging indicator; charge-while-sleeping | ⬜ |
+| Battery % accuracy vs stock | ⬜ |
+| Charging detection/indicator; sleep while charging | ⚠️ indicator works on RG34XXSP; charging permits light sleep but shared power code deliberately suppresses deep sleep |
 | Overnight drain (8 h mem-sleep vs stock baseline) | ⬜ (unblocked — sleep/wake now reliable) |
-| RetroAchievements login + unlock | ⬜ |
-| Pak Store install | ⬜ |
-| OTA update flow | ⬜ |
+| RetroAchievements login + unlock | ✅ works on RG34XXSP; on-screen credential keyboard also verified |
+| Pak Store install | ➖ explicitly excluded from alpha scope; testing is not applicable for this release |
+| OTA update flow | ➖ explicitly excluded from alpha scope; testing is not applicable for this release |
 | BT controller pairing + input | ⬜ |
-| Bootlogo pak: preset carousel, apply (writes `mmcblk0p2`), first-apply `original.bmp` backup, restore | ✅ user-tested on RG40XXV 2026-07-09: apply works, `original.bmp` backup captured; reboot after apply is a bit slow but acceptable |
+| Bootlogo pak, RG40XXV 640×480 | ✅ carousel/apply/backup tested; restore inferred via same apply path |
+| Bootlogo pak, RG34XXSP 720×480 | ⚠️ pak opens with no visible presets. Source BMPs are valid and non-black; runtime path/loading/rendering needs investigation. Apply/restore not attempted |
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
-| RG34XXSP: general H700 port + 720×480 UI | ✅ user-tested; works like RG40XXV |
-| RG34XXSP: lid sleep/wake | ✅ lid close sleeps; lid open wakes from screen-off; power key wakes from deep suspend (stock-like, desired — see 06) |
+| RG34XXSP: general H700 port + 720×480 UI | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus work well; resolution-specific overlays untested |
+| RG34XXSP: lid sleep/wake | ⚠️ lid close and open work; deep suspend requires power as expected, but power also wakes light sleep while the lid is closed |
 | RG28XX: rotated UI + games | ⬜ (plumbing in place, unvalidated — 04) |
-| RGcubexx: 720×720 | ⬜ |
+| RGcubexx: 720×720 | ⬜ no device available; intentionally an external alpha-validation target |
 
 ### Performance
 | Item | Status |
 |---|---|
-| GBA/SNES/PS1 full speed with vsync, no audio underruns | ✅ |
-| Frame pacing / tearing / input lag vs stock RA | ⬜ (no complaints observed, not measured) |
-| Governor transitions don't stutter audio | ⬜ |
+| GBA/SNES/PS1 full speed with vsync, no audio underruns | ✅ on RG40XXV; RG34XXSP PS1 currently crashes during launch |
+| Frame pacing / tearing / input lag vs stock RA | ✅ gameplay-tested on RG40XXV; no visible pacing, tearing, latency, or audio issues (not instrumented) |
+| Manual governor changes don't stutter audio | ✅ tested in-game on RG34XXSP |
+| Auto governor load/frequency selection | ⚠️ MD can remain near 480 MHz and slow down depending on shader/scaling; stock shader + 3× + linear raises ~720 MHz and is smooth. Powersave/performance are smooth; needs debugging |
+
+### RG34XXSP core/game bring-up
+
+Detailed results and the remaining system backlog are tracked in
+[10-core-game-matrix.md](10-core-game-matrix.md).
+
+| System/core | Status |
+|---|---|
+| GB / GBC / GBA / FC / SFC | ✅ games launch and play perfectly |
+| MD / PicoDrive | ⚠️ launches, but some rendering combinations slow down with auto CPU near 480 MHz |
+| FBN / FBNeo | ⚠️ missing BIOS blocked game validation; the error path then left MinArch unable to open its menu or exit |
+| PS / PCSX-ReARMed | ⚠️ crashes back to NextUI during launch for every tested game |
+| Remaining shipped cores | ⬜ systematic coverage pending |
+
+### RG34XXSP remaining validation
+
+- To claim full parity rather than alpha coverage, repeat the RG40XXV-scoped rows on
+  RG34XXSP: cold-boot soak, fresh-install defaults, brightness/colortemp behavior,
+  the full shader/effect sweep, rumble, and WiFi scan/connect/forget/sleep/NTP.
+- Run the full per-core protocol in [10](10-core-game-matrix.md), including menu,
+  clean exit, save/load state, sustained Auto CPU play, sleep/resume, and power-off
+  auto-resume. The initial green results establish launch/gameplay, not every one of
+  those checks for every system.
+- Test screenshots and overlays made for 720×480.
+- Retest FBNeo with the required BIOS, and separately preserve the missing-BIOS error
+  case as a regression test after it is fixed.
+- Diagnose PS1 launch and retest multiple formats/titles with the required BIOS.
+- Reproduce the MD Auto CPU behavior with exact shader, scale, and interpolation
+  combinations.
+- After the preview bug is fixed, test 720×480 Bootlogo apply, backup, and restore.
+- Test BT controller pairing/input, battery percentage accuracy, and overnight drain.
+- Run clean uninstall, SIGUSR1 shutdown, dirty-card recovery, and muOS/stockmod
+  coexistence on this hardware where practical.
 
 ### Robustness
 | Item | Status |

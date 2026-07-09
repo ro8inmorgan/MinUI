@@ -2,7 +2,7 @@
 
 Ground truth for the H700 platform. Everything here was verified live on hardware
 over SSH (probed 2026-07-08, corrections folded in from the implementation/review
-cycle 2026-07-09) or recovered from git history. Re-run the probes after any
+cycle through 2026-07-10) or recovered from git history. Re-run the probes after any
 Anbernic stock-firmware update — paths have historically been stable, but the
 `dmenu_ln`/muOS hooks are stockmod-version-dependent.
 
@@ -12,7 +12,7 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 |---|---|---|
 | TrimUI Brick (TG5040, A133P) | Probed live | Reference — NextUI runs perfectly |
 | Anbernic RG40XXV (H700) | Probed live | Port target #1 (was running stockmod) — **primary tested device** |
-| Anbernic RG34XXSP (H700) | User-tested | Port target #2 (clamshell, lid sensor) — general parity with RG40XXV, lid wake/sleep broken |
+| Anbernic RG34XXSP (H700) | User-tested | Port target #2 (clamshell, lid sensor) — strong 720×480/UI parity; core and lid edge cases tracked in 08 |
 | Anbernic RG28XX (H700) | Not yet tested | Port target #3 (rotated 480×640 panel) |
 
 ## RG40XXV (H700) — probed live
@@ -98,8 +98,10 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 - `/sys/power/state`: **`freeze mem`** — real suspend-to-RAM (same as TG5040)
 - `echo mem` suspend works; wake source is the **power button** (AXP2202 PEK).
   **RTC alarm wake does NOT fire** — no timed wake; don't build features on it.
-  ⚠️ In the shipped port, wake is **unreliable — the device sometimes hangs entering or
-  leaving suspend** (open issue, see 06 and 09-roadmap).
+  The shipped sleep/wake path is reliable in repeated RG40XXV/RG34XXSP testing,
+  including in-game resume and power-off auto-resume. RG34XXSP exception: the power
+  button currently wakes light sleep while the lid is closed despite the software
+  lid gate (see 06). Charging intentionally prevents deep sleep in shared code.
 - PMIC: **AXP2202** — `/sys/class/power_supply/axp2202-battery/` and `axp2202-usb/`
 - Battery: `capacity`, `status`, `voltage_now`, `temp`, `time_to_empty_now`,
   `time_to_full_now`, `charge_counter`, `health`
@@ -108,8 +110,9 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   - `work_led` — power LED (0=on, 1=off) — used by the port around backlight off/on
   - `workled_sleep` — LED behavior during sleep
   - `lowpwr_led`, `led_test`
-  - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — wired, but lid
-    wake/sleep is broken on RG34XXSP (screen stays on); polarity/values still need probing
+  - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — polarity verified
+    (`1` = open); lid close sleeps and lid open wakes screen-off. Deep suspend still
+    requires power, but power also wakes light sleep while closed (unexpected; open).
   - `brightness`, `display_id` (panel variant id), `spk_state`, `mcu_esckey`, `nds_esckey`, `boot_mode`
 - `/sys/class/pwm/pwmchip0` exists (alternative rumble path; `moto` is simpler)
 
@@ -208,10 +211,9 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
   clone base.
 
 ## Facts still unverified (need hardware/testing)
-1. `hallkey` semantics on RG34XXSP: polarity/values, whether `has_lid` is set, and why
-   lid close does not sleep/blank the screen.
+1. Why RG34XXSP power-key release wakes light sleep while `hallkey=0` even though
+   `PLAT_shouldWake()` contains a closed-lid gate.
 2. RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path end-to-end.
 3. Headphone jack detection on 2026 firmware (old note: `jack_state` never changes).
 4. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
-5. Whether device glib (2.72) is ≥ what settings.elf links against — it loads and runs,
-   so empirically fine, but never explicitly checked.
+5. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.

@@ -32,10 +32,11 @@ Suspend interplay: WiFi does not survive `mem` suspend on its own; the suspend
 script stops the stack in `before()` and restarts it in `after()` (06). Verified
 working across sleep on RG40XXV.
 
-Untested so far: RetroAchievements login/unlock, Pak Store install, OTA update flow
-(all pure HTTP on top of a working wlan0 — expected free, not yet exercised).
+RetroAchievements login and unlock work on RG34XXSP, including credential entry through
+the on-screen keyboard. Pak Store and OTA update are explicitly excluded from the alpha
+scope; testing is not applicable and they are not alpha release gates.
 
-## Bluetooth (as shipped — system BlueZ, input yes, audio gated off)
+## Bluetooth (as shipped — system BlueZ, input implemented, audio gated off)
 
 - BlueZ 5.64 on device → no `btmanager`/upgrade-pakz (as planned); `generic_bt.c`
   drives `bluetoothctl`

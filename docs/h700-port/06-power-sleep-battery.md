@@ -1,6 +1,6 @@
 # 06 — Power, Sleep, Battery, Lid
 
-## ✅ Sleep/wake fixed (2026-07-09, verified on RG34XXSP)
+## ✅ Sleep/wake fixed (2026-07-09, verified on RG34XXSP and RG40XXV)
 
 The former "#1 open defect" turned out to be four separate bugs, all found and fixed:
 
@@ -30,10 +30,14 @@ The former "#1 open defect" turned out to be four separate bugs, all found and f
    (wifi/bt/hooks). Measured wake-to-responsive: ~0.5–1.2 s (audio reinit 150–200 ms,
    formerly 9–10 s).
 
-Verified by physical testing on RG34XXSP (stockmod OS): repeated power-tap sleep/wake
-cycles, screen-off → suspend two-stage escalation with 10 s/10 s timers, suspend →
-power-key wake, lid-close → sleep, and state restore (display settings, WiFi
-reconnect). Long-press power-off unaffected.
+Verified by physical testing on RG34XXSP (stockmod OS) and re-tested on RG40XXV:
+repeated power-tap sleep/wake cycles, screen-off → suspend two-stage escalation with
+10 s/10 s timers, suspend → power-key wake, lid-close → sleep, and state restore
+(display settings, WiFi reconnect). In-game sleep/resume and in-game power-off →
+power-on → automatic resume of the running game are also verified. Long-press
+power-off is unaffected. Two RG34XXSP edge cases were found on 2026-07-10: a power-key
+release wakes light sleep even while the lid remains closed, and charging keeps the
+device in light sleep rather than deep suspend.
 
 Stockmod/logind interference was ruled out: `HandlePowerKey=ignore` is in place (our
 launch.sh drop-in), stockmod's `pwr_new.sh` is not running under NextUI, and no evdev
@@ -78,7 +82,7 @@ Two layers, as on tg5040:
   above); lid gate below. Generic autosleep (`PWR_*` in api.c: idle timeout, disabled
   while charging/HDMI) works unchanged on top.
 
-## Lid (RG34XXSP) — working
+## Lid (RG34XXSP) — working with one wake-gate issue
 
 `LID_PATH = axp2202-battery/hallkey`; `PLAT_initLid` sets `has_lid` if the file exists
 (absent on RG40XXV). Polarity verified on hardware: 1 = open. Lid close →
@@ -86,17 +90,23 @@ Two layers, as on tg5040:
 suspend timeout). Lid open wakes from *screen-off* sleep (hallkey polled by
 `PLAT_shouldWake`); waking from *deep* suspend requires the power key because the hall
 sensor is not a kernel wake source — same as stock firmware, considered desirable.
-Power key is ignored as a wake source while the lid is closed.
+The intended software behavior is to ignore power while the lid is closed, and
+`PLAT_shouldWake()` has that gate, but hardware testing shows power currently wakes
+light sleep anyway. The cause is unresolved.
 
 ## Battery
 
 - `PLAT_getBatteryStatus`: `axp2202-battery/capacity` + `axp2202-usb/online`, coarse
-  bucketing in shared code — same paths as tg5040, copied verbatim. **Accuracy vs
-  stock reading, charging indicator, and charge-while-sleeping: untested.**
+  bucketing in shared code — same paths as tg5040, copied verbatim. Charging detection
+  and the UI indicator work on RG34XXSP; percentage accuracy vs stock remains untested.
+- While charging, lid or power sleep reaches screen-off/light sleep only. This matches
+  shared `PWR_waitForWake()` behavior: the charging check deliberately skips
+  `PWR_deepSleep()` and checks again a minute later. Decide separately whether H700
+  should override that product policy; it is not a failed suspend attempt.
 - Richer metrics (`time_to_empty_now`, `voltage_now`, `temp`, `charge_counter`) are
   available for future batmon extensions; not wired.
-- Standby drain: never measured (plan target was ≤ stock + ~1% over 8 h; blocked on
-  the wake-reliability issue making soak tests moot).
+- Standby drain: not yet measured (plan target is ≤ stock + ~1% over 8 h); the test
+  is now unblocked by reliable sleep/wake.
 
 ## Power off / reboot
 
@@ -109,4 +119,9 @@ by u-boot/stock before our hijack, untouched.
 
 `governor.sh`: auto=`schedutil`, performance=`performance` @1512000,
 powersave=`conservative` capped mid-range. Menu vs in-game profiles ride the shared
-settings; performance is forced during game launch. Single cluster → no core pinning.
+settings; performance is forced during game launch. Manual in-game changes are clean.
+RG34XXSP MD testing exposed an auto-mode issue: slow cases sat near 480 MHz, while a
+stock shader + 3× scale + linear interpolation drove ~720 MHz and ran smoothly;
+powersave (~1.1 GHz observed) and performance (~1.5 GHz) were also smooth. The coupling
+between render settings, workload detection, and schedutil needs debugging. Single
+cluster → no core pinning.

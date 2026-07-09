@@ -4,16 +4,21 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Status (2026-07-09): working beta on RG40XXV and RG34XXSP.** Boot, video (custom
-Mali SDL2 + full GLES shader pipeline), audio, input, games at full speed,
-brightness/colortemp/displaycal, WiFi, and rumble are all tested-good on RG40XXV
-hardware. RG34XXSP has also been user-tested and behaves the same as RG40XXV, except
-lid wake/sleep does not work yet (the screen stays on). Known open items: sleep wake is
-unreliable (the #1 defect), BT audio is gated off, RG28XX/cube are wired but untested.
-Full status in [08](08-testing-status.md), path to done in [09](09-roadmap.md).
+**Status (2026-07-10): ready for an alpha release, with documented RG34XXSP issues.**
+RG40XXV has broad hardware coverage. RG34XXSP now passes the complete 720×480 UI
+sweep, box art, Files, Input, Recently Played, game switcher, RetroAchievements,
+displaycal persistence, manual governor changes, lid sleep/wake, and GB/GBC/GBA/FC/SFC.
+Open RG34XXSP issues are PS1 launch crashes, an FBNeo missing-BIOS lockup, MD Auto CPU
+scaling sensitivity, missing 720×480 Bootlogo previews, POWER waking through a closed
+lid, and charging remaining in light sleep by current shared policy. Screenshots,
+resolution-specific overlays, battery accuracy/overnight drain, recovery paths, and
+RG28XX/RGcubexx hardware coverage remain untested. The cube is intentionally an
+external alpha-validation target. BT audio, Pak Store, and OTA update are explicitly
+outside this alpha scope. Full status is in [08](08-testing-status.md), priorities in
+[09](09-roadmap.md), and emulator coverage in [10](10-core-game-matrix.md).
 
 These docs began as the implementation plan and were restructured after the
-implementation landed (branch `h700`, 17 commits) into reference documentation:
+implementation landed (branch `h700`) into reference documentation:
 verified device facts, the architecture as shipped, deviations from the plan and why,
 and the lessons that transfer to future platform ports.
 
@@ -27,10 +32,11 @@ and the lessons that transfer to future platform ports.
 | [03-platform-layer.md](03-platform-layer.md) | `workspace/h700/`: platform.c/h, input (evdev-primary), libmsettings, keymon, cores |
 | [04-video-display.md](04-video-display.md) | SDL2+Mali/GLES stack, geometry, rotation, HDMI, displaycal, the alpha-blit question |
 | [05-audio.md](05-audio.md) | ALSA path, the dlopen'd-libasound bug story, volume/mute quirks, BT-audio gating |
-| [06-power-sleep-battery.md](06-power-sleep-battery.md) | Sleep design, **the wake-reliability issue**, lid, battery, governors |
+| [06-power-sleep-battery.md](06-power-sleep-battery.md) | Sleep design, lid/charging edge cases, battery, governors |
 | [07-wifi-bluetooth.md](07-wifi-bluetooth.md) | NextUI-owned wpa_supplicant, DHCP/creds handling, BT status |
 | [08-testing-status.md](08-testing-status.md) | Validation matrix with real results, regression guardrails, shared-code touch list |
-| [09-roadmap.md](09-roadmap.md) | Prioritized path from beta to a 9.5/10 port |
+| [09-roadmap.md](09-roadmap.md) | Prioritized path from alpha candidate to a 9.5/10 port |
+| [10-core-game-matrix.md](10-core-game-matrix.md) | Per-system/core/game coverage and open emulator defects |
 
 ## Architecture in one paragraph
 
@@ -50,12 +56,12 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Platform | one `h700`, `DEVICE` env per device | ✅ as planned |
 | Arch / toolchain | 64-bit, reuse tg5040 image | ✅ as planned — with real costs; pitfalls catalogued in 01 |
 | SDL2 | in-tree malifbdev-rot build | ✅ as planned, pinned + config-asserted |
-| Video | generic_video GLES pipeline on Mali blob | ✅ worked 1:1; shaders/overlays/effects tested-good |
+| Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; 720×480 UI and box art pass, resolution-specific overlays untested |
 | **Input** | SDL joystick route | **Deviation:** raw evdev primary (SDL js enumeration unreliable on stock image); SDL kept for BT pads (03) |
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
-| **BT audio** | build + ship bluealsa | **Deviation:** gated off this beta (`NO_BT_AUDIO`); re-enable path documented (05/07) |
-| Sleep | `echo mem` + tg5040-style wrapper | ✅ implemented incl. resume restore — ⚠️ wake unreliable, open (06) |
-| Lid | hallkey → PLAT lid API | ⚠️ wired, but RG34XXSP lid wake/sleep does not work yet (screen stays on) |
+| **BT audio** | build + ship bluealsa | **Deviation:** gated off this alpha (`NO_BT_AUDIO`); re-enable path documented (05/07) |
+| Sleep | `echo mem` + tg5040-style wrapper | ⚠ repeated sleep/wake, in-game resume, and power-off auto-resume pass; charging intentionally stays in light sleep (06) |
+| Lid | hallkey → PLAT lid API | ⚠ close/open works, but POWER can wake RG34XXSP while the lid remains closed |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |
 | Rumble / LEDs | moto sysfs; MAX_LIGHTS 0 | ✅ as planned; rumble tested-good |
 | Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
@@ -66,14 +72,19 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 
 ## Top open risks
 
-1. **Sleep/wake hangs** — headline feature not yet trustworthy ([06](06-power-sleep-battery.md), roadmap P0).
-2. **Partially tested device matrix** — RG34XXSP broadly works, but lid handling is
-   broken; RG28XX/cube code paths have never met hardware.
-3. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
+1. **RG34XXSP runtime issues** — PS1 launch crashes, FBNeo can trap MinArch after a
+   missing-BIOS failure, MD Auto CPU scaling is render-setting-sensitive, Bootlogo
+   previews are absent at 720×480, and POWER can wake through the closed lid.
+2. **Partially tested robustness matrix** — clean uninstall, dirty-SD recovery,
+   SIGUSR1 shutdown, battery accuracy, screenshots, and overnight drain need runs.
+3. **Partially tested device matrix** — RG40XXV and RG34XXSP are working; RG28XX
+   rotation still needs hardware validation, and RGcubexx is an external alpha target.
+4. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
    Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
-4. **Brick-era assumptions in shared UI** — Input tester shows Brick's layout, an
-   Fn-switch setting exists for hardware RG XX doesn't have, and dead enhance
-   display controls are exposed; needs a capability-flag sweep (09-roadmap #8).
+5. **Shared-UI capability regressions** — the Input tester is device-aware, dead
+   display controls are hidden/verified, and Fn-switch settings are now gated off.
+   Keep the systematic capability sweep as shared UI continues to evolve.
    (Formerly listed here: the alpha-blit unknown — resolved; it was the missing
-   64-bit libpng. The branch is now rebased onto main incl. alpha blending; only
-   the on-device rendering re-check remains, 04.)
+   64-bit libpng. The branch includes main's alpha blending; game switcher/overlay
+   rendering is clean, with screenshots and resolution-specific overlays still to
+   check, 04.)

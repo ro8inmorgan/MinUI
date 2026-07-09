@@ -11,7 +11,8 @@ resolution and rotation, plus `dev_has_lstick / dev_has_rstick` capability flags
 that drive stick availability — the tg5040 `is_brick` pattern.
 
 Analog stick matrix (verified against Retro Catalog/Anbernic specs 2026-07, RG40XXV
-confirmed on hardware; every stick present clicks, so L3 ⇔ left stick, R3 ⇔ right):
+and RG34XXSP confirmed on hardware; every stick present clicks, so L3 ⇔ left stick,
+R3 ⇔ right):
 
 | Device | Sticks | Detection key |
 |---|---|---|
@@ -26,6 +27,11 @@ else unknown defaults to dual (today's behavior, covers `DEVICE=rg40xx` without 
 model string). No H700 Anbernic device has an Fn switch. Exact `RGXX_MODEL` strings
 still unconfirmed for the RG35xx family and RG40xxH (same caveat as msettings'
 displaycal presets).
+
+The Input pak intentionally visualizes digital button/click state only. It detects
+stick availability and draws L3/R3, but `minput.c` has no rendering path for analog
+axis movement; RG34XXSP showing working L3/R3 without moving-stick graphics is expected
+and is not an H700 regression.
 
 ## platform.h (as shipped)
 
@@ -109,14 +115,14 @@ open/closed per poll and could drop the wake press between polls.
 |---|---|
 | Video | `#include "generic_video.c"` — custom SDL2 mali driver does the rest (04) |
 | Battery | `axp2202-battery/capacity` + `axp2202-usb/online`, coarse bucketing in shared code — identical to tg5040 |
-| CPU speed | `governor.sh` via `system()`: auto=schedutil, performance=max 1512000, powersave=conservative capped mid-range. Single A53 cluster → `PLAT_pinToCores` no-op |
+| CPU speed | `governor.sh` via `system()`: auto=schedutil, performance=max 1512000, powersave=conservative capped mid-range. Manual changes work. RG34XXSP MD testing exposed render-setting-sensitive auto frequencies (often 480 MHz when slow; ~720 MHz when smooth), still under investigation. Single A53 cluster → `PLAT_pinToCores` no-op |
 | CPU temp | thermal_zone0 |
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
 | GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
 | LEDs | `MAX_LIGHTS 0`, all `PLAT_setLed*` stubs — hardware has no RGB LEDs. `work_led` used only as sleep/backlight indicator |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
-| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); intended behavior is lid-close → sleep and power-key swallowed while closed. **Tested on RG34XXSP: not working yet; the screen stays on when the lid closes.** |
+| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP issue: power also wakes light sleep while the lid is closed despite the intended gate. |
 | Model | `PLAT_getModel` → "Anbernic " + `RGXX_MODEL` (copied into a static buffer, not a raw getenv pointer) |
 | Date/time | `timedatectl` / `hwclock` / `date` via snprintf-bounded commands; timezones via `timedatectl set-timezone`/`list-timezones`, NTP via `set-ntp` (systemd-timesyncd) — much cleaner than tg5040's uci |
 | Turbo | `PLAT_canTurbo()=false`, no-ops (tg5040's turbo rides trimui_inputd; no H700 equivalent wired) |
@@ -135,11 +141,12 @@ open/closed per poll and could drop the wake press between polls.
   Tested on RG40XXV and RG34XXSP: UI and audible levels are correct from mute through
   100%, with no current volume-control issues.
 - **Mute**: `SPK` switch off + store/restore volume (no `/sys/class/speaker/mute` on
-  H700). h700 is included in `hasMuteToggle()` in settings.cpp.
+  H700). The physical volume UI still supports mute; Fn-switch settings are gated off
+  because RG XX devices have no Fn switch.
 - **Color temperature**: `/sys/class/disp/disp/attr/color_temperature` — works
   (tested ✅). The sibling `enhance_contrast` / `enhance_saturation` /
   `enhance_bright` attrs are also written, **but have no visible effect on RG XX
-  panels** — those settings need gating off for h700 (09-roadmap #8). All
+  panels** — those settings are gated off for h700 (09-roadmap #8). All
   `scale*()` switches carry `default:` cases (a draft could hit uninitialized
   values on out-of-range input).
 - **DisplayCal**: same gamma-LUT ioctls as tg5040 (0x10b/0x10c/0x10d) — worked 1:1 as

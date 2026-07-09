@@ -1,6 +1,7 @@
-# 09 — Roadmap: from working beta to a 9.5/10 port
+# 09 — Roadmap: from alpha candidate to a 9.5/10 port
 
-Everything below is verified against branch tip `0e60efd` (updated 2026-07-09).
+Everything below is verified against branch tip `4c754b7`, with hardware results
+recorded through 2026-07-10.
 Ordered by impact within each section.
 
 ## P0 — Correctness / robustness
@@ -13,55 +14,66 @@ Ordered by impact within each section.
    satisfy the sleep condition (now `PWR_requestSleep()`), and wake froze the UI
    ~5–10 s (ALSA PCM held open across suspend takes SDL ~9 s to close — now closed in
    `PWR_enterSleep`; plus wifi/bt restart moved to `after_async &`). Unblocks the
-   overnight-drain test.
+   overnight-drain test. RG40XXV re-test, in-game sleep/resume, and power-off →
+   power-on → running-game resume have since been verified too. Two RG34XXSP edge
+   cases remain: POWER currently wakes the unit while its lid is closed, and charging
+   intentionally keeps the shared power path in light sleep instead of deep suspend.
 2. **Decide muOS/stockmod coexistence policy** (`boot/boot.sh` — currently shows
    "STOCK TARGET REQUIRED" splash but *continues booting*; launch.sh drops
    stockmod-warning.txt). Either hard-fail with the splash held on screen, or
    document why continuing is safe. A user with stockmod installed currently gets a
    confusing half-boot.
-3. **Run the untested-robustness gauntlet** (08 matrix ⬜ rows): clean uninstall,
-   SIGUSR1 quit, dirty-SD fsck recovery, battery accuracy/charging, screenshots/
-   recents/box art, RetroAchievements, Pak Store, OTA update. Each is implemented;
-   none has been exercised. OTA especially — a broken update path is the worst
-   post-release bug class.
+3. **Run the remaining robustness gauntlet** (08 matrix ⬜ rows): clean uninstall,
+   SIGUSR1 quit, dirty-SD fsck recovery, battery accuracy, screenshots, and overnight
+   drain. Box art, RetroAchievements, Recently Played, and the game switcher are
+   tested-good on RG34XXSP.
+   Pak Store and OTA update are explicitly excluded from the alpha scope; testing is
+   not applicable and they are not alpha release gates.
 4. **~~Document the `digital volume` inversion~~ Done (2026-07-09)** — `100 - val`
    is intentional because the control is an attenuator. Volume UI and levels are
    tested-good on RG40XXV and RG34XXSP from mute through 100% (05).
 
 ## P1 — Feature completeness
 
-5. **RG34XXSP lid fix + polish** — general bring-up is now user-tested and works like
-   RG40XXV, including the 720×480 UI path. ~~Fix lid sleep/wake~~ Done (2026-07-09):
-   lid close sleeps, lid open wakes from screen-off (power key needed after deep
-   suspend, matching stock — hallkey polarity verified 1=open; see 06). Remaining:
-   decide whether per-Emu `default-rg34xx.cfg` device cfgs are needed (none exist
-   yet — only `default.cfg`).
+5. **RG34XXSP polish and runtime fixes** — the 720×480 UI, lid sleep/wake, manual
+   governor changes, displaycal persistence, RetroAchievements, Files, Recently
+   Played, game switcher, and the primary 8/16-bit systems are hardware-tested.
+   Remaining: fix POWER waking through a closed lid; decide whether charging should
+   continue to suppress deep sleep; diagnose missing 720×480 Bootlogo previews, PS1
+   launch crashes, the FBNeo missing-BIOS lockup, and MD auto-governor/render-setting
+   sensitivity; decide whether per-Emu `default-rg34xx.cfg` files are needed. Track
+   core coverage in [10](10-core-game-matrix.md).
 6. **RG28XX rotation validation** — plumbing exists on both layers (SDL_ROTATION=1
    env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
    patch covers GL contexts and that the two layers don't double-rotate; add
    `default-rg28xx.cfg` cfgs.
-7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch now sits
-   on top of current main including the alpha-blending work. (The alpha/tinted-
+7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch was rebased
+   onto main including the alpha-blending work. Upstream main has advanced since, so
+   rebase once more before the final merge/release candidate. (The alpha/tinted-
    bitmap question was solved: the glitches were the missing 64-bit libpng bundle,
    not main's alpha changes — 04.) Remaining: **confirm rendering stays clean on
-   device with the rebased build** (blit-heavy screens: browse list with box art,
-   game switcher, overlays).
+   device with the rebased build**: the game switcher and box art are clean at
+   720×480. Screenshots and resolution-specific overlays remain to be checked.
 8. **Audit Brick-era feature assumptions in shared UI** — NextUI only ever targeted
    the Brick / Smart Pro, and several UI pieces hardcode that hardware. Known cases
    on RG XX:
-   - **~~Input tester pak~~ Done (2026-07-10)** — L3/R3 pills were drawn on every
+   - **~~Input tester pak~~ Done (2026-07-09)** — L3/R3 pills were drawn on every
      device because `CODE_L3/R3` were unconditional in platform.h, and `is_rg34xx`
      wrongly stripped L3/R3 from the RG34XXSP. Now `detect_device()` sets
      `dev_has_lstick`/`dev_has_rstick` per model (verified matrix in 03: 35XXH/
      35XXPro/34XXSP/40XXH/cube dual, 40XXV left-only, 28XX/34XX/35XX+/2024/SP
      none — note the RG40XXV has *one* stick, clickable as L3) and those flags
      gate CODE_L3/R3, JOY_L3/R3, and the AXIS_* macros. Zero shared-code changes;
-     the Input pak adapts via its existing `has_*` derivation. Remaining: confirm
-     exact `RGXX_MODEL` strings for the RG35xx family / RG40xxH on hardware.
+     the Input pak adapts via its existing `has_*` derivation. Tested-good on
+     RG40XXV and RG34XXSP. The pak shows L3/R3 click state, not analog movement;
+     that is its existing cross-platform behavior and is not an H700 port task.
+     Other variants remain alpha hardware-validation targets. Remaining:
+     confirm exact `RGXX_MODEL` strings for the RG35xx family / RG40xxH on hardware.
    - **~~Fn switch option~~ Done (2026-07-09)** — the sliding Fn button doesn't
      exist on any RG XX device, so the settings capability predicate now excludes
      h700 while retaining the option on tg5040/tg5050.
-   - **~~Display settings~~ Done (2026-07-09, `0e60efd`)** — the dead enhance
+   - **~~Display settings~~ Done (2026-07-09, `0e60efd`)** — visually verified on
+     RG40XXV. The dead enhance
      controls (contrast/saturation/exposure) are now hidden on h700; displaycal
      reboot persistence fixed (was clobbered to defaults every boot); per-model
      displaycal preset plumbing added for the full 11-device H700 family (all
@@ -74,30 +86,47 @@ Ordered by impact within each section.
    reversible (drop a `bluealsa` binary in `.system/h700/bin` and the path lights
    up). Building bluez-alsa in the toolchain is the last piece of tg5040 feature
    parity. If dropped instead, remove the dormant bt_init/audiomon plumbing.
-10. **480p UI polish pass** (04) — verdict from real use on RG40XXV/RG34XXSP:
-    **mostly fine, OK for alpha**. No systemic layout breakage; known concrete issue: in some paks
-    (e.g. the Battery pak) the button-hint pills are large enough to overlap each
-    other. Before release, audit every shipped-by-default UI surface at 640×480
-    and 720×480 and fix pill/hint sizing where cramped.
+10. **480p UI polish pass** (04) — verdict from real use on RG40XXV and RG34XXSP:
+    **good for alpha**. The 720×480 Home UI, Battery, Game Tracker, Input, Clock,
+    Settings, on-screen keyboard, Files, and in-game menus all work well. Box art is
+    clean. Screenshots and resolution-specific overlays remain untested. Keep Files
+    at PPU 2 for now; PPU 3 may be evaluated later for the RG34XX/SP panel density.
 11. **Headphone jack detection** (05) — investigate how stock switches speaker/HP on
     a live device; may be hardware auto-mute (= nothing to do). Cheap to answer,
     closes a matrix row either way.
-12. **Measure real panel refresh** — `SCREEN_FPS 60.0` is assumed. A vsync-timing
-    test per device takes minutes and protects frame pacing math.
-13. Later: RGcubexx bring-up (720×720, wired but untested), HDMI out (`SetHDMI()` is
+12. **Investigate RG34XXSP auto CPU scaling** — manual in-game governor changes work,
+    but MD can slow down when Auto settles near 480 MHz with some shader/render
+    combinations. Stock shader + 3× scale + linear interpolation raised Auto to about
+    720 MHz and ran smoothly; Powersave and Performance selected about 1100/1500 MHz
+    and were also smooth. Determine whether this is workload detection, a core/render
+    interaction, or an Auto policy bug. There are no general frame-pacing, tearing,
+    input-lag, or audio concerns from tested gameplay.
+
+12a. **Build out the core/game matrix** — the initial RG34XXSP results are now in
+    [10](10-core-game-matrix.md). GB/GBC/GBA/FC/SFC pass; PS1 crashes back to Home for
+    every tested title; FBNeo needs a valid BIOS retest and must not trap MinArch when
+    BIOS is missing; MD needs the Auto-scaling investigation above. Expand coverage
+    across the remaining shipped systems and at least one additional H700 model.
+13. Later: RGcubexx bring-up (720×720, wired but no device is available locally;
+    external validation is an explicit purpose of the alpha), HDMI out (`SetHDMI()` is
     a no-op; mechanism documented in 04), RG35XX-family variants (displaycal presets
     + `DEVICE=rg35xx` mapping already plumbed — 04), Panel-Fix tool, **per-panel
     displaycal calibration** (measure each device, fill in the neutral presets in
     displaycal.h; confirm exact `RGXX_MODEL` strings for RG35xx family / RG40xxH
     while at it).
 
-13a. **~~Bootlogo pak~~ Done (2026-07-09)** — `Bootlogo.pak` builds and ships for
+13a. **Bootlogo pak: partial** — `Bootlogo.pak` builds and ships for
     h700: full tg5040 preset catalog regenerated as 24-bit BMPs per panel
     resolution (`640x480`, `720x480`, `480x640` rotated for RG28XX, `720x720`),
     folder picked via `$DEVICE`; writes `bootlogo.bmp` to `mmcblk0p2` and backs up
     the stock logo as `original.bmp` on first apply (02, 03). User-tested on
-    RG40XXV: apply + `original.bmp` backup verified; the post-apply reboot is a
-    bit slow but acceptable. Other panel sizes (34xx/28xx/cube) still unexercised.
+    RG40XXV: 640×480 apply + `original.bmp` backup verified, and the original appears
+    in the carousel. Restore was not explicitly selected but uses the same apply path;
+    the post-apply reboot is a bit slow but acceptable. On RG34XXSP, the 720×480 pak
+    shows no preview images. The packaged BMPs are valid, correctly sized, and
+    non-black, so this is a runtime loading/rendering issue rather than blank assets;
+    applying or restoring was not attempted there. The 480×640 and 720×720 paths
+    still need hardware testing.
 
 ## P2 — Cleanup / refactors / simplifications
 
