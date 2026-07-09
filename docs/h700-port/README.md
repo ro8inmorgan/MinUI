@@ -73,4 +73,5 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
    Fn-switch setting exists for hardware RG XX doesn't have, and dead enhance
    display controls are exposed; needs a capability-flag sweep (09-roadmap #8).
    (Formerly listed here: the alpha-blit unknown — resolved; it was the missing
-   64-bit libpng, and the branch will rebase onto main incl. alpha blending, 04.)
+   64-bit libpng. The branch is now rebased onto main incl. alpha blending; only
+   the on-device rendering re-check remains, 04.)

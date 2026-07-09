@@ -90,10 +90,10 @@ pre-alpha graphics stack. **The real root cause turned out to be the missing 64-
 and the silent dlopen failure corrupted image loading (fixed in `510d3bb1`, see
 pitfall #2 in 01). The alpha-blending code on main was never at fault.
 
-Consequence: the plan is to **rebase/merge the h700 branch back onto current main,
-alpha-blending work included** (09-roadmap #7). `workspace/all/` carries zero net
-change from the reverted experiment, so the rebase is clean on that front; verify
-rendering on device after the merge as the closing check.
+Consequence: the h700 branch has been **rebased onto current main, alpha-blending
+work included** (done 2026-07-09). `workspace/all/` carried zero net change from the
+reverted experiment, so the rebase was clean on that front. Closing check still open:
+verify rendering on device with the rebased build (09-roadmap #7).
 
 ## Boot splash
 

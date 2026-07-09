@@ -36,12 +36,12 @@ Ordered by impact within each section.
    env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
    patch covers GL contexts and that the two layers don't double-rotate; add
    `default-rg28xx.cfg` cfgs.
-7. **Rebase/merge the h700 branch back onto main, including the alpha-blending
-   work.** The alpha/tinted-bitmap question is solved: the graphical glitches were
-   caused by the missing 64-bit libpng bundle (SDL2_image's dlopen failing —
-   fixed in `510d3bb1`), **not** by main's alpha-blending changes. The blend-compat
-   revert was treating the wrong suspect. With libpng fixed, re-apply/merge on top
-   of current main and confirm rendering stays clean on device (04).
+7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch now sits
+   on top of current main including the alpha-blending work. (The alpha/tinted-
+   bitmap question was solved: the glitches were the missing 64-bit libpng bundle,
+   not main's alpha changes — 04.) Remaining: **confirm rendering stays clean on
+   device with the rebased build** (blit-heavy screens: browse list with box art,
+   game switcher, overlays).
 8. **Audit Brick-era feature assumptions in shared UI** — NextUI only ever targeted
    the Brick / Smart Pro, and several UI pieces hardcode that hardware. Known cases
    on RG XX:
