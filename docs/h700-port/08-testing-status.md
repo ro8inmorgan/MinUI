@@ -29,6 +29,9 @@
 | Brightness 0–10 + colortemp ramps; persist across reboot | ✅ |
 | MENU short-tap → shortcuts overlay vs. hold → brightness (compound-tap fix, see 00/03) | ✅ tested on RG34XXSP; firmware quirk is common to the H700 line, expected fine on all RG XX |
 | Displaycal RGB gains: act, persist, survive sleep + game launch | ✅ |
+| Displaycal survives reboot (was clobbered to defaults every boot; fixed 2026-07-09) | ✅ verified on RG40XXV by patching msettings.bin + reboot |
+| Fresh-install defaults: brightness 4, displaycal off/neutral | ✅ verified on RG40XXV (deleted msettings.bin + reboot) |
+| Dead enhance controls (contrast/saturation/exposure) hidden on h700 | ✅ code-gated 2026-07-09; visual check on device pending |
 | Shaders (all shipped .glsl), overlays, effects on Mali-G31 | ✅ |
 | Volume UI + levels, mute through 100% | ✅ tested on RG40XXV and RG34XXSP; no known issues |
 | Rumble (moto on/off) | ✅ |

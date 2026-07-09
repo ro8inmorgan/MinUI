@@ -1,6 +1,6 @@
 # 09 — Roadmap: from working beta to a 9.5/10 port
 
-Everything below is verified against branch tip `752cefe8` (updated 2026-07-09).
+Everything below is verified against branch tip `0e60efd` (updated 2026-07-09).
 Ordered by impact within each section.
 
 ## P0 — Correctness / robustness
@@ -54,11 +54,13 @@ Ordered by impact within each section.
      dual sticks + L3/R3; 34XX/28XX have none).
    - **Fn switch option** in the settings app — the sliding Fn button doesn't exist
      on any RG XX device; hide/gate it for h700.
-   - **Display settings** expose brightness/saturation/contrast/exposure enhance
-     controls that **do nothing on RG XX**. What actually works: LCD backlight
-     brightness, color temperature, white-point correction (displaycal), RGB
-     tuning. Gate the dead controls per-platform (and stop syncsettings from
-     "restoring" values that have no effect).
+   - **~~Display settings~~ Done (2026-07-09, `0e60efd`)** — the dead enhance
+     controls (contrast/saturation/exposure) are now hidden on h700; displaycal
+     reboot persistence fixed (was clobbered to defaults every boot); per-model
+     displaycal preset plumbing added for the full 11-device H700 family (all
+     neutral/disabled until panels are measured); default brightness raised to 4;
+     `RG35xx*` now maps to `DEVICE=rg35xx` in launch.sh (see 04). Remaining
+     nit: syncsettings still "restores" the no-op enhance values on resume.
    Worth a systematic sweep: grep settings.cpp / paks for capability flags that
    default to "present" and decide each for h700.
 9. **BT audio: ship bluealsa or formally drop it.** The gate-off is clean and
@@ -76,7 +78,11 @@ Ordered by impact within each section.
 12. **Measure real panel refresh** — `SCREEN_FPS 60.0` is assumed. A vsync-timing
     test per device takes minutes and protects frame pacing math.
 13. Later: RGcubexx bring-up (720×720, wired but untested), HDMI out (`SetHDMI()` is
-    a no-op; mechanism documented in 04), RG35XX-family variants, Panel-Fix tool.
+    a no-op; mechanism documented in 04), RG35XX-family variants (displaycal presets
+    + `DEVICE=rg35xx` mapping already plumbed — 04), Panel-Fix tool, **per-panel
+    displaycal calibration** (measure each device, fill in the neutral presets in
+    displaycal.h; confirm exact `RGXX_MODEL` strings for RG35xx family / RG40xxH
+    while at it).
 
 ## P2 — Cleanup / refactors / simplifications
 

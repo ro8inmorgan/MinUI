@@ -69,16 +69,36 @@ Treat the whole path as unverified.
 Same `/dev/disp` gamma-LUT ioctls as tg5040 (`0x10b` set / `0x10c` enable / `0x10d`
 disable). On RG40XXV: RGB gain sliders visibly act, persist, and **survive sleep and
 game launch** (syncsettings.elf re-applies the LUT after resume — 06). `settings.cpp`
-gained the Anbernic vendor + RG40XX/RG34XX/RG28XX/RGCubeXX models and enables
+gained the Anbernic vendor + RG XX models and enables
 colortemp/displaycal/mute/analog-stick/wifi/bt capability flags for h700.
-Per-panel default gain presets: not yet measured (neutral defaults).
+
+**Reboot persistence — fixed 2026-07-09.** `InitSettings()` used to call
+`applyDisplayCalDefaultsForDevice()` unconditionally *after* loading the persisted
+`msettings.bin`, clobbering white point / RGB gains back to off/100/100/100 on every
+boot (and every client attach). Now only the shm host seeds displaycal defaults, and
+only when the file is missing or predates v11. Verified on RG40XXV: patched values
+survive reboot. (tg5040 has the same latent bug, masked by its calibrated presets —
+flagged as a separate task.)
+
+**Per-model default presets — plumbed, not yet measured.** `displaycal.h` has a
+preset per H700 model (RG28XX, RG34XX, RG34XXSP, RG35XX = Plus/H/2024 shared,
+RG35XXSP, RG35XXPRO, RG40XXH, RG40XXV, RGCubeXX), all currently disabled/neutral
+(100/100/100). Selection keys on `RGXX_MODEL` (exact-model string from stock
+`dmenu.bin`; confirmed so far: `RG28xx`, `RG34xx`, `RG34xxSP`, `RG40xxV`,
+`RGcubexx` — RG35xx-family and RG40xxH strings matched by prefix until confirmed)
+with `DEVICE` fallback, in both h700 libmsettings and the settings app's
+reset-to-defaults. launch.sh now maps `RG35xx*` → `DEVICE=rg35xx` instead of lumping
+the 35xx family into rg40xx. Calibrating a panel later = editing numbers in
+displaycal.h only. Default brightness on h700 is 4 (tg5040 Brick keeps 2).
 
 **What actually works on RG XX panels:** LCD backlight brightness, color temperature,
 white-point correction (displaycal), RGB tuning. The `enhance_*` display controls
-(brightness/contrast/saturation/exposure) are exposed in settings just like tg5040
-**but do nothing on RG XX** — the sysfs attrs exist (00) yet have no visible effect.
-They need per-platform gating, and syncsettings shouldn't bother restoring them
-(09-roadmap #8).
+(contrast/saturation/exposure) **do nothing on RG XX** — the sysfs attrs exist (00)
+yet have no visible effect — so since 2026-07-09 they are hidden on h700 via the
+`DeviceInfo` capability gates in settings.cpp (including the mute-toggle variants).
+The libmsettings plumbing remains (harmless no-ops; the shared API keeps the
+symbols), and syncsettings still "restores" them on resume — a cosmetic cleanup at
+most.
 
 ## Alpha/tinted-bitmap blits — resolved (it was libpng all along)
 
