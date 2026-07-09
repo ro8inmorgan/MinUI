@@ -253,7 +253,13 @@ namespace {
             SmartProS,
             Flip,
             RG40XX,
+            RG40XXV,
+            RG40XXH,
             RG34XX,
+            RG34XXSP,
+            RG35XX, // Plus/H/2024
+            RG35XXSP,
+            RG35XXPRO,
             RG28XX,
             RGCubeXX
         };
@@ -293,6 +299,10 @@ namespace {
                     m_vendor = Anbernic;
                     m_model = RG40XX;
                     m_platform = h700;
+                } else if(exactMatch("rg35xx", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG35XX;
+                    m_platform = h700;
                 } else if(exactMatch("rg34xx", device)) {
                     m_vendor = Anbernic;
                     m_model = RG34XX;
@@ -307,6 +317,21 @@ namespace {
                     m_platform = h700;
                 }
             }
+            // Anbernic stock firmware reports the exact model (e.g. RG40xxV,
+            // RG34xxSP); use it to refine the DEVICE-based family match.
+            char* rgModel = getenv("RGXX_MODEL");
+            if (m_platform == h700 && rgModel) {
+                std::string model(rgModel);
+                if (model == "RG40xxV") m_model = RG40XXV;
+                else if (model == "RG40xxH") m_model = RG40XXH;
+                else if (model == "RG34xxSP") m_model = RG34XXSP;
+                else if (model.rfind("RG35xx", 0) == 0) {
+                    std::string suffix = model.substr(6);
+                    if (suffix.rfind("SP", 0) == 0) m_model = RG35XXSP;
+                    else if (suffix.rfind("Pro", 0) == 0 || suffix.rfind("PRO", 0) == 0) m_model = RG35XXPRO;
+                    else m_model = RG35XX;
+                }
+            }
         }
 
         Vendor getVendor() const { return m_vendor; }
@@ -317,12 +342,14 @@ namespace {
             return m_platform == tg5040 || m_platform == h700;
         }
 
+        // the H700 disp driver doesn't support the enhance_* sysfs nodes,
+        // so contrast/saturation/exposure are hidden there
         bool hasContrastSaturation() const {
-            return m_platform == my355 || m_platform == tg5040 || m_platform == h700;
+            return m_platform == my355 || m_platform == tg5040;
         }
 
         bool hasExposure() const {
-            return m_platform == tg5040 || m_platform == h700;
+            return m_platform == tg5040;
         }
 
         bool hasDisplayCal() const {
@@ -558,9 +585,19 @@ int main(int argc, char *argv[])
         if(deviceInfo.hasDisplayCal())
         {
             const DisplayCalDefaults defaultDisplayCal = DisplayCal_getDefaultSettings(
-                deviceInfo.getModel() == DeviceInfo::Brick ? DISPLAYCAL_PRESET_BRICK : 
+                deviceInfo.getModel() == DeviceInfo::Brick ? DISPLAYCAL_PRESET_BRICK :
                 deviceInfo.getModel() == DeviceInfo::BrickPro ? DISPLAYCAL_PRESET_BRICKPRO :
-                deviceInfo.getModel() == DeviceInfo::SmartPro ? DISPLAYCAL_PRESET_SMARTPRO : DISPLAYCAL_PRESET_DEFAULT);
+                deviceInfo.getModel() == DeviceInfo::SmartPro ? DISPLAYCAL_PRESET_SMARTPRO :
+                deviceInfo.getModel() == DeviceInfo::RG28XX ? DISPLAYCAL_PRESET_RG28XX :
+                deviceInfo.getModel() == DeviceInfo::RG34XX ? DISPLAYCAL_PRESET_RG34XX :
+                deviceInfo.getModel() == DeviceInfo::RG34XXSP ? DISPLAYCAL_PRESET_RG34XXSP :
+                deviceInfo.getModel() == DeviceInfo::RG35XX ? DISPLAYCAL_PRESET_RG35XX :
+                deviceInfo.getModel() == DeviceInfo::RG35XXSP ? DISPLAYCAL_PRESET_RG35XXSP :
+                deviceInfo.getModel() == DeviceInfo::RG35XXPRO ? DISPLAYCAL_PRESET_RG35XXPRO :
+                deviceInfo.getModel() == DeviceInfo::RG40XXH ? DISPLAYCAL_PRESET_RG40XXH :
+                deviceInfo.getModel() == DeviceInfo::RG40XXV ? DISPLAYCAL_PRESET_RG40XXV :
+                deviceInfo.getModel() == DeviceInfo::RGCubeXX ? DISPLAYCAL_PRESET_RGCUBEXX :
+                DISPLAYCAL_PRESET_DEFAULT);
             displayItems.push_back(
                 new MenuItem{ListItemType::Generic, "White point correction", "Corrects the display white point to better match the \nsRGB standard, at the expense of some peak brightness.", {false, true}, on_off, []() -> std::any
                 { return GetDisplayCalEnabled() != 0; }, [](const std::any &value)

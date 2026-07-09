@@ -59,19 +59,49 @@ static const struct DisplayCalDefaults DisplayCalDefaults_BrickPro = {
 	DISPLAYCAL_BRICKPRO_DEFAULT_BLUE_GAIN
 };
 
+// Anbernic H700 family. Not measured yet: disabled with neutral gains until
+// each panel is calibrated, at which point only the values below change.
+#define DISPLAYCAL_H700_UNCALIBRATED { 0, 100, 100, 100 }
+static const struct DisplayCalDefaults DisplayCalDefaults_RG28XX = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG34XX = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG34XXSP = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG35XX = DISPLAYCAL_H700_UNCALIBRATED; // Plus/H/2024
+static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXSP = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXPRO = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXH = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXV = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RGCubeXX = DISPLAYCAL_H700_UNCALIBRATED;
+
 enum DisplayCalPreset {
 	DISPLAYCAL_PRESET_DEFAULT = 0,
 	DISPLAYCAL_PRESET_BRICK,
 	DISPLAYCAL_PRESET_SMARTPRO,
 	DISPLAYCAL_PRESET_BRICKPRO,
+	DISPLAYCAL_PRESET_RG28XX,
+	DISPLAYCAL_PRESET_RG34XX,
+	DISPLAYCAL_PRESET_RG34XXSP,
+	DISPLAYCAL_PRESET_RG35XX,
+	DISPLAYCAL_PRESET_RG35XXSP,
+	DISPLAYCAL_PRESET_RG35XXPRO,
+	DISPLAYCAL_PRESET_RG40XXH,
+	DISPLAYCAL_PRESET_RG40XXV,
+	DISPLAYCAL_PRESET_RGCUBEXX
 };
 
 static inline DisplayCalDefaults DisplayCal_getDefaultSettings(enum DisplayCalPreset preset) {
-	if(preset == DISPLAYCAL_PRESET_SMARTPRO) {
-		return DisplayCalDefaults_SmartPro;
-	}
-	if(preset == DISPLAYCAL_PRESET_BRICK) {
-		return DisplayCalDefaults_Brick;
+	switch(preset) {
+		case DISPLAYCAL_PRESET_SMARTPRO: return DisplayCalDefaults_SmartPro;
+		case DISPLAYCAL_PRESET_BRICK: return DisplayCalDefaults_Brick;
+		case DISPLAYCAL_PRESET_RG28XX: return DisplayCalDefaults_RG28XX;
+		case DISPLAYCAL_PRESET_RG34XX: return DisplayCalDefaults_RG34XX;
+		case DISPLAYCAL_PRESET_RG34XXSP: return DisplayCalDefaults_RG34XXSP;
+		case DISPLAYCAL_PRESET_RG35XX: return DisplayCalDefaults_RG35XX;
+		case DISPLAYCAL_PRESET_RG35XXSP: return DisplayCalDefaults_RG35XXSP;
+		case DISPLAYCAL_PRESET_RG35XXPRO: return DisplayCalDefaults_RG35XXPRO;
+		case DISPLAYCAL_PRESET_RG40XXH: return DisplayCalDefaults_RG40XXH;
+		case DISPLAYCAL_PRESET_RG40XXV: return DisplayCalDefaults_RG40XXV;
+		case DISPLAYCAL_PRESET_RGCUBEXX: return DisplayCalDefaults_RGCubeXX;
+		default: break;
 	}
 	if(preset == DISPLAYCAL_PRESET_BRICKPRO) {
 		return DisplayCalDefaults_BrickPro;

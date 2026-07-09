@@ -314,15 +314,44 @@ int peekVersion(const char *filename) {
 	return version;
 }
 
+static int prefixMatch(char* pre, char* str) {
+	if (!pre || !str) return 0;
+	return (strncmp(pre, str, strlen(pre))==0);
+}
+
+// Pick the displaycal preset for this device. Exact RGXX_MODEL strings confirmed
+// so far: RG28xx, RG34xx, RG34xxSP, RG40xxV, RGcubexx. The RG35xx family and
+// RG40xxH are matched by prefix/suffix until their exact strings are confirmed.
+static enum DisplayCalPreset displayCalPresetForDevice(void) {
+	char* device = getenv("DEVICE");
+	char* model = getenv("RGXX_MODEL");
+
+	if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) return DISPLAYCAL_PRESET_RG28XX;
+	if (exactMatch("RG34xxSP", model)) return DISPLAYCAL_PRESET_RG34XXSP;
+	if (prefixMatch("RG34xx", model) || exactMatch("rg34xx", device)) return DISPLAYCAL_PRESET_RG34XX;
+	if (exactMatch("RG40xxV", model)) return DISPLAYCAL_PRESET_RG40XXV;
+	if (exactMatch("RG40xxH", model)) return DISPLAYCAL_PRESET_RG40XXH;
+	if (prefixMatch("RGcube", model) || exactMatch("cube", device)) return DISPLAYCAL_PRESET_RGCUBEXX;
+	if (prefixMatch("RG35xx", model)) {
+		char* suffix = model + strlen("RG35xx");
+		if (prefixMatch("SP", suffix)) return DISPLAYCAL_PRESET_RG35XXSP;
+		if (prefixMatch("Pro", suffix) || prefixMatch("PRO", suffix)) return DISPLAYCAL_PRESET_RG35XXPRO;
+		return DISPLAYCAL_PRESET_RG35XX; // Plus/H/2024 share a preset for now
+	}
+	// DEVICE=rg40xx alone can't distinguish V from H, so fall through to neutral
+	return DISPLAYCAL_PRESET_DEFAULT;
+}
+
 static void applyDisplayCalDefaultsForDevice(Settings *target) {
-	DisplayCalDefaults defaults = DisplayCal_getDefaultSettings(DISPLAYCAL_PRESET_DEFAULT);
+	DisplayCalDefaults defaults = DisplayCal_getDefaultSettings(displayCalPresetForDevice());
 	target->displaycal_enabled = defaults.enabled;
 	target->displaycal_red_gain = defaults.red_gain;
 	target->displaycal_green_gain = defaults.green_gain;
 	target->displaycal_blue_gain = defaults.blue_gain;
 }
 
-void InitSettings(void) {	
+void InitSettings(void) {
+	int seed_displaycal = 0;
 	sprintf(SettingsPath, "%s/msettings.bin", getenv("USERDATA_PATH"));
 	
 	shm_fd = shm_open(SHM_KEY, O_RDWR | O_CREAT | O_EXCL, 0644); // see if it exists
@@ -349,6 +378,8 @@ void InitSettings(void) {
 				else {
 					// initialize with defaults
 					memcpy(settings, &DefaultSettings, shm_size);
+					// no displaycal fields before v11, seed device defaults
+					seed_displaycal = 1;
 
 					// overwrite with migrated data
 					if(version==10) {
@@ -509,11 +540,13 @@ void InitSettings(void) {
 			else {
 				// load defaults
 				memcpy(settings, &DefaultSettings, shm_size);
+				seed_displaycal = 1;
 			}
 		}
 		else {
 			// load defaults
 			memcpy(settings, &DefaultSettings, shm_size);
+			seed_displaycal = 1;
 		}
 		
 		// these shouldn't be persisted
@@ -529,7 +562,9 @@ void InitSettings(void) {
 		system("amixer -q sset 'OutputR Mixer DACR' on >/dev/null 2>&1");
 	}
 
-	applyDisplayCalDefaultsForDevice(settings);
+	// only the host seeds displaycal defaults, and only when the persisted
+	// settings predate them — a clean current-version load keeps user values
+	if (is_host && seed_displaycal) applyDisplayCalDefaultsForDevice(settings);
 
 	// This will implicitly update all other settings based on FN switch state
 	SetMute(settings->mute);

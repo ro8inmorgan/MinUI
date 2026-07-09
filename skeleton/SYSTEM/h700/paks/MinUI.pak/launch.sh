@@ -131,6 +131,8 @@ export RGXX_MODEL="$(strings /mnt/vendor/bin/dmenu.bin 2>/dev/null | grep -m1 '^
 case "$RGXX_MODEL" in
 	RG28xx) export DEVICE="rg28xx" ;;
 	RG34xx*|RG34XX*) export DEVICE="rg34xx" ;;
+	RG35xx*|RG35XX*) export DEVICE="rg35xx" ;;
+	RG40xx*|RG40XX*) export DEVICE="rg40xx" ;;
 	RGcubexx) export DEVICE="cube" ;;
 	*) export DEVICE="rg40xx" ;;
 esac
