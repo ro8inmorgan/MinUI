@@ -5,7 +5,7 @@
 | Device | Evidence | Role |
 |---|---|---|
 | RG40XXV | Probed live | Primary bring-up device |
-| RG34XXSP | User-tested | General parity with RG40XXV; lid wake/sleep broken |
+| RG34XXSP | User-tested | General parity with RG40XXV; sleep/wake + lid validated here |
 | RG28XX | Not yet tested | Rotation validation target |
 | TrimUI Brick TG5040 | Probed live | Regression reference (behavioral 1:1 comparisons) |
 
@@ -34,11 +34,11 @@
 | Rumble (moto on/off) | ✅ |
 | WiFi scan/connect/forget | ✅ |
 | WiFi survives sleep; NTP sync | ✅ |
-| **Deep sleep (auto/manual/in-game) + wake** | ⚠️ **wake unreliable — sometimes hangs entering/leaving suspend (see 06)** |
+| Deep sleep (auto/manual) + wake | ✅ fixed & user-tested on RG34XXSP 2026-07-09 (4 stacked bugs — see 06); in-game (minarch) path shares the code but untested; RG40XXV re-test pending |
 | Screenshots, Recently Played, game switcher, box art | ⬜ |
 | Clean uninstall (delete dmenu.bin → pristine stock) | ⬜ |
 | Battery % accuracy vs stock; charging indicator; charge-while-sleeping | ⬜ |
-| Overnight drain (8 h mem-sleep vs stock baseline) | ⬜ (blocked on wake reliability) |
+| Overnight drain (8 h mem-sleep vs stock baseline) | ⬜ (unblocked — sleep/wake now reliable) |
 | RetroAchievements login + unlock | ⬜ |
 | Pak Store install | ⬜ |
 | OTA update flow | ⬜ |
@@ -46,7 +46,7 @@
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
 | RG34XXSP: general H700 port + 720×480 UI | ✅ user-tested; works like RG40XXV |
-| RG34XXSP: lid sleep/wake | ⚠️ tested, broken — lid does not sleep/wake; screen stays on |
+| RG34XXSP: lid sleep/wake | ✅ lid close sleeps; lid open wakes from screen-off; power key wakes from deep suspend (stock-like, desired — see 06) |
 | RG28XX: rotated UI + games | ⬜ (plumbing in place, unvalidated — 04) |
 | RGcubexx: 720×720 | ⬜ |
 
@@ -79,12 +79,13 @@
   8. `workspace/all/syncsettings/syncsettings.c` — also restore colortemp/contrast/saturation/exposure/displaycal on resume
   9. `workspace/makefile` — rfkill for h700; ledcontrol/bootlogo gated to tg50x0
   10. Root `makefile` + `makefile.toolchain` — h700 platform + tg5040-image reuse
-  (`workspace/all/common/api.c` was touched by the alpha-blit experiment and fully
-  reverted — net zero.)
+  11. `workspace/all/common/api.c`/`api.h` — `PWR_requestSleep()` (lid sleep) and
+  `SND_quit()` in `PWR_enterSleep` (close ALSA before suspend; see 06). Both are
+  platform-agnostic changes — watch them when rebasing onto main.
 - **Re-run the 00-device-facts probes after each Anbernic stock-firmware update.**
   Paths have been stable historically, but `dmenu_ln`/muOS hooks are
   stockmod-version-dependent, and the model-string detector reads a stock binary.
 - When adding or promoting a device (34XXSP/28XX/cube): walk this matrix top to
-  bottom on that device; the ⬜ rows above are the backlog for RG40XXV too. For
-  RG34XXSP specifically, the next targeted probes are `hallkey` polarity/values and
-  whether the kernel/stock stack handles any lid action before NextUI sees it.
+  bottom on that device; the ⬜ rows above are the backlog for RG40XXV too.
+  (RG34XXSP hallkey semantics are settled: 1 = lid open, polled from sysfs, no evdev
+  switch exists, and nothing else in the stock/stockmod stack reacts to it — 06.)

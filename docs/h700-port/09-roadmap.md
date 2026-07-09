@@ -5,13 +5,15 @@ Ordered by impact within each section.
 
 ## P0 — Correctness / robustness
 
-1. **Fix unreliable sleep/wake** (the #1 defect — see 06 for the state of play and
-   suspects). All previously-identified software suspects are already fixed, so this
-   needs real debugging: instrument `skeleton/SYSTEM/h700/bin/suspend` with
-   breadcrumbs to distinguish hang-on-entry from hang-on-exit, compare our
-   pre-suspend service/driver state against stock's sleep path, and reconsider the
-   5-try retry loop (a retry against a half-suspended SoC may itself wedge). Blocks
-   the overnight-drain test and any credible "sleep is a headline feature" claim.
+1. **~~Fix unreliable sleep/wake~~ Done (2026-07-09)** — was four stacked bugs, all
+   fixed and user-verified on RG34XXSP (see 06 for the full postmortem): the suspend
+   script died on `set -o pipefail` (unsupported shell → non-zero exit → poweroff
+   instead of suspend), the persistent `wake_fd` buffered the sleep-triggering
+   power-key release (instant bounce-back on every 2nd+ sleep), lid close could never
+   satisfy the sleep condition (now `PWR_requestSleep()`), and wake froze the UI
+   ~5–10 s (ALSA PCM held open across suspend takes SDL ~9 s to close — now closed in
+   `PWR_enterSleep`; plus wifi/bt restart moved to `after_async &`). Unblocks the
+   overnight-drain test.
 2. **Decide muOS/stockmod coexistence policy** (`boot/boot.sh` — currently shows
    "STOCK TARGET REQUIRED" splash but *continues booting*; launch.sh drops
    stockmod-warning.txt). Either hard-fail with the splash held on screen, or
@@ -29,10 +31,11 @@ Ordered by impact within each section.
 ## P1 — Feature completeness
 
 5. **RG34XXSP lid fix + polish** — general bring-up is now user-tested and works like
-   RG40XXV, including the 720×480 UI path. Remaining SP-specific work: fix lid
-   sleep/wake (currently the screen stays on), probe hallkey semantics/polarity, verify
-   power-key-while-closed behavior, and decide whether per-Emu `default-rg34xx.cfg`
-   device cfgs are needed (none exist yet — only `default.cfg`).
+   RG40XXV, including the 720×480 UI path. ~~Fix lid sleep/wake~~ Done (2026-07-09):
+   lid close sleeps, lid open wakes from screen-off (power key needed after deep
+   suspend, matching stock — hallkey polarity verified 1=open; see 06). Remaining:
+   decide whether per-Emu `default-rg34xx.cfg` device cfgs are needed (none exist
+   yet — only `default.cfg`).
 6. **RG28XX rotation validation** — plumbing exists on both layers (SDL_ROTATION=1
    env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
    patch covers GL contexts and that the two layers don't double-rotate; add

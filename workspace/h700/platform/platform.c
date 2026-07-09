@@ -366,6 +366,24 @@ static void poll_evdev_input(uint32_t tick) {
 	}
 }
 
+// wake_fd is a second, independent open of event0 used by PLAT_shouldWake.
+// It must be kept drained while awake, otherwise the power-key release that
+// triggers the next sleep is still buffered when PWR_waitForWake starts
+// polling and the device wakes back up instantly.
+static void drain_wake_fd(void) {
+	if (wake_fd < 0)
+		wake_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+	if (wake_fd < 0) return;
+
+	struct input_event event;
+	errno = 0;
+	while (read(wake_fd, &event, sizeof(event)) == sizeof(event));
+	if (errno && errno != EAGAIN && errno != EWOULDBLOCK) {
+		close(wake_fd);
+		wake_fd = -1;
+	}
+}
+
 void PLAT_pollInput(void) {
 	pad.just_pressed = BTN_NONE;
 	pad.just_released = BTN_NONE;
@@ -384,8 +402,11 @@ void PLAT_pollInput(void) {
 	poll_sdl_input(tick);
 	poll_evdev_input(tick);
 
-	if (lid.has_lid && PLAT_lidChanged(NULL))
-		pad.just_released |= BTN_SLEEP;
+	drain_wake_fd();
+
+	int lid_open;
+	if (lid.has_lid && PLAT_lidChanged(&lid_open) && !lid_open)
+		PWR_requestSleep();
 }
 
 void PLAT_updateInput(const SDL_Event *event) {
@@ -595,6 +616,7 @@ int PLAT_shouldWake(void) {
 				should_wake = 0;
 				continue;
 			}
+			LOG_debug("PLAT_shouldWake: power key release, waking\n");
 			should_wake = 1;
 		}
 	}

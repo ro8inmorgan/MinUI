@@ -4179,6 +4179,11 @@ void PWR_update(int *_dirty, int *_show_setting, PWR_callback_t before_sleep, PW
 		*_show_setting = show_setting;
 }
 
+void PWR_requestSleep(void)
+{
+	pwr.requested_sleep = 1;
+}
+
 // TODO: this isn't whether it can sleep but more if it should sleep in response to the sleep button
 void PWR_disableSleep(void)
 {
@@ -4245,7 +4250,10 @@ void PWR_powerOff(int reboot)
 
 static void PWR_enterSleep(void)
 {
-	SND_pauseAudio(true);
+	// Fully close the audio device before sleeping: a PCM that stays open
+	// across suspend-to-RAM ends up in a state SDL takes ~10s to close on
+	// wake, freezing the UI. PWR_exitSleep reopens it via SND_resetAudio.
+	SND_quit();
 	LEDS_pushProfileOverride(LIGHT_PROFILE_SLEEP);
 	if (GetHDMI())
 	{

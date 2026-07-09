@@ -573,6 +573,7 @@ int PWR_isPoweringOff(void);
 void PWR_sleep(void);
 int PWR_deepSleep(void);
 
+void PWR_requestSleep(void);
 void PWR_disableSleep(void);
 void PWR_enableSleep(void);
 
