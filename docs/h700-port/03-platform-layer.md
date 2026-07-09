@@ -7,12 +7,31 @@ constants from the old rg35xxplus port (`git show 8cd78866:...`).
 
 One platform serves all devices: `DEVICE`/`RGXX_MODEL` env (set by launch.sh, see 02)
 → `detect_device()` sets `is_rg28xx / is_rg34xx / is_cube` globals that drive
-resolution, rotation, and stick availability — the tg5040 `is_brick` pattern.
+resolution and rotation, plus `dev_has_lstick / dev_has_rstick` capability flags
+that drive stick availability — the tg5040 `is_brick` pattern.
+
+Analog stick matrix (verified against Retro Catalog/Anbernic specs 2026-07, RG40XXV
+confirmed on hardware; every stick present clicks, so L3 ⇔ left stick, R3 ⇔ right):
+
+| Device | Sticks | Detection key |
+|---|---|---|
+| RG28XX, RG34XX, RG35XX Plus/2024/SP | none | `RG28xx` / `RG34xx` exact; `RG35xx` prefix default |
+| RG35XX H, RG35XX Pro | dual | `RG35xx` prefix + `H`/`Pro` suffix |
+| RG34XXSP | dual | `RG34xxSP` exact |
+| RG40XX H, RG CubeXX, unknown | dual | `RG40xxH`, `RGcube*`; dual is the fallback |
+| RG40XX V | left only | `RG40xxV` exact |
+
+Unknown `RG35xx` variants default to stickless (most of that family is); anything
+else unknown defaults to dual (today's behavior, covers `DEVICE=rg40xx` without a
+model string). No H700 Anbernic device has an Fn switch. Exact `RGXX_MODEL` strings
+still unconfirmed for the RG35xx family and RG40xxH (same caveat as msettings'
+displaycal presets).
 
 ## platform.h (as shipped)
 
 ```c
 extern int is_rg28xx, is_rg34xx, is_cube;
+extern int dev_has_lstick, dev_has_rstick;
 
 #define FIXED_SCALE   2
 #define FIXED_WIDTH   (is_cube?720:(is_rg34xx?720:640))
@@ -67,8 +86,12 @@ Verified mappings (also recorded in 00):
   shortcuts overlay into brightness mode. Fix: `button_from_code()` no longer maps
   `CODE_MENU_ALT` to `BTN_MENU` (keymon likewise ignores it); tap-vs-hold is derived
   from the clean 312 timing. The SDL path was never affected (`JOY_MENU_ALT = JOY_NA`).
-- Analog sticks: ABS_Z/RX/RY/RZ, raw 0..4096, scaled ×32767/4096. Sticks exist on
-  RG40XXV and cube only; `is_*` conditionals set JOY_L3/R3 = NA elsewhere.
+- Analog sticks: ABS_Z/RX/RY/RZ, raw 0..4096, scaled ×32767/4096. Presence varies
+  per model (see the stick matrix above); `dev_has_lstick`/`dev_has_rstick` gate
+  CODE_L3/R3, JOY_L3/R3, and AXIS_LX/LY/RX/RY to NA where the stick is absent, so
+  the Input pak and shared input code adapt without platform-independent changes.
+  (Previously CODE_L3/R3 were unconditional, so the Input pak drew L3/R3 pills on
+  every device, and `is_rg34xx` wrongly stripped L3/R3 from the RG34XXSP.)
 - SDL indices (secondary path): A=0 B=1 Y=2 X=3 L1=4 R1=5 SELECT=6 START=7 MENU=8,
   L3=9 L2=10 R2=11 R3=12, MINUS=15 PLUS=16; axes LX=0 LY=1 RX=2 RY=3.
 

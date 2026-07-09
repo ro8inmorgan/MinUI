@@ -14,6 +14,8 @@
 extern int is_rg28xx;
 extern int is_rg34xx;
 extern int is_cube;
+extern int dev_has_lstick;
+extern int dev_has_rstick;
 
 ///////////////////////////////
 
@@ -62,8 +64,8 @@ extern int is_cube;
 #define CODE_R1			309
 #define CODE_L2			314
 #define CODE_R2			315
-#define CODE_L3			313
-#define CODE_R3			316
+#define CODE_L3			(dev_has_lstick ? 313 : CODE_NA)
+#define CODE_R3			(dev_has_rstick ? 316 : CODE_NA)
 
 #define CODE_MENU		312
 #define CODE_MENU_ALT	354
@@ -91,8 +93,8 @@ extern int is_cube;
 #define JOY_R1			5
 #define JOY_L2			10
 #define JOY_R2			11
-#define JOY_L3			(is_rg34xx || is_rg28xx ? JOY_NA : 9)
-#define JOY_R3			(is_rg34xx || is_rg28xx ? JOY_NA : 12)
+#define JOY_L3			(dev_has_lstick ? 9 : JOY_NA)
+#define JOY_R3			(dev_has_rstick ? 12 : JOY_NA)
 
 #define JOY_MENU		8
 #define JOY_POWER		JOY_NA
@@ -104,10 +106,10 @@ extern int is_cube;
 #define AXIS_L2			AXIS_NA
 #define AXIS_R2			AXIS_NA
 
-#define AXIS_LX			0
-#define AXIS_LY			1
-#define AXIS_RX			2
-#define AXIS_RY			3
+#define AXIS_LX			(dev_has_lstick ? 0 : AXIS_NA)
+#define AXIS_LY			(dev_has_lstick ? 1 : AXIS_NA)
+#define AXIS_RX			(dev_has_rstick ? 2 : AXIS_NA)
+#define AXIS_RY			(dev_has_rstick ? 3 : AXIS_NA)
 
 ///////////////////////////////
 

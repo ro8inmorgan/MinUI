@@ -49,9 +49,15 @@ Ordered by impact within each section.
 8. **Audit Brick-era feature assumptions in shared UI** — NextUI only ever targeted
    the Brick / Smart Pro, and several UI pieces hardcode that hardware. Known cases
    on RG XX:
-   - **Input tester pak** shows the Brick's button layout: no analog sticks
-     rendered, R3 assumed always present. Needs device-aware layout (RG40XXV has
-     dual sticks + L3/R3; 34XX/28XX have none).
+   - **~~Input tester pak~~ Done (2026-07-10)** — L3/R3 pills were drawn on every
+     device because `CODE_L3/R3` were unconditional in platform.h, and `is_rg34xx`
+     wrongly stripped L3/R3 from the RG34XXSP. Now `detect_device()` sets
+     `dev_has_lstick`/`dev_has_rstick` per model (verified matrix in 03: 35XXH/
+     35XXPro/34XXSP/40XXH/cube dual, 40XXV left-only, 28XX/34XX/35XX+/2024/SP
+     none — note the RG40XXV has *one* stick, clickable as L3) and those flags
+     gate CODE_L3/R3, JOY_L3/R3, and the AXIS_* macros. Zero shared-code changes;
+     the Input pak adapts via its existing `has_*` derivation. Remaining: confirm
+     exact `RGXX_MODEL` strings for the RG35xx family / RG40xxH on hardware.
    - **Fn switch option** in the settings app — the sliding Fn button doesn't exist
      on any RG XX device; hide/gate it for h700.
    - **~~Display settings~~ Done (2026-07-09, `0e60efd`)** — the dead enhance

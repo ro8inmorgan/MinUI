@@ -39,6 +39,7 @@
 | WiFi survives sleep; NTP sync | ✅ |
 | Deep sleep (auto/manual) + wake | ✅ fixed & user-tested on RG34XXSP 2026-07-09 (4 stacked bugs — see 06); in-game (minarch) path shares the code but untested; RG40XXV re-test pending |
 | Files app (NextCommander): input, scaling, first-frame render | ✅ fixed & user-tested on RG40XXV 2026-07-09 (SDL joystick classification patch, button index remap, square-window + oversize-window fixes, startup warmup render, PPU 2 — see 01/03) |
+| Input pak: per-device stick layout (L3/R3 pills only where sticks exist; RG40XXV shows L3 only) | ⬜ (code-gated 2026-07-10 via `dev_has_lstick/rstick` — see 03; needs on-device check + `RGXX_MODEL` string capture on RG35xx family / RG40xxH) |
 | Screenshots, Recently Played, game switcher, box art | ⬜ |
 | Clean uninstall (delete dmenu.bin → pristine stock) | ⬜ |
 | Battery % accuracy vs stock; charging indicator; charge-while-sleeping | ⬜ |

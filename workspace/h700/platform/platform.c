@@ -29,6 +29,8 @@
 int is_rg28xx = 0;
 int is_rg34xx = 0;
 int is_cube = 0;
+int dev_has_lstick = 0;
+int dev_has_rstick = 0;
 static int wake_fd = -1;
 
 #define H700_INPUT_COUNT 12
@@ -185,6 +187,29 @@ static void detect_device(void) {
 	is_rg28xx = exactMatch("rg28xx", device) || exactMatch("RG28xx", model);
 	is_rg34xx = exactMatch("rg34xx", device) || exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model);
 	is_cube = exactMatch("cube", device) || exactMatch("RGcubexx", model);
+
+	// Analog sticks per model; every stick on these devices clicks (L3 = left,
+	// R3 = right). Exact RGXX_MODEL strings confirmed so far: RG28xx, RG34xx,
+	// RG34xxSP, RG40xxV, RGcubexx. The RG35xx family and RG40xxH are matched by
+	// prefix/suffix until their exact strings are confirmed (same as msettings).
+	dev_has_lstick = 1; // unknown models keep the previous dual-stick layout
+	dev_has_rstick = 1;
+	if (is_rg28xx) {
+		dev_has_lstick = dev_has_rstick = 0;
+	}
+	else if (is_rg34xx) {
+		// the RG34xx has no sticks, the RG34xxSP has two
+		dev_has_lstick = dev_has_rstick = exactMatch("RG34xxSP", model);
+	}
+	else if (exactMatch("RG40xxV", model)) {
+		dev_has_rstick = 0; // single left stick
+	}
+	else if ((model && prefixMatch("RG35xx", model)) || exactMatch("rg35xx", device)) {
+		// only the H and Pro have sticks; Plus/2024/SP (and unknown variants,
+		// since most of the family is stickless) don't
+		char *suffix = (model && prefixMatch("RG35xx", model)) ? model + strlen("RG35xx") : "";
+		dev_has_lstick = dev_has_rstick = prefixMatch("H", suffix) || prefixMatch("Pro", suffix);
+	}
 }
 
 void PLAT_initPlatform(void) {
