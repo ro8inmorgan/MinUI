@@ -58,8 +58,9 @@ Ordered by impact within each section.
      gate CODE_L3/R3, JOY_L3/R3, and the AXIS_* macros. Zero shared-code changes;
      the Input pak adapts via its existing `has_*` derivation. Remaining: confirm
      exact `RGXX_MODEL` strings for the RG35xx family / RG40xxH on hardware.
-   - **Fn switch option** in the settings app — the sliding Fn button doesn't exist
-     on any RG XX device; hide/gate it for h700.
+   - **~~Fn switch option~~ Done (2026-07-09)** — the sliding Fn button doesn't
+     exist on any RG XX device, so the settings capability predicate now excludes
+     h700 while retaining the option on tg5040/tg5050.
    - **~~Display settings~~ Done (2026-07-09, `0e60efd`)** — the dead enhance
      controls (contrast/saturation/exposure) are now hidden on h700; displaycal
      reboot persistence fixed (was clobbered to defaults every boot); per-model
