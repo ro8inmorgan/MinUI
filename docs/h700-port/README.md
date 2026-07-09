@@ -1,87 +1,73 @@
-# NextUI → Allwinner H700 (Anbernic RG XX) Port Plan
+# NextUI → Allwinner H700 (Anbernic RG XX) Port
 
-**Goal:** run NextUI on the Anbernic RG XX line (Allwinner H700) with feature parity
-with the TrimUI Brick (tg5040) — including displaycal, WiFi/BT, and first-class
-sleep leveraging the stock OS's excellent suspend — installed *on top of the latest
-Anbernic stock OS*, no reflash, fully reversible.
+**Goal:** NextUI on the Anbernic RG XX line (Allwinner H700) with feature parity with
+the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
+of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Initial targets:** RG40XXV and RG34XXSP. RG28XX (rotated panel) follows. CubeXX,
-HDMI-out and the wider RG35XX family are follow-ups on the same platform code.
+**Status (2026-07-09): working beta on RG40XXV.** Boot, video (custom Mali SDL2 +
+full GLES shader pipeline), audio, input, games at full speed, brightness/colortemp/
+displaycal, WiFi, and rumble are all tested-good on hardware. Known open items: sleep
+wake is unreliable (the #1 defect), BT audio is gated off, RG34XXSP/RG28XX/cube are
+wired but untested. Full status in [08](08-testing-status.md), path to done in
+[09](09-roadmap.md).
+
+These docs began as the implementation plan and were restructured after the
+implementation landed (branch `h700`, 17 commits) into reference documentation:
+verified device facts, the architecture as shipped, deviations from the plan and why,
+and the lessons that transfer to future platform ports.
 
 ## Documents
 
 | Doc | Contents |
 |---|---|
-| [00-device-facts.md](00-device-facts.md) | Ground truth: live probe results from RG40XXV + TG5040, old-port sysfs inventory, boot-chain analysis |
-| [01-toolchain-and-build.md](01-toolchain-and-build.md) | h700-toolchain docker image, sysroot, repo/build integration |
-| [02-boot-and-installer.md](02-boot-and-installer.md) | dmenu.bin hijack, installer, SD layouts, skeleton tree |
-| [03-platform-layer.md](03-platform-layer.md) | `workspace/h700/`: platform.c/h, input, libmsettings, keymon, cores |
-| [04-video-display.md](04-video-display.md) | SDL2+Mali/GLES stack, per-device geometry, RG28XX rotation, HDMI, displaycal |
-| [05-audio.md](05-audio.md) | ALSA/SDL audio, volume/mute, jack, BT audio |
-| [06-power-sleep-battery.md](06-power-sleep-battery.md) | Deep sleep, wake, lid (34XXSP), battery, governors, poweroff |
-| [07-wifi-bluetooth.md](07-wifi-bluetooth.md) | wpa_supplicant strategy, bluealsa, parity checklist |
-| [08-testing-and-rollout.md](08-testing-and-rollout.md) | Phase-0 spikes, validation matrix, phases & estimates |
+| [00-device-facts.md](00-device-facts.md) | Ground truth: probed hardware facts, sysfs/ioctl/evdev reference, boot chain, quirks |
+| [01-toolchain-and-build.md](01-toolchain-and-build.md) | tg5040-image reuse, in-tree SDL2, **toolchain-reuse pitfalls (read before porting anything else)** |
+| [02-boot-and-installer.md](02-boot-and-installer.md) | dmenu.bin hijack, boot shim, installer, SD layout, uninstall |
+| [03-platform-layer.md](03-platform-layer.md) | `workspace/h700/`: platform.c/h, input (evdev-primary), libmsettings, keymon, cores |
+| [04-video-display.md](04-video-display.md) | SDL2+Mali/GLES stack, geometry, rotation, HDMI, displaycal, the alpha-blit question |
+| [05-audio.md](05-audio.md) | ALSA path, the dlopen'd-libasound bug story, volume/mute quirks, BT-audio gating |
+| [06-power-sleep-battery.md](06-power-sleep-battery.md) | Sleep design, **the wake-reliability issue**, lid, battery, governors |
+| [07-wifi-bluetooth.md](07-wifi-bluetooth.md) | NextUI-owned wpa_supplicant, DHCP/creds handling, BT status |
+| [08-testing-status.md](08-testing-status.md) | Validation matrix with real results, regression guardrails, shared-code touch list |
+| [09-roadmap.md](09-roadmap.md) | Prioritized path from beta to a 9.5/10 port |
 
-## Why this port is very tractable (evidence-based)
+## Architecture in one paragraph
 
-1. **Same silicon family, same BSP generation as the reference platform.** H700 and
-   the TG5040's A133P are both quad-A53 Allwinner SoCs on 4.9 BSP kernels with the
-   same disp2 display driver (`/dev/disp`, identical `/sys/class/disp` attrs — verified),
-   the same AXP2202-family PMIC with the *same* battery sysfs paths (verified), and
-   `freeze mem` suspend (verified working by suspending the actual RG40XXV remotely).
-2. **Same CPU arch and compatible glibc.** Stock RG OS is Ubuntu 22.04 arm64
-   (glibc 2.35) vs tg5040's glibc 2.33 — tg5040-built aarch64/cortex-a53 binaries are
-   ABI-compatible with the target. Cores list ports unchanged; no 32-bit toolchain
-   resurrection needed (the old rg35xxplus port was 32-bit — we go 64-bit).
-3. **NextUI's platform abstraction is clean.** Shared code (`workspace/all/`) has
-   essentially zero platform #ifdefs; a platform = one directory + skeleton + toolchain
-   image. tg5050 proves the clone-and-repoint model.
-4. **The old MinUI rg35xxplus port is recoverable from git** (`git show 8cd78866:...`)
-   and documents every H700 hardware path — buttons, brightness ioctl, rumble, lid,
-   HDMI, boot hijack — most re-verified live on 2026 firmware during this planning.
-   It is a *hardware-paths reference only*: its software architecture (32-bit,
-   SDL_Renderer, pre-shader-era APIs) is obsolete; **tg5040 is the golden platform**
-   and the code clone base.
-5. **The boot hijack still exists on current firmware** (verified in the stock
-   launcher scripts on-device): drop `dmenu.bin` on the FAT ROMs partition → stock
-   runs it instead of its frontend. Reversible by deleting one file.
+One `h700` platform serves rg40xx/rg34xx/rg28xx/cube (`DEVICE` env, detected at boot
+from the stock dmenu.bin binary). It builds inside the **tg5040 toolchain image** (same
+aarch64/A53 target, forward-compatible glibc) with one in-tree extra: a pinned custom
+SDL2 (`JohnnyonFlame/SDL-malifbdev-rot`) targeting the Mali blob's fbdev EGL winsys.
+NextUI's shared `generic_video.c`/`generic_wifi.c`/`generic_bt.c` run unchanged. Boot
+is hijacked by dropping one `dmenu.bin` file on the stock card's FAT partition; NextUI
+itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
+(systemd, timedatectl, dhclient, BlueZ 5.64, stock unzip) rather than bundled around.
 
-## Key decisions (rationale in the linked docs)
+## Key decisions — outcome register
 
-| Decision | Choice | Doc |
+| Decision | Planned | Shipped / outcome |
 |---|---|---|
-| Platform name | `h700` (one platform, `DEVICE` env selects rg40xx/rg34xx/rg28xx/cube — the tg5040 `is_brick` pattern) | 03 |
-| Arch | aarch64 / cortex-a53, 64-bit (matches stock OS & tg5040 flags) | 01 |
-| Toolchain | **Reuse the tg5040 docker image** (empirically proven: tg5040-built displaycal.elf runs on stockmod + Knulli); custom SDL2 built in-tree (`workspace/h700/other/`, old-port pattern); dedicated image deferred | 01 |
-| Video | Bundled custom SDL2 (JohnnyonFlame/SDL-malifbdev-rot, rebuilt 64-bit) + Mali-G31 blob GLES 3.2 → NextUI's generic_video/shader pipeline unchanged | 04 |
-| Rotation (28xx) | Try SDL-level rot first; durable plan = small rotation hook in generic_video present pass | 04 |
-| Sleep | `echo mem` (verified) + tg5040-style suspend wrapper (wifi bounce on resume required — observed); power-button wake; RTC wake unavailable | 06 |
-| Lid (34XXSP) | `axp2202-battery/hallkey`, old-port semantics in current `PLAT_initLid/lidChanged` API | 06 |
-| WiFi | NextUI-owned wpa_supplicant (generic_wifi.c unchanged); stop NetworkManager at launch | 07 |
-| BT | System BlueZ 5.64 + ship bluealsa (no btmanager pakz needed) | 07 |
-| Rumble | `axp2202-battery/moto` (on/off) | 03 |
-| LEDs | `MAX_LIGHTS 0`; `work_led`/`workled_sleep` for power-LED sleep signaling only | 03 |
-| Brightness / displaycal | Same `/dev/disp` ioctls as tg5040 (0x102 brightness, 0x10b-d gamma LUT) — expected 1:1 | 04 |
-| Install location | NextUI entirely on TF2 (`/mnt/sdcard`); stock TF1 card untouched except one drag-dropped `dmenu.bin` on its FAT ROMs partition (the verified stock-boot hijack; stock OS partitions never written). No TF1-only mode. | 02 |
+| Platform | one `h700`, `DEVICE` env per device | ✅ as planned |
+| Arch / toolchain | 64-bit, reuse tg5040 image | ✅ as planned — with real costs; pitfalls catalogued in 01 |
+| SDL2 | in-tree malifbdev-rot build | ✅ as planned, pinned + config-asserted |
+| Video | generic_video GLES pipeline on Mali blob | ✅ worked 1:1; shaders/overlays/effects tested-good |
+| **Input** | SDL joystick route | **Deviation:** raw evdev primary (SDL js enumeration unreliable on stock image); SDL kept for BT pads (03) |
+| **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
+| **BT audio** | build + ship bluealsa | **Deviation:** gated off this beta (`NO_BT_AUDIO`); re-enable path documented (05/07) |
+| Sleep | `echo mem` + tg5040-style wrapper | ✅ implemented incl. resume restore — ⚠️ wake unreliable, open (06) |
+| Lid | hallkey → PLAT lid API | ✅ wired; untested (no 34XXSP yet) |
+| WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |
+| Rumble / LEDs | moto sysfs; MAX_LIGHTS 0 | ✅ as planned; rumble tested-good |
+| Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
+| Install | TF1 gets one file; NextUI on TF2; no TF1-only mode | ✅ as planned; TF1 writes mountpoint+cmp guarded |
+| **Splash** | per-panel raw-BMP `dd` assets | **Deviation:** `fbsplash` text renderer — no per-resolution assets needed (02) |
+| RG28XX rotation | SDL-level first, GL hook fallback | Both layers plumbed; unvalidated (04) |
+| HDMI | stretch goal | Detection wired; `SetHDMI()` no-op — still a stretch goal (04) |
 
-## Top risks (each has a fallback documented)
+## Top open risks
 
-1. ~~Mali blob 32-bit-only / wrong winsys~~ **RESOLVED ✔** (verified on device):
-   blob is 64-bit aarch64, OpenGL ES 3.2 (r20p0, matching kernel kbase), fbdev EGL
-   winsys — and the stock OS's own SDL2 is 64-bit built on the `mali` video driver.
-   The planned stack is exactly what the device already runs (00/04).
-2. **NextUI UI regressions at 480p** — no 480-line platform has existed for ~2 years;
-   layout/pill/font audit budgeted (04).
-3. **RG28XX rotation through the GL path** — the malifbdev-rot patch may only rotate
-   the non-GL blitter; the generic_video rotation hook is the designed fallback (04).
-4. **stockmod boot precedence** (`muos1.ini` beats our hijack) — documentation +
-   installer detection (02).
-5. **Sleep-resume WiFi/panel quirks** — resume-side re-init is planned work, not an
-   afterthought (06); 20-cycle + overnight-drain acceptance tests (08).
-
-## Timeline
-
-~6–8 weeks single-dev to a 40XXV + 34XXSP beta; RG28XX ≈ +1 week after. Phase table
-with per-phase exit criteria in [08-testing-and-rollout.md](08-testing-and-rollout.md).
-Start with the Phase-0 spike list — every architectural bet above gets proven or
-re-planned within the first week, before any large code investment.
+1. **Sleep/wake hangs** — headline feature not yet trustworthy ([06](06-power-sleep-battery.md), roadmap P0).
+2. **Untested device matrix** — 34XXSP/28XX/cube code paths have never met hardware.
+3. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
+   Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
+4. **Alpha-blit unknown** — rendering differs from what a compat experiment expected;
+   currently looks right, root cause unowned (04).

@@ -1,108 +1,114 @@
-# 01 — Toolchain & Build System Integration
+# 01 — Toolchain & Build System
 
-## Goal
-`make PLATFORM=h700 shell` / `make all` builds an `h700` platform exactly like tg5040 does
-today: docker image pulled/built from `toolchains/h700-toolchain`, workspace mounted, all
-apps + cores cross-compiled, packaged into `MinUI.zip`.
+## How the h700 build works
 
-## Decision: 64-bit aarch64 build (not 32-bit like the old port)
+`make PLATFORM=h700 all` builds like any other platform, with one twist: **there is no
+dedicated h700 toolchain image — the build runs inside the existing
+`ghcr.io/loveretro/tg5040-toolchain` image.** Same arch (aarch64/cortex-a53), same
+`-mcpu=cortex-a53` tuning, and the image's glibc (2.33) is older than the target's
+(Ubuntu 22.04, glibc 2.35) — forward-compatible by construction. This was empirically
+validated before any code was written (a tg5040-built displaycal.elf ran unmodified on
+RG40XXV stockmod and an RG34XXSP running Knulli) and has held up in production.
 
-The old rg35xxplus port was 32-bit (`arm-buildroot-linux-gnueabihf`) because the
-2023-era stock OS was 32-bit. The 2026 stock OS is **Ubuntu 22.04 arm64 with glibc
-2.35**, and the tg5040 platform is already aarch64/cortex-a53. Building 64-bit means:
+Integration points:
+- Root `makefile`: `PLATFORMS = tg5050 tg5040 h700`; `make shell` passes
+  `PLATFORM=$(PLATFORM)` through (and `makefile.toolchain` injects
+  `-e PLATFORM -e UNION_PLATFORM` into the container).
+- `makefile.toolchain`: maps h700 → the tg5040 image.
+- `workspace/h700/platform/makefile.env`: tg5040-derived flags (`-mcpu=cortex-a53`,
+  `SDL = SDL2`, `GL = GLES`), with the in-tree SDL2 prefix first in include/lib order.
+- `workspace/h700/makefile`: platform-local `early` target builds the external deps
+  (SDL2, below) before the apps.
+- The full tg5040 core list (28 cores + patches) builds unchanged — same arch, same tuning.
 
-- `workspace/h700/platform/makefile.env` is a copy of tg5040's (`-mcpu=cortex-a53 -flto`, `SDL = SDL2`, `GL = GLES`)
-- The entire tg5040 core list builds unchanged (same arch, same tuning)
-- No NEON/hard-float 32-bit toolchain maintenance
-- Gate (Phase 0): confirm the device's Mali blob `/usr/lib/libEGL.so` is 64-bit.
-  If it unexpectedly is not, fall back to shipping a known-good 64-bit H700 blob
-  (the same blob muOS/Knulli use on this SoC) in `.system/h700/lib` — the kernel
-  side (`mali_kbase` on 4.9) accepts both; blob and kernel driver version must match
-  (check `dmesg | grep mali` for the kbase version, expect r16p0-style for G31).
+### In-tree SDL2 (the one real gap in the shared image)
+On tg5040 the stock OS supplies runtime SDL2; on H700 we ship our own. The platform
+`early` target clones **`JohnnyonFlame/SDL-malifbdev-rot`**, **pinned to commit
+`d4a7d7503524cc469fe775242f3f925d4dd56c88`**, builds it aarch64 and installs into a local
+prefix that `makefile.env` puts first. Configure highlights (see `workspace/h700/makefile`):
 
-## Toolchain: REUSE the tg5040 docker image (no new toolchain for bring-up)
+- `--enable-video-mali --enable-video-opengles`, x11/wayland/kmsdrm disabled.
+  The makefile **asserts `#define SDL_VIDEO_DRIVER_MALI 1` in the generated
+  `SDL_config.h`** right after configure — a silent fallback to the dummy driver
+  produces a black screen much later, so fail fast here.
+- `--enable-alsa --enable-alsa-shared` — ALSA loaded via **dlopen at runtime**, not
+  direct-linked. This is load-bearing, not an optimization (see pitfall #1 below).
+- `--enable-loadso --enable-filesystem` — loadso is required for GL context creation
+  and for alsa-shared/image-shared dlopen to work at all. (An early draft disabled
+  both; don't.)
+- No udev (`SDL_JOYSTICK_DISABLE_UDEV=1` is also exported at runtime — see 03).
 
-**Empirically validated:** a tg5040-toolchain-built `displaycal.elf` runs unmodified
-on the RG40XXV (stockmod) *and* on an RG34XXSP running Knulli. Same arch, same
-`-mcpu=cortex-a53` tuning, and the tg5040 toolchain's glibc (2.33) is older than the
-targets' (stock 2.35, Knulli ≥2.33) — forward-compatible by construction.
+### Runtime library bundling (`platform/makefile.copy`)
+Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted for:
+`libSDL2*` (our custom build + matching SDL2_image/ttf), `libtinyalsa.so*`,
+`libpng12.so*` (see pitfall #2). **Deliberately not bundled:** `libasound`
+(dlopened from the device — bundling the SDK's copy caused the audio bug) and
+`libUMP` (doesn't exist on Mali-G31 systems; an early build bundled it by cargo-cult).
+Rule of thumb: `ldd` every shipped .elf against a clean stock rootfs; bundle exactly
+the misses, nothing more.
 
-So: **`PLATFORM=h700` builds inside the existing `ghcr.io/loveretro/tg5040-toolchain`
-image.** Implementation: `makefile.toolchain` derives the image name from
-`$(PLATFORM)` — add a small override (e.g. `TOOLCHAIN_NAME ?= $(PLATFORM)` with
-`h700: TOOLCHAIN_NAME=tg5040`, or an `IMAGE_OVERRIDE` var) rather than a new repo.
+### Updater detection (multi-platform SD cards)
+`skeleton/BOOT/common/updater` detects H700 via `grep -q sun50iw9
+/proc/device-tree/model` **before** the `*"0xd03"*` cpuinfo case — H700's cpuinfo is
+indistinguishable from other A53 platforms. On Anbernic the normal boot path doesn't go
+through `updater` (our dmenu.bin calls `.tmp_update/h700.sh` directly), but correct
+detection prevents mis-flash if a multi-platform card moves between devices.
 
-What the tg5040 image already provides for h700:
-- aarch64 cross GCC + cortex-a53 flags — apps and all 28 cores build as-is
-- SDK sysroot with nearly every NextUI dep: SDL2_image/ttf, sqlite, libsamplerate,
-  libzip, curl/ssl, zlib/bz2/lzma/zstd/lz4, tinyalsa, GLES/EGL link stubs (runtime
-  symbols come from the device's libmali — standard ABI, link stubs are fine)
-- all host tools the cores makefile needs
+## Toolchain-reuse pitfalls (lessons for future platform ports)
 
-The one real gap — **SDL2 itself**: on tg5040 the stock OS supplies runtime SDL2; on
-H700 we ship our own mali-fbdev SDL2 (see 04) and must compile NextUI against *its*
-headers/libs, not the SDK's. Solve it the way the old rg35xxplus port did: build the
-custom SDL2 in-tree under `workspace/h700/other/sdl2/` via the platform `early`
-target, install into a local prefix inside the container, and have
-`workspace/h700/platform/makefile.env` put that prefix first in include/lib/pkg-config
-order. Bundle the resulting `libSDL2*.so` (+ matching-version SDL2_image/ttf if the
-SDK's are ABI-incompatible with SDL 2.28) into `.system/h700/lib`.
+Cross-building in a *sibling platform's* image against a *different* target rootfs
+works, but every failure below came from exactly that gap. Check these first on any
+future stock-OS port:
 
-Runtime-lib rule of thumb: anything linked from the SDK sysroot that isn't guaranteed
-on the H700 stock OS gets bundled into `.system/h700/lib` (NextUI already does this on
-tg5040 for samplerate/zip/etc. — extend the list; `ldd` every shipped .elf against a
-clean stock rootfs as a CI-able check).
+1. **libasound symbol versioning → glitchy audio.** The tg5040 SDK's libasound has no
+   symbol versioning. Direct-linking SDL against it made the dynamic linker resolve the
+   *unversioned* legacy `ALSA_0.9` `snd_pcm_hw_params_set_*` symbols from the device's
+   (versioned) libasound at runtime. Those have value semantics instead of
+   pointer-in/out — `set_rate_near` silently clamped the codec to 192 kHz while SDL
+   believed 32.768 kHz → sliced, glitchy audio that *almost* worked. Fix:
+   `--enable-alsa-shared` (dlopen; dlsym always picks the default/current symbol
+   version). General lesson: **for libraries that exist on the target, prefer dlopen
+   over cross-linking whenever the SDK's copy may differ in symbol versioning.**
+2. **dlopen'd deps have their own arch requirements.** SDL2_image dlopens
+   `libpng12.so.0`. The stock H700 OS only has a *32-bit* copy (under
+   `/mnt/vendor/lib`); dlopen fails silently → no PNG loading. We bundle the
+   toolchain's 64-bit `libpng12.so.0`. Lesson: audit not just `ldd` output but the
+   *dlopen list* of every shipped library (`strings *.so | grep '\.so'`).
+3. **pkg-config lies across rootfs boundaries.** The tg5040 SDK's `glesv2.pc` links
+   libUMP (a Utgard-GPU-era dependency that doesn't exist on Mali-G31/bifrost
+   systems). Link `-lGLESv2 -lEGL` directly instead of trusting sibling-platform
+   pkg-config for GPU libs.
+4. **LTO + libretro cores.** The inherited `-flto` broke picodrive: the linker plugin
+   dropped libretro glue objects. The h700 cores makefile disables LTO / filters
+   linker-plugin flags for affected cores, and pins `override PLATFORM := libretro`
+   for reproducible clean rebuilds.
+5. **Target shell ≠ build assumptions.** Stock `/bin/sh` is **dash**. The bashism `&>`
+   (used throughout the tg5040 pak scripts we cloned) parses under dash as
+   "background the command and truncate a file named by the next word" — launch
+   scripts exited instantly and games bounced back to menu. All h700 pak scripts use
+   POSIX `> file 2>&1`. Grep any cloned script for bashisms before shipping.
+6. **Shared-code makefile gates.** `workspace/all/minarch/makefile` gates features
+   (RetroAchievements, CHD, SRM, libsamplerate) by platform name — a new platform
+   must be added to those filter lists or minarch silently builds featureless (or not
+   at all).
 
-**Dedicated `h700-toolchain` image: deferred, optional.** If/when divergence grows
-(different SDL patches, extra deps like bluez-alsa, wanting jammy's exact glibc), a
-thin image `FROM ghcr.io/loveretro/tg5040-toolchain` that pre-bakes the SDL2 build +
-extras is the natural next step — cheap to add later, not a prerequisite. Revisit
-after Phase 3.
+## Dedicated `h700-toolchain` image: still deferred, deliberately
 
-## Repo integration checklist
+The reuse costs above are all *solved*, and the SDL2 build is pinned and cached. A thin
+image `FROM tg5040-toolchain` pre-baking SDL2 + a jammy-matched libasound would remove
+pitfall classes 1–3 structurally and speed CI — worth doing if the platform accumulates
+more external deps (e.g. shipping bluealsa, see 07/09-roadmap), not before.
 
-- [ ] `makefile`: add `h700` to `PLATFORMS` (`PLATFORMS = tg5050 tg5040 h700`)
-- [ ] `makefile.toolchain`: image-name override so `PLATFORM=h700` uses the tg5040 image (no `toolchains/h700-toolchain/` dir needed for now)
-- [ ] `workspace/h700/` — new platform dir (contents defined in docs 03–07):
-  ```
-  platform/{platform.c,platform.h,makefile.env,makefile.copy}
-  libmsettings/{msettings.c,msettings.h,makefile}
-  keymon/{keymon.c,makefile}
-  cores/makefile
-  install/{boot.sh,update.sh,logo.png}
-  boot/  (dmenu.bin builder — see 02)
-  makefile  (platform-local `early`/`all` targets, modeled on tg5040's)
-  ```
-- [ ] `workspace/makefile`: tg5040 has special-cased steps (`rfkill`, `btmanager`, `poweroff_next`) under `ifeq ($(PLATFORM), tg5040)`. Add an h700 branch only for what h700 actually needs (likely `rfkill` only; plain `poweroff` works on systemd — verify — and bluez is modern already, no `btmanager` needed).
-- [ ] `skeleton/SYSTEM/h700/` + `skeleton/EXTRAS/Tools/h700/` + `skeleton/BOOT/` additions (see 02)
-- [ ] `skeleton/BOOT/common/updater`: add H700 detection **before** the `*"0xd03"*` case (H700 cpuinfo also matches 0xd03!):
-  ```sh
-  if grep -q sun50iw9 /proc/device-tree/model 2>/dev/null; then PLATFORM="h700"; fi
-  ```
-  (or match `*"sun50iw9"*` on `cat /proc/device-tree/model` — do NOT rely on /proc/cpuinfo which is indistinguishable from zero28)
-  Note: on Anbernic the H700 boot path doesn't go through `updater` at all (our
-  `dmenu.bin` calls `.tmp_update/h700.sh` directly, see 02), but keeping `updater`
-  correct costs one line and prevents mis-detection if a multi-platform card is moved
-  between devices.
-- [ ] `github/` CI workflows: add h700 to the build matrix (mirror what exists for tg5040)
+## Build outputs
 
-## Build outputs (parity with tg5040)
-
-`make PLATFORM=h700 all` must produce inside `build/`:
-- `.system/h700/bin/*` — `nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf, gametimectl.elf, syncsettings.elf, nextval.elf, show2.elf, settings.elf(=minput?), clock, ledcontrol …` (same list as tg5040; drop what doesn't apply, see per-doc notes)
-- `.system/h700/lib/` — `libmsettings.so, libbatmondb.so, libgametimedb.so, libsamplerate…` **plus `libSDL2-2.0.so.0`, `libSDL2_image`, `libSDL2_ttf`** (unlike tg5040, the stock OS SDL2 2.0.12 has no usable GLES video backend for us — we bundle our own; LD_LIBRARY_PATH in launch.sh puts our lib dir first)
-- `.system/h700/cores/*.so` — same core list as tg5040
-- `.system/h700/shaders/` — copy of tg5040's `.glsl` set (they're ES 3.0, portable)
-- `.tmp_update/h700.sh` (installer), `dmenu.bin` (boot shim, see 02)
-
-## Suggested first milestone (Phase 0 spike, ~1-2 days)
-
-Before writing any platform code, validate the whole chain with throwaway binaries,
-all inside the existing tg5040 toolchain container:
-1. ~~hello world ABI check~~ **already proven** — user's tg5040-built displaycal.elf
-   runs on RG40XXV stockmod and RG34XXSP/Knulli.
-3. Tiny EGL/GLES probe (fbdev EGL native window via blob): create context, print
-   `GL_VERSION`/`GL_RENDERER`, clear screen to a color. This single test de-risks the
-   entire video stack (64-bit blob works, ES version confirmed, fbdev winsys works).
-4. Build the custom SDL2, run an SDL window + `SDL_GL_CreateContext` + swap test.
-5. Write `mem` to `/sys/power/state` from a test binary, wake with power button ✔ (already proven via rtcwake).
+`make PLATFORM=h700 all` produces in `build/`:
+- `.system/h700/bin/*` — nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf,
+  gametimectl.elf, syncsettings.elf, nextval.elf, show2.elf, settings.elf, clock, …
+  (tg5040 list minus ledcontrol/bootlogo, which are gated to tg50x0) plus `rfkill`
+  (h700 builds its own minimal `/dev/rfkill` ioctl tool — stock rfkill may be absent)
+- `.system/h700/lib/` — libmsettings.so, libbatmondb.so, libgametimedb.so, …
+  plus the bundled SDL2/tinyalsa/libpng12 set above
+- `.system/h700/cores/*.so` — full tg5040-parity core list
+- `.system/h700/shaders/` — tg5040 `.glsl` set (ES 3.0, portable)
+- `.tmp_update/h700.sh` (installer), `h700/dmenu.bin` (boot shim — see 02),
+  NextCommander built via `patches/NextCommander-h700.patch`

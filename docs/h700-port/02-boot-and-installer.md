@@ -2,10 +2,10 @@
 
 ## How NextUI takes over the stock OS (no reflash, fully reversible)
 
-Verified on the live RG40XXV: the stock launcher wrapper `/mnt/vendor/ctrl/dmenu_ln`
-prefers **`/mnt/mmc/dmenu.bin`** (the FAT32 ROMs partition of the *boot* SD, TF1)
-over the built-in frontend. Placing our own `dmenu.bin` there hijacks boot. Removal =
-delete one file. This is the same mechanism the old MinUI rg35xxplus port used.
+The stock launcher wrapper `/mnt/vendor/ctrl/dmenu_ln` prefers **`/mnt/mmc/dmenu.bin`**
+(the FAT32 ROMs partition of the boot SD, TF1) over the built-in frontend (verified,
+full chain in 00). Placing our own `dmenu.bin` there hijacks boot; deleting it restores
+pure stock. This shipped as designed and is the entire install/uninstall story on TF1.
 
 ```
 stock boot:  systemd launcher.service → launcher.sh → loadapp.sh → dmenu_ln
@@ -15,121 +15,99 @@ stock boot:  systemd launcher.service → launcher.sh → loadapp.sh → dmenu_l
                                 NO  → /mnt/vendor/bin/dmenu.bin (stock UI)
 ```
 
-### stockmod caveat (must be in README/install docs)
-`dmenu_ln` checks `/mnt/vendor/muos1.ini` / `muos2.ini` **first** and runs the bundled
-muOS instead if present (the user's RG40XXV is in this state). Users running stockmod
-must switch the boot target back to "stock" (or the installer, once running via any
-one-shot exec path, deletes `/mnt/vendor/muos*.ini`). Document prominently:
-**NextUI installs on top of the *stock* boot path.**
+### stockmod / muOS caveat
+`dmenu_ln` checks `/mnt/vendor/muos1.ini` / `muos2.ini` **first** and boots the bundled
+muOS instead if present. The boot shim detects this, logs it, and shows a
+**"STOCK TARGET REQUIRED"** splash; `launch.sh` additionally drops a
+`stockmod-warning.txt` on the SD card. It is currently a warning, **not** a hard fail —
+the user must switch the boot target back to "stock" (or delete the ini) themselves.
+`skeleton/BASE/README.txt` documents this in the H700 install section.
+(Whether to hard-fail instead is an open call — see 09-roadmap.)
 
-## SD card layout: stock card gets one drag-dropped file; NextUI lives on TF2
+## SD card layout: TF1 stays stock, NextUI lives on TF2
 
-**Policy (project owner):** TF1 remains the stock OS card. NextUI runs from TF2.
-Minimal, end-user-simple changes to the stock card are fine (drag-drop a file from a
-PC). When in doubt, do what the old rg35xxplus port did — and this is exactly that:
+**Policy (project owner), implemented as designed:**
+- TF1's only write, ever, is the single `dmenu.bin` file on its user-visible FAT
+  partition. Stock partitions p1–p7 are never written — no bootlogo replacement, no DTB
+  Panel-Fix writes, no apt installs. Both writers of that file (`install/update.sh` and
+  the launch.sh self-heal) guard with `mountpoint -q /mnt/mmc` **and** `cmp -s` so they
+  only touch TF1 when it's genuinely mounted and the content actually differs.
+- **TF2 = NextUI's card** (`/dev/mmcblk1p1`): `.system`, `.tmp_update`, `.userdata`,
+  Bios, Roms, Saves. FAT32 recommended; the shim also tries exfat and `-t auto` as
+  fallbacks (kernel 4.9 has no native exfat — exfat works only if the stock OS has a
+  helper). `SDCARD_PATH` stays `/mnt/SDCARD` via symlink/bind to the real mountpoint,
+  so shared code's hardcoded paths keep working.
+- **TF1-only layout: not supported** (deliberate scope cut vs the old port — keeps the
+  stock card pristine and the support matrix small). No TF2 → "INSERT NEXTUI TF2 CARD"
+  splash, then fall through to the stock frontend so the device always boots something.
 
-**End-user install (matches old MinUI rg35xxplus flow):**
-1. Put TF1 (stock card) in a card reader — the ROMs partition (mmcblk0p8, FAT32) is
-   the one a PC sees. **Drag `dmenu.bin` onto its root.** That's the entire stock-card
-   change (`dmenu_ln` on the stock OS runs `/mnt/mmc/dmenu.bin` if present — verified;
-   it never consults TF2 for a boot target, so this one file is both necessary and
-   sufficient for autoboot).
-2. Format TF2 FAT32, copy the NextUI base-zip contents onto it (`MinUI.zip`, Bios,
-   Roms, …). First boot self-installs to `.system/` — same as every MinUI/NextUI
-   platform.
-3. Uninstall: delete `dmenu.bin` from TF1 → device boots pure stock again.
+**End-user install** (documented in `skeleton/BASE/README.txt`):
+1. Drag `h700/dmenu.bin` from the release onto TF1's ROMs partition root (any PC + card
+   reader).
+2. Copy `MinUI.zip` (plus Bios/Roms) onto a FAT32 TF2. First boot self-installs.
+3. Uninstall: delete `dmenu.bin` from TF1 → pure stock boot. `.system`/`.userdata` on
+   TF2 remain inert data.
 
-Rules that keep the stock card safe:
-- Stock OS **partitions p1–p7 (boot-resource, rootfs, vendor, data) are never
-  written.** Unlike the old port: no `bootlogo.bmp` replacement on `/dev/mmcblk0p2`,
-  no DTB "Panel Fix" writes to `/dev/mmcblk0` (drop that tool initially), no apt
-  installs into rootfs (2026 stock already runs sshd). The only TF1 write ever is the
-  `dmenu.bin` file on the user-visible FAT partition.
-- **TF2 = NextUI's card** (`/dev/mmcblk1p1` → `/mnt/sdcard`): `.system`, `.tmp_update`,
-  `.userdata`, Bios, Roms, Saves — everything. FAT32 initially (kernel 4.9 has no
-  native exfat; check stock for a FUSE exfat helper before allowing exfat).
-  `SDCARD_PATH` stays `/mnt/SDCARD` via symlink → `/mnt/sdcard` (see 03).
-- **TF1-only layout: not supported** (old port allowed it; we don't — keeps the stock
-  card pristine and the support matrix small). If TF2 is absent, the shim shows an
-  "insert NextUI SD card" splash and exec's the stock frontend, so the device always
-  boots something sensible.
-- dmenu.bin self-heal/update: launch.sh compares `.system/h700/dat/dmenu.bin` (TF2)
-  against `/mnt/mmc/dmenu.bin` and re-copies on mismatch — updates ship through TF2
-  releases; the user never touches TF1 again after install.
-- Verify on current firmware whether stock automounts TF2 at `/mnt/sdcard` before
-  `dmenu_ln` runs (mount point exists; card wasn't inserted during probing). If not,
-  the shim mounts it — the old port's boot.sh has the exact mount logic to reuse.
+## The boot shim (`workspace/h700/boot/`)
 
-## `workspace/h700/boot/` — the dmenu.bin shim
+`build.sh` produces `dmenu.bin` as a self-extracting script: `boot.sh` + an
+`echo BINARY` sentinel + a gzipped tar payload (`fbsplash`, static `unzip` helper).
+Notable implementation details (`boot/boot.sh`):
 
-Reuse the old self-extracting design (`git show 8cd78866:workspace/rg35xxplus/boot/build.sh`):
-`dmenu.bin` = shell script + `echo BINARY` sentinel + gzip payload (splash images,
-static `unzip`). At boot it:
+- `trap '' USR1` — the stock `launcher.sh stop` sends SIGUSR1; must not kill the shim.
+- Payload offset found with `grep -na '^BINARY' "$0" | cut -d: -f1 | head -1`
+  (`head`, not `tail` — the script's own grep line would otherwise match last).
+- Logs to `/tmp/nextui-h700.log` by default; only writes a log to TF1 if it is a real
+  mountpoint, truncating per boot (no unbounded growth on the stock card).
+- **Splash**: `fbsplash` (`boot/fbsplash.c`, ~180 lines) mmaps `/dev/fb0` and renders
+  text with a built-in 5×7 bitmap font — zero library dependencies, works before
+  anything is extracted. Messages: `INSTALLING NEXTUI`, `UPDATING NEXTUI`,
+  `INSERT NEXTUI TF2 CARD`, `NEXTUI INSTALL MISSING`, `STOCK TARGET REQUIRED`.
+  (The old port's per-panel raw-BMP `dd` scheme was dropped — rendered text needs no
+  per-resolution assets. Post-install, SDL-based `show2.elf` takes over as usual.)
+- **TF2 mount**: tries vfat → exfat → auto; on failure runs `repair_tf2()` —
+  `fsck.fat -a` or `fsck.exfat -a` chosen by `blkid` — then retries once.
+- **Update trigger**: boots into the installer when `MinUI.zip` **or any `*.pakz`** is
+  present at the SD root. If `.tmp_update/h700.sh` is missing (fresh card), it
+  bootstrap-extracts only `.tmp_update/*` from the zip first, then delegates — **the
+  zip is left in place for the installer to own** (an early version deleted the zip
+  before the installer ran, which left stale files forever).
+- Then `exec`s `.system/h700/paks/MinUI.pak/launch.sh`; any failure falls back to the
+  stock frontend.
+- Prefers the stock OS's `unzip` when present; the embedded static helper is the
+  fallback (stock Ubuntu has a full userland — use it).
 
-1. Mounts TF2 if the stock OS hasn't already; if TF2 absent → splash "insert NextUI SD card", exec stock frontend (no TF1 fallback, see policy above)
-2. Shows splash: `dd` a raw BMP/fb dump to `/dev/fb0` (640×480 RGB565/XRGB — regenerate
-   splash assets per panel: default 640×480, `-w` 720×480 for RG34xx, `-r` rotated
-   480×640 for RG28XX, chosen by `cat /sys/class/graphics/fb0/modes`)
-3. First boot / update: if `MinUI.zip` (or `*.pakz`) present at SD root → run
-   `.tmp_update/h700.sh` (self-extracted static unzip available) which unzips into
-   `.system/` and `.tmp_update/`
-4. `exec .system/h700/paks/MinUI.pak/launch.sh`
+## The installer (`workspace/h700/install/`)
 
-Improvement over the old port: current NextUI has `show2.elf --mode=daemon` with
-progress display — after first install, prefer it over raw `dd` splash (needs SDL —
-only usable post-extract; keep `dd` for the very first boot).
+- `boot.sh` → ships as `.tmp_update/h700.sh`. Owns the update transaction:
+  clean-replaces `.system/h700/bin`, `lib`, and `paks/MinUI.pak` (`rm -rf` then
+  extract) so stale files can't survive an update, processes `*.pakz` (including
+  `post_install.sh` hooks), and deletes `MinUI.zip` itself when done.
+- `update.sh` → ships as `.system/h700/bin/install.sh` (in-place updates from within
+  the running OS). Also performs the TF1 `dmenu.bin` self-heal (mountpoint + cmp
+  guarded, above).
 
-The stock wrapper loops and re-runs `dmenu.bin` when it exits, and `launcher.sh stop`
-sends `SIGUSR1` — the shim and launch.sh must not treat either as an error
-(NextUI's own `while` launch loop in MinUI.pak handles restarts; on poweroff request
-touch `/tmp/poweroff` and call `poweroff` — systemd handles clean shutdown on this OS).
+## `MinUI.pak/launch.sh` (the master runtime script)
 
-## `workspace/h700/install/`
-
-- `boot.sh` → becomes `.tmp_update/h700.sh`. Model on tg5040's (`workspace/tg5040/install/boot.sh`):
-  set governor performance during install, show splash, unzip `MinUI.zip` payload,
-  process `*.pakz`, then reboot. Remove all trimui-isms (`/usr/trimui`…).
-- `update.sh` → becomes `.system/h700/bin/install.sh` (in-place updates from the OS).
-- Re-copy `dmenu.bin` from `.system/h700/dat/dmenu.bin` (TF2) to `/mnt/mmc/dmenu.bin`
-  **only when contents differ** (self-healing + updates ship new shims, while keeping
-  TF1 writes to the absolute minimum).
-
-## `skeleton/` additions
-
-```
-skeleton/SYSTEM/h700/
-  bin/            governor.sh, suspend, install.sh, run_hooks.sh, setterm, shutdown-helper
-  etc/wifi/       wifi_init.sh          (see 07)
-  etc/bluetooth/  bt_init.sh            (see 07)
-  paks/MinUI.pak/launch.sh              (master boot script — see below)
-  paks/Emus/{FC,GB,GBA,GBC,MD,PS,SFC,…}.pak/   (clone tg5040 set; default.cfg per-device variants)
-  shaders/        (copy of tg5040 set)
-  system.cfg
-skeleton/EXTRAS/Tools/h700/             (Files.pak, Input.pak, Clock.pak, … clone from tg5040 where portable)
-```
-
-### MinUI.pak/launch.sh responsibilities (H700 edition)
-Clone tg5040's and adapt:
-- `export PLATFORM=h700`, standard path exports (SDCARD_PATH=/mnt/sdcard, …)
-- **Device detection** (replaces tg5040's `TRIMUI_MODEL` sniff):
-  ```sh
-  export RGXX_MODEL=$(strings /mnt/vendor/bin/dmenu.bin | grep -m1 ^RG)   # e.g. RG40xxV / RG34xxSP / RG28xx / RGcubexx
-  case "$RGXX_MODEL" in
-    RG28xx)   export DEVICE="rg28xx" ;;     # rotated panel
-    RG34xx*)  export DEVICE="rg34xx" ;;     # 720x480 (+SP has lid)
-    RGcubexx) export DEVICE="cube" ;;       # 720x720 (later)
-    *)        export DEVICE="rg40xx" ;;     # 640x480 family default
-  esac
-  ```
-  (validate on 2026 firmware; fallback detectors: fb0 mode `480x640` → 28xx,
-  `xres/yres` in /sys/class/disp, `axp2202-battery/display_id`, DTB lcd timings)
-- `export LD_LIBRARY_PATH=$SYSTEM_PATH/lib:/usr/lib` — **our SDL2 first**
-- Stop stock services we replace (crucial for input/audio/sleep hygiene):
-  `systemctl stop brightCtrl` isn't a unit — `killall brightCtrl.bin cexpert` instead;
-  consider `systemctl stop NetworkManager` if we drive wpa_supplicant directly (see 07)
-- governor performance, start `keymon.elf &`, `batmon.elf &`, `audiomon.elf` (if kept), wifi/bt init, boot hooks, then the standard `while` loop around `nextui.elf` / `minarch.elf` (`/tmp/next` mechanics identical to tg5040)
-- On loop exit: `/tmp/poweroff` → `poweroff`; `/tmp/reboot` → `reboot` (systemd versions; no custom poweroff_next I2C dance needed — **verify `poweroff` works cleanly from our context**, else port `poweroff_next`)
-
-## Uninstall story (document it)
-Delete `dmenu.bin` from the ROMs partition (visible from any PC via card reader) →
-stock boots untouched. `.system`/`.userdata` remain inert data.
+Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~264 lines):
+- `export PLATFORM=h700`, path exports, `/mnt/SDCARD` compat symlink.
+- **Device detection**: `RGXX_MODEL=$(strings /mnt/vendor/bin/dmenu.bin | grep -m1 ^RG)`
+  → `DEVICE` case (rg28xx / rg34xx / cube / rg40xx default). Confirmed working on 2026
+  firmware.
+- `LD_LIBRARY_PATH=$SYSTEM_PATH/lib:...` — our SDL2 first.
+- Env for the graphics/audio/input stack: `SDL_VIDEODRIVER=mali`,
+  `SDL_AUDIODRIVER=alsa`, `SDL_JOYSTICK_DISABLE_UDEV=1`, and `SDL_ROTATION=1` when
+  `DEVICE=rg28xx`.
+- Kills/stops stock services we replace: `brightCtrl.bin`, `cexpert`, NetworkManager;
+  writes a `/run/systemd/logind.conf.d/nextui-h700.conf` drop-in with
+  `HandlePowerKey=ignore` + `HandlePowerKeyLongPress=ignore` and restarts logind (so
+  systemd never races us on the power button).
+- Spawns `keymon.elf`, `batmon.elf`, `audiomon.elf`; wifi/bt init per settings (07);
+  runs boot hooks; then the standard crash-restart loop around `nextui.elf` /
+  `/tmp/next` chaining.
+- Poweroff/reboot via sentinel files: `/tmp/poweroff` → `poweroff`, `/tmp/reboot` →
+  `reboot` (systemd handles clean unmounts — works; no `poweroff_next` port needed).
+- Diagnostics affordances: a `debug-keep-network` flag file keeps SSH/WiFi up, and
+  after 5 consecutive nextui crashes the loop brings up networking + SSH for 300 s so
+  a bricked-UI device is still reachable. (Currently always-on in the release path —
+  see 09-roadmap about gating it.)

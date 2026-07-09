@@ -1,111 +1,89 @@
 # 04 — Video, Display, Rotation, HDMI, DisplayCal
 
-## Architecture recap
+## Architecture (worked exactly as designed)
+
 NextUI renders via `workspace/all/common/generic_video.c`: SDL2 window →
-`SDL_GL_CreateContext` (requests **GLES 3.2** profile) → shader pipeline (shaders are
-rewritten to `#version 300 es`, so ES 3.0 is the true floor) → `SDL_GL_SwapWindow`.
-No fbdev blits, no SDL_Renderer in the hot path. Whatever platform provides a working
-SDL2 + EGL/GLES stack gets the entire NextUI feature set (shaders, overlays, effects,
-scrolling text, screenshots) for free.
+`SDL_GL_CreateContext` → GLES 3 shader pipeline → `SDL_GL_SwapWindow`. The H700
+platform provides SDL2 + a working EGL/GLES stack and gets the entire feature set
+(shaders, overlays, effects, scrolling text, screenshots) for free. **Confirmed on
+hardware**: all shipped `.glsl` shaders, overlays, and effects run on the Mali-G31 at
+full speed at 640×480.
 
-## The H700 graphics stack (the real porting work)
-
-- Kernel 4.9 BSP: **no DRM/KMS**. Display = Allwinner disp2 (`/dev/disp` + fbdev).
-- GPU: Mali-G31 MP2, `mali_kbase` r20p0 kernel driver + vendor blob userspace.
-  **Verified on device:** blob `libmali.so.0.20.0` is 64-bit aarch64, reports
-  **`OpenGL ES 3.2 v1.r20p0-01rel0`** (matches kernel kbase r20p0), and is built with
-  the **fbdev EGL winsys** — every assumption in this doc is confirmed hardware fact.
-- Therefore SDL2 uses the **Mali/fbdev EGL winsys** (EGL `fbdev` native window),
-  like muOS/Knulli's SDL on these devices.
-- Extra proof: the **stock OS's own `/usr/lib/libSDL2-2.0.so.0.12.0` is 64-bit and
-  compiled with exactly the `mali` video driver** (only `mali` + `dummy` backends).
-  The stack we're building is the one the device already runs. During bring-up, the
-  stock libSDL2 can even serve as a temporary crutch (it's SDL 2.0.12 — too old to
-  ship, but fine for validating our binaries before the custom SDL is done).
-
-### Custom SDL2 (bundled in `.system/h700/lib`)
-Start from **`JohnnyonFlame/SDL-malifbdev-rot`** (what the old port shipped: SDL 2.28.5,
-`--enable-video-mali`, with built-in **rotation** support — written specifically for
-the RG28XX/RGcubexx generation). Tasks:
-1. Build it **aarch64** against the jammy sysroot + device Mali blob (old port built it 32-bit).
-2. Confirm `SDL_WINDOW_OPENGL` + `SDL_GL_CreateContext` with ES 3.2/3.0 works on the
-   mali video driver path (the old port used SDL_Renderer on top; NextUI drives GL
-   directly — the mali backend supports EGL contexts natively, this is its whole point).
-3. Audio: keep ALSA backend enabled (`--enable-alsa`), everything else off (matches
-   old configure: no kmsdrm/x11/wayland/pulse/dbus).
-4. Evaluate rebasing the mali-fbdev patch onto SDL 2.30.x if NextUI depends on newer
-   SDL APIs — check what SDL version the tg5040 SDK ships and what `generic_video.c`
-   + `api.c` actually require; 2.28.5 is likely sufficient. (Alternative donor with
-   the same backend: Knulli's buildroot patchset for h700.)
-
-Phase 0 gate (see 01): a 200-line raw EGL/GLES test binary proves blob + fbdev winsys
-+ ES version before any SDL work. If the blob's EGL doesn't accept fbdev native
-windows (unlikely — stock RA uses it), fall back to the blob variant muOS ships.
+The stack:
+- Kernel 4.9 BSP, no DRM/KMS. Display = Allwinner disp2 (`/dev/disp` + fbdev).
+- Mali-G31 MP2, kbase r20p0 + vendor blob (64-bit, ES 3.2, fbdev EGL winsys — 00).
+- **Custom SDL2** from `JohnnyonFlame/SDL-malifbdev-rot`, pinned commit
+  `d4a7d750…`, built aarch64 in-tree (01), `SDL_VIDEODRIVER=mali` exported by
+  launch.sh. SDL 2.28-era — sufficient for current NextUI; no 2.30 rebase was needed.
+- GLES linked directly (`-lGLESv2 -lEGL`), **not** via the SDK's pkg-config (libUMP
+  trap, see 01). `generic_video.c` gained hard error checks: SDL init / window /
+  renderer / GL-context failures now `exit(1)` instead of limping on — on a device
+  with no display fallback, failing loudly into the crash-restart loop (which brings
+  up SSH) beats a black screen.
 
 ## Per-device geometry
 
-| Device | Panel | FIXED_W×H | Notes |
+| Device | Panel | FIXED_W×H | Status |
 |---|---|---|---|
-| RG40XXV | 640×480 4:3 | 640×480 | reference target |
-| RG34XXSP | 720×480 3:2 | 720×480 | `is_rg34xx` (same LCD as RG34XX) |
-| RG28XX | **480×640 portrait** | 640×480 logical | needs rotation (below) |
-| RGcubexx | 720×720 | 720×720 | later; only overscan device |
+| RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
+| RG34XXSP | 720×480 3:2 | 720×480 | wired (`is_rg34xx`), untested |
+| RG28XX | 480×640 portrait | 640×480 logical | rotation plumbed, untested (below) |
+| RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
 
-UI scale: these are ~half the resolution of tg5040 (1280×720/1024×768). `FIXED_SCALE 2`
-and `MAIN_ROW_COUNT 6` follow the old port. Audit current NextUI UI code for
-assumptions introduced since the 480p platforms were dropped (font sizes, pill
-sprites, quick switcher) — run the whole UI at 640×480 in the `desktop` platform
-first if it supports arbitrary resolution, or budget polish time here. **This is a
-real risk area: NextUI hasn't rendered at 480p for ~2 years.**
+### 480p UI audit — still open
+These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
+rendered at 480p for ~2 years. `FIXED_SCALE 2` + `MAIN_ROW_COUNT 6` work, and general
+browsing looks right on RG40XXV, but no systematic audit of fonts / pills / quick
+switcher / long-text layouts at 640×480 (or 720×480) has been done. See 09-roadmap.
 
-## RG28XX rotation (deferred to phase 2, design now)
+## RG28XX rotation — implemented, unvalidated
 
-The panel scans portrait 480×640; fb0 mode will report `480x640`. Options, in order
-of preference:
-1. **Inside SDL (malifbdev-rot)**: the backend was patched precisely for this — it
-   presents a landscape-logical display and rotates in the blit/flip. If it works with
-   GL contexts (verify! the rot patch may only cover the non-GL blitter path), NextUI
-   needs zero changes.
-2. **GL-level rotation in generic_video.c**: add a platform hook (e.g.
-   `PLAT_getDisplayRotation()` returning 0/90/270) applied as a final rotation in the
-   present pass (rotate the output quad / swap w↔h of the backbuffer viewport). Clean,
-   ~contained change; also benefits any future rotated device.
-3. Allwinner DE rotation via `/dev/disp` (the disp2 driver has a rotation/smart-color
-   module on some BSPs) — investigate `dispdbg`; least portable, likely dead end.
+Both planned layers were plumbed:
+1. **SDL level**: launch.sh exports `SDL_ROTATION=1` when `DEVICE=rg28xx`
+   (consumed by the malifbdev-rot driver — rotating in the backend was the repo's
+   whole reason to exist).
+2. **GL level**: `platform.c` sets `should_rotate = is_rg28xx`, feeding
+   `generic_video.c`'s existing rotation handling (dst-rect w/h swap in present).
 
-Plan for (2) as the durable solution, try (1) first since the code exists.
-Everything else (input is unrotated, touch none) is unaffected.
+Unknown until hardware testing: whether the malifbdev-rot patch covers the *GL
+context* path (the original concern was it might only rotate the non-GL blitter),
+and whether the two layers interact correctly (both active could double-rotate).
+Treat the whole path as unverified.
 
-## HDMI out
+## HDMI — detection wired, output switching not
 
-Old port: `HAS_HDMI`, 1280×720 output, monitored by `hdmimon.sh` (recover:
-`git show 8cd78866:skeleton/SYSTEM/rg35xxplus/bin/hdmimon.sh`) using
-`/sys/kernel/debug/dispdbg` (`switch1 4 10 ...`) + `fbset`, then restarting the UI with
-`hdmi_export.sh` sourced. Hotplug state: `/sys/class/extcon/hdmi/cable.0/state`
-(confirmed present).
+- `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state}` so hotplug
+  *detection* works (hdmimon/rumble-skip logic can fire).
+- `SetHDMI()` is an **empty no-op** — no mode switch / fb re-init / UI restart. Full
+  HDMI out remains a stretch goal. The known mechanism, if ever needed: old port's
+  `hdmimon.sh` via `/sys/kernel/debug/dispdbg` (`switch1 4 10 …`) + `fbset`, 1280×720,
+  audio on ALSA card 2 (`ahubhdmi`). Recover with
+  `git show 8cd78866:skeleton/SYSTEM/rg35xxplus/bin/hdmimon.sh`.
 
-Current tg5040 NextUI: check how/if it handles HDMI (TrimUI Brick HDMI support in
-NextUI is limited). **Scope decision: HDMI = stretch goal, phase 3.** The plumbing is
-understood and documented; don't block the handheld experience on it. Until then:
-`PLAT` reports no HDMI; NextUI treats display as fixed.
+## DisplayCal — ported 1:1, tested ✅
 
-## DisplayCal (white-point correction) — expected to port 1:1
+Same `/dev/disp` gamma-LUT ioctls as tg5040 (`0x10b` set / `0x10c` enable / `0x10d`
+disable). On RG40XXV: RGB gain sliders visibly act, persist, and **survive sleep and
+game launch** (syncsettings.elf re-applies the LUT after resume — 06). The `enhance_*`
+attrs (contrast/saturation/exposure) are exposed through settings just like tg5040;
+`settings.cpp` gained the Anbernic vendor + RG40XX/RG34XX/RG28XX/RGCubeXX models and
+enables colortemp/displaycal/mute/analog-stick/wifi/bt capability flags for h700.
+Per-panel default gain presets: not yet measured (neutral defaults).
 
-- Lives in `workspace/all/common/displaycal.{c,h}`, compiled into `libmsettings.so` +
-  standalone `displaycal.elf`; UI gated at runtime on model name in `settings.cpp`.
-- Mechanism: 256-entry RGB gamma LUT via `/dev/disp` ioctls `DISP_LCD_SET_GAMMA_TABLE
-  (0x10b)` / `GAMMA_CORRECTION_ENABLE (0x10c)` / `DISABLE (0x10d)`.
-- H700 has the same disp2 driver generation (attr dir matches TG5040 nearly 1:1, incl.
-  `color_temperature`). The user reports displaycal-class functionality already works
-  fine on RG XX devices. **Validation (Phase 0/2):** 20-line test — set a strongly
-  tinted LUT, confirm visible effect, confirm survival across suspend/resume.
-- Work items: add h700 to the displaycal build (`libmsettings` makefile), extend the
-  model gate in `settings.cpp` to Anbernic models, add per-panel default gain presets
-  (measure per device; start neutral 100/100/100).
-- `enhance_*` attrs (bright/contrast/saturation) exist too — same as tg5040; whatever
-  NextUI exposes for those on tg5040 carries over.
+## Known unresolved: alpha/tinted-bitmap blits
+
+An attempt to normalize the asset sheet and force alpha-blend blits for H700's
+SDL2/SDL_image behavior (`GFX_needsBitmapBlendCompat()` gated in shared `api.c`) was
+committed and **reverted 16 minutes later** — it regressed the known-good rendering.
+The branch deliberately stays on the "pre-alpha graphics stack"; `workspace/all/`
+carries **zero net change** from the experiment. Symptom class to look for when
+revisiting: bitmaps whose alpha should tint/blend rendering opaque (or vice versa)
+where tg5040 renders correctly. Root cause not yet established — likely a pixel-format
+or blend-mode default difference in our SDL2/SDL2_image build. See 09-roadmap.
 
 ## Boot splash
-`show2.elf` (SDL) post-install; raw fb `dd` in the dmenu.bin shim pre-install (see 02).
-Generate 640×480, 720×480, 480×640(rotated) variants of the splash assets — the old
-port's `-r/-s/-w` suffix scheme, selected by fb0 mode.
+
+Deviation from plan: instead of per-panel raw-BMP `dd` assets, the shim ships
+`fbsplash` — a dependency-free fb0 text renderer (02). Post-install, SDL-based
+`show2.elf` handles rich splash/progress as on other platforms. No per-resolution
+splash assets to maintain.

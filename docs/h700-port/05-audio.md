@@ -1,49 +1,73 @@
 # 05 — Audio
 
-## Playback path (shared code, low risk)
-`workspace/all/common/api.c` `SND_init` uses SDL audio (`SDL_OpenAudioDevice`) with a
-software resampler. Our custom SDL2 is built with the **ALSA** backend → default ALSA
-device on card 0 (`audiocodec`). Verified on device:
+## Playback path (as shipped, tested ✅)
+
+`SND_init` (shared `api.c`) → SDL audio → **ALSA backend → card 0 `audiocodec`**.
+`SDL_AUDIODRIVER=alsa` exported by launch.sh. GBA/SNES/PS1 run full speed with clean
+audio, no underruns, on RG40XXV.
 
 ```
-card 0: audiocodec   ← speaker / lineout / headphone
+card 0: audiocodec   ← speaker / lineout / headphone (the one we use)
 card 1: ahubdam
-card 2: ahubhdmi     ← HDMI audio (phase 3, together with HDMI video)
+card 2: ahubhdmi     ← HDMI audio (unused until HDMI out lands)
 ```
 
-Work items:
-- Ensure a sane default ALSA route: launch.sh runs an `alsactl restore`-style init or
-  explicit `amixer` unmute sequence (`SPK Switch` on, `LINEOUT Switch`, DAC mixers on —
-  capture a known-good `alsa.state` from the stock OS while its UI plays sound, ship it).
-- `SDL_AUDIODRIVER=alsa` exported in launch.sh (belt & braces).
-- If default-device selection misbehaves, set `AUDIODEV=hw:0,0` / configure
-  `/etc/asound.conf` in our environment (we can ship one and point `ALSA_CONFIG_PATH`
-  at it without touching rootfs).
+## The dlopen'd-ALSA fix (the port's hardest bug — full story)
 
-## Volume / mute (libmsettings, see 03)
-- Master: `digital volume` mixer ctl; line/speaker: `lineout volume` (old port drove
-  volume with `amixer sset 'lineout volume' N%`; NextUI uses tinyalsa directly —
-  same controls, discover exact ranges with `amixer cget` on device).
-- Mute: `SPK Switch` off (+ store/restore volume), since tg5040's
-  `/sys/class/speaker/mute` doesn't exist here.
-- `PLAT_overrideMute` accordingly.
+Symptom: audio played but was glitchy/"sliced". Cause chain:
 
-## Headphone jack
-- The codec driver module exposes `snd_soc_sunxi_component_jack/parameters/jack_state`;
-  the old port found it non-functional ("always 0"). Re-test on 2026 firmware.
-- Investigate how the *stock* OS switches speaker/HP (it does): watch
-  `amixer contents` diff and kernel log while plugging headphones on the live device;
-  there may be an ALSA jack kctl or an input switch event (SW_HEADPHONE_INSERT on some
-  BSPs). Wire whatever exists into `audiomon`/`PLAT_audioDeviceWatch*`; worst case,
-  speaker stays on lineout auto-switch in hardware (many Anbernic units mute the
-  speaker in hardware when jack inserted — if so, we need do nothing).
+1. SDL2 was direct-linked against the tg5040 SDK's `libasound`, which has **no symbol
+   versioning**; the SDK's copy of libasound was also bundled at first.
+2. At runtime against the device's (versioned) libasound, the dynamic linker resolved
+   SDL's *unversioned* references to the **legacy `ALSA_0.9` compatibility symbols** —
+   which have value semantics, not the modern pointer-in/out semantics — for the
+   whole `snd_pcm_hw_params_set_*` family.
+3. `snd_pcm_hw_params_set_rate_near` therefore misbehaved: the codec was clamped to
+   **192 kHz** while SDL believed it got **32.768 kHz** → resample math produced
+   sliced audio.
 
-## Bluetooth audio
-See 07 — BlueALSA vs PulseAudio decision. NextUI's generic_bt streams via bluealsa +
-`PLAT_pickSampleRate` limits. Ubuntu 22.04 has BlueZ 5.64 (modern), and bluealsa is
-buildable; keep parity with tg5040's approach to reuse generic_bt.c unchanged.
+Fix (commit `752cefe8`): build SDL2 with `--enable-alsa-shared` so it **dlopens the
+device's own libasound** — `dlsym` always resolves the default (current) symbol
+version. The bundled libasound copy was removed. Only `libtinyalsa` (used directly by
+libmsettings) is bundled. Lesson generalized in 01: prefer dlopen over cross-linking
+for libraries that exist on the target.
+
+## Volume / mute (libmsettings — details in 03)
+
+- Master: `digital volume`, a 0–63 **attenuator with a reversed scale** — code writes
+  `100 - val` percent. Confirmed correct by listening; the control's TLV metadata is
+  garbage, so don't trust `amixer` ranges here. `lineout volume` secondary.
+- Mute: `SPK` switch off + saved/restored volume (H700 has no
+  `/sys/class/speaker/mute`). Mute toggle enabled for h700 in settings. Tested ✅.
+- Suspend: the `suspend` script saves the full mixer state (`alsactl store`) in
+  `before()` and **restores it in `after()`** on resume (an early version had the
+  restore commented out; it's live now).
+
+## Headphone jack — not wired (open)
+
+`snd_soc_sunxi_component_jack/parameters/jack_state` exists but was historically
+"always 0"; never re-tested on 2026 firmware. Unknown how the stock OS switches
+speaker/HP (possibly hardware auto-mute, in which case nothing is needed). To
+investigate: diff `amixer contents` and watch input devices while plugging headphones
+on a live device. Until then: no jack-based switching in NextUI.
+
+## Bluetooth audio — deliberately disabled this beta
+
+Plan was to build and ship `bluez-alsa` (Ubuntu 22.04 doesn't include it). **Shipped
+decision: gate BT audio off instead**:
+- settings built with `-DNO_BT_AUDIO` for h700 → BT samplerate menu hidden
+  (`btmenu.cpp` made null-safe for the missing item)
+- `audiomon` refuses A2DP sinks unless a `bluealsa` binary exists (it doesn't)
+- `bt_init.sh` still starts bluealsa *if present*, so dropping a built bluealsa into
+  `.system/h700/bin` lights the path up again
+- `skeleton/BASE/README.txt` tells users BT audio is off in this beta
+
+BT controller input still works through SDL (07). Shipping bluealsa is the path to
+re-enable audio — see 09-roadmap.
 
 ## Sample rates
-`PLAT_pickSampleRate(requested, max)`: copy tg5040 logic (clamp; when BT connected,
-clamp to configured BT limit). The sunxi codec supports 48000/44100 natively — no
-platform quirk expected.
+
+`PLAT_pickSampleRate`: tg5040 logic. One H700-specific fix: it must not call
+`GetAudioSink()` (shared-memory settings) — minarch calls it before `InitSettings()`
+maps the shm, which segfaulted; it now consults only `PLAT_bluetoothConnected()`.
+Codec natively supports 48000/44100.
