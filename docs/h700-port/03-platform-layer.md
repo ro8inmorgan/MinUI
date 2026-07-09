@@ -39,6 +39,13 @@ Bluetooth controllers. Reasons discovered during bring-up:
   the built-in pad now works. Note the fork assigns SDL button indices in
   ascending evdev-keycode order, so the pad's ESC/VOL−/VOL+ (1/114/115) occupy
   indices 0–2 and the gamepad cluster starts at index 3 (A=3 … MENU=11).
+  **Because of that, platform.c must never open the built-in pad as an SDL
+  joystick**: `poll_sdl_input()` interprets SDL joysticks with the BT-pad
+  `JOY_*` layout, so the built-in pad's events would double-apply with scrambled
+  meanings (B→L1, VOL−→back, MENU→volume UI — seen in Settings 2026-07-09).
+  `is_builtin_pad()` skips "ANBERNIC-keys" in both the init scan and the
+  hotplug path; evdev is the sole path for built-in controls, SDL joystick is
+  for external (BT) pads only.
 - evdev codes are needed for keymon and wake handling anyway.
 
 Implementation: `poll_evdev_input()` scans/reads `/dev/input/event0..11` directly with

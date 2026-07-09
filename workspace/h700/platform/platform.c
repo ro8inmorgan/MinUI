@@ -194,6 +194,15 @@ void PLAT_initPlatform(void) {
 
 static SDL_Joystick **joysticks = NULL;
 static int num_joysticks = 0;
+
+// The built-in gpio-keys pad is handled via raw evdev (above); opening it as an
+// SDL joystick too would feed poll_sdl_input() duplicate events interpreted with
+// the Bluetooth-pad JOY_* layout (and the pad's SDL button indices are shifted
+// by its ESC/VOL keys anyway). SDL joysticks are for external pads only.
+static int is_builtin_pad(const char *name) {
+	return name && strcmp(name, "ANBERNIC-keys") == 0;
+}
+
 void PLAT_initInput(void) {
 	detect_device();
 	for (int i = 0; i < H700_INPUT_COUNT; i++)
@@ -203,12 +212,22 @@ void PLAT_initInput(void) {
 	if(SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0)
 		LOG_error("Failed initializing joysticks: %s\n", SDL_GetError());
 	SDL_JoystickEventState(SDL_ENABLE);
-	num_joysticks = SDL_NumJoysticks();
-    if (num_joysticks > 0) {
-        joysticks = (SDL_Joystick **)malloc(sizeof(SDL_Joystick *) * num_joysticks);
-        for (int i = 0; i < num_joysticks; i++) {
-			joysticks[i] = SDL_JoystickOpen(i);
-			LOG_info("Opening joystick %d: %s\n", i, SDL_JoystickName(joysticks[i]));
+	int total = SDL_NumJoysticks();
+    if (total > 0) {
+        joysticks = (SDL_Joystick **)malloc(sizeof(SDL_Joystick *) * total);
+        for (int i = 0; i < total; i++) {
+			const char *name = SDL_JoystickNameForIndex(i);
+			if (is_builtin_pad(name)) {
+				LOG_info("Skipping built-in joystick %d: %s (handled via evdev)\n", i, name);
+				continue;
+			}
+			SDL_Joystick *joy = SDL_JoystickOpen(i);
+			if (!joy) {
+				LOG_error("Failed to open joystick %d: %s\n", i, SDL_GetError());
+				continue;
+			}
+			joysticks[num_joysticks++] = joy;
+			LOG_info("Opening joystick %d: %s\n", i, SDL_JoystickName(joy));
         }
     }
 	scan_evdev_inputs();
@@ -413,6 +432,11 @@ void PLAT_updateInput(const SDL_Event *event) {
 	switch (event->type) {
     case SDL_JOYDEVICEADDED: {
         int device_index = event->jdevice.which;
+        const char *name = SDL_JoystickNameForIndex(device_index);
+        if (is_builtin_pad(name)) {
+            LOG_info("Skipping built-in joystick %d: %s (handled via evdev)\n", device_index, name);
+            break;
+        }
         SDL_Joystick *new_joy = SDL_JoystickOpen(device_index);
         if (new_joy) {
             joysticks = realloc(joysticks, sizeof(SDL_Joystick *) * (num_joysticks + 1));
