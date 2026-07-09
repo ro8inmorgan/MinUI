@@ -80,8 +80,16 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   the stock image** (udev interplay) — the shipped port reads evdev directly for built-in
   controls and keeps SDL joystick (with `SDL_JOYSTICK_DISABLE_UDEV=1`) for BT controllers.
 - Verified evdev button codes (event1): A 304, B 305, Y 306, X 307, L1 308, R1 309,
-  SELECT 310, START 311, MENU 312 (alt 354), L3 313, L2 314, R2 315, R3 316,
+  SELECT 310, START 311, MENU 312, L3 313, L2 314, R2 315, R3 316,
   PLUS 115, MINUS 114.
+- **MENU emits a compound sequence on short taps** (verified via evtest on RG34XXSP,
+  likely all RG XX H700 models): 312 down at press, 312 up at release, then a
+  synthetic 354 (`KEY_GOTO`) down at the same instant as the 312 up, 354 up ~190 ms
+  later. On a long hold, only 312 fires (down/up, no 354). So 312 tracks the physical
+  button; 354 is a firmware "tap detected" pulse and **must not be mapped to
+  BTN_MENU** — doing so extends every tap past the 250 ms long-press threshold
+  (tap misread as hold → brightness overlay instead of shortcuts). The extra
+  KEY_ESC (code 1) capability bit has not been observed to fire.
 - SDL joystick indices for the built-in pad (secondary path): A=0 B=1 Y=2 X=3 L1=4 R1=5
   SELECT=6 START=7 MENU=8, L3=9 L2=10 R2=11 R3=12, MINUS=15 PLUS=16; axes LX=0 LY=1 RX=2 RY=3.
 - `evtest` is available on the device for mapping discovery.

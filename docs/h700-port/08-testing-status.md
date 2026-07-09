@@ -27,6 +27,7 @@
 | Browse/launch/quit games across system pak cores; save/load state; in-game menu | ✅ |
 | Fast resume (BTN_RESUME) + auto-resume after power loss | ✅ |
 | Brightness 0–10 + colortemp ramps; persist across reboot | ✅ |
+| MENU short-tap → shortcuts overlay vs. hold → brightness (compound-tap fix, see 00/03) | ✅ tested on RG34XXSP; firmware quirk is common to the H700 line, expected fine on all RG XX |
 | Displaycal RGB gains: act, persist, survive sleep + game launch | ✅ |
 | Shaders (all shipped .glsl), overlays, effects on Mali-G31 | ✅ |
 | Volume 0–20 + mute | ✅ |

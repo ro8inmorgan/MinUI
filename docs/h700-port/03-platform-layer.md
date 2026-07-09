@@ -43,6 +43,16 @@ Verified mappings (also recorded in 00):
   SELECT 310, START 311, MENU 312, L3 313, L2 314, R2 315, R3 316; PLUS 115 /
   MINUS 114 (event2); POWER 116 (event0, `axp2202-pek` — note tg5040 uses 102).
   **D-pad has no keycodes on current firmware — it arrives as ABS_HAT0X/Y.**
+- **MENU compound-tap quirk (fixed)**: the firmware reports the physical MENU button
+  faithfully on 312 (down while held, up on release), but on a *short tap* it also
+  emits a synthetic 354 (`KEY_GOTO`) pulse that starts the instant 312 releases and
+  lasts ~190 ms (verified via evtest on RG34XXSP; on a long hold 354 never fires).
+  Mapping both 312 and 354 to `BTN_MENU` (as the old rg35xxplus platform did via
+  `CODE_MENU_ALT`) stretched every tap past the 250 ms `MENU_DELAY` threshold —
+  a quick MENU tap registered as a hold, so the home screen flipped from the
+  shortcuts overlay into brightness mode. Fix: `button_from_code()` no longer maps
+  `CODE_MENU_ALT` to `BTN_MENU` (keymon likewise ignores it); tap-vs-hold is derived
+  from the clean 312 timing. The SDL path was never affected (`JOY_MENU_ALT = JOY_NA`).
 - Analog sticks: ABS_Z/RX/RY/RZ, raw 0..4096, scaled ×32767/4096. Sticks exist on
   RG40XXV and cube only; `is_*` conditionals set JOY_L3/R3 = NA elsewhere.
 - SDL indices (secondary path): A=0 B=1 Y=2 X=3 L1=4 R1=5 SELECT=6 START=7 MENU=8,
@@ -105,7 +115,8 @@ open/closed per poll and could drop the wake press between polls.
 
 tg5040 structure + H700 codes: reads event1 (buttons) + event2 (volume 115/114) +
 event0 (power 116). MENU+vol = brightness, SELECT+vol = colortemp, plain vol = volume —
-tg5040 parity. No mute DIP switch on H700 (gpio243 watcher dropped).
+tg5040 parity. No mute DIP switch on H700 (gpio243 watcher dropped). Tracks MENU on
+code 312 only — the synthetic 354 post-tap pulse is ignored (see MENU quirk above).
 
 ## Cores (`workspace/h700/cores/`)
 

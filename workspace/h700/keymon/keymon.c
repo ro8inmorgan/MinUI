@@ -117,7 +117,10 @@ int main(int argc, char *argv[]) {
 
 				switch (ev.code) {
 					case CODE_MENU:
-					case CODE_MENU_ALT:
+						// Only the real MENU code (312) tracks the physical button.
+						// CODE_MENU_ALT (354/KEY_GOTO) is a synthetic post-tap pulse
+						// (see platform.c) and must not be treated as MENU held, or a
+						// stray tap could momentarily divert vol +/- to brightness.
 						menu_pressed = ev.value;
 					break;
 					case CODE_SELECT:

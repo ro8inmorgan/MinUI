@@ -127,7 +127,14 @@ static int button_from_code(int code, int *id) {
 	else if (code == CODE_START)    { *id = BTN_ID_START;      return BTN_START; }
 	else if (code == CODE_SELECT)   { *id = BTN_ID_SELECT;     return BTN_SELECT; }
 	else if (code == CODE_MENU)     { *id = BTN_ID_MENU;       return BTN_MENU; }
-	else if (code == CODE_MENU_ALT) { *id = BTN_ID_MENU;       return BTN_MENU; }
+	// NOTE: CODE_MENU_ALT (354/KEY_GOTO) is deliberately NOT mapped to BTN_MENU.
+	// The H700 firmware reports the physical MENU button faithfully on CODE_MENU
+	// (312/BTN_TL2) — down while held, up on release. On a *short* tap it also
+	// emits a synthetic KEY_GOTO pulse that starts the instant CODE_MENU releases
+	// and lasts ~190ms. Mapping both to BTN_MENU stretches every tap past the
+	// 250ms long-press threshold, so a quick MENU tap wrongly registers as a hold
+	// (brightness overlay instead of the shortcuts overlay). Ignore the synthetic
+	// pulse and let NextUI derive tap-vs-hold from the clean CODE_MENU timing.
 	else if (code == CODE_L1)       { *id = BTN_ID_L1;         return BTN_L1; }
 	else if (code == CODE_L2)       { *id = BTN_ID_L2;         return BTN_L2; }
 	else if (code == CODE_L3)       { *id = BTN_ID_L3;         return BTN_L3; }
