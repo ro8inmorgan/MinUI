@@ -30,11 +30,15 @@ The stack:
 | RG28XX | 480×640 portrait | 640×480 logical | rotation plumbed, untested (below) |
 | RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
 
-### 480p UI audit — still open
+### 480p UI — mostly fine, polish pass pending
 These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
-rendered at 480p for ~2 years. `FIXED_SCALE 2` + `MAIN_ROW_COUNT 6` work, and general
-browsing looks right on RG40XXV, but no systematic audit of fonts / pills / quick
-switcher / long-text layouts at 640×480 (or 720×480) has been done. See 09-roadmap.
+rendered at 480p for ~2 years. Real-use verdict on RG40XXV: **no systemic breakage —
+OK for alpha**. Known concrete issue: in some paks (e.g. the Battery pak) the
+button-hint pills are large enough to overlap each other. A full audit of every
+shipped-by-default UI surface at 640×480/720×480 is still owed before release
+(09-roadmap). Related but distinct: several shared UI pieces hardcode Brick-era
+hardware assumptions (Input tester layout, Fn switch, dead display controls) — see
+09-roadmap #8.
 
 ## RG28XX rotation — implemented, unvalidated
 
@@ -64,22 +68,32 @@ Treat the whole path as unverified.
 
 Same `/dev/disp` gamma-LUT ioctls as tg5040 (`0x10b` set / `0x10c` enable / `0x10d`
 disable). On RG40XXV: RGB gain sliders visibly act, persist, and **survive sleep and
-game launch** (syncsettings.elf re-applies the LUT after resume — 06). The `enhance_*`
-attrs (contrast/saturation/exposure) are exposed through settings just like tg5040;
-`settings.cpp` gained the Anbernic vendor + RG40XX/RG34XX/RG28XX/RGCubeXX models and
-enables colortemp/displaycal/mute/analog-stick/wifi/bt capability flags for h700.
+game launch** (syncsettings.elf re-applies the LUT after resume — 06). `settings.cpp`
+gained the Anbernic vendor + RG40XX/RG34XX/RG28XX/RGCubeXX models and enables
+colortemp/displaycal/mute/analog-stick/wifi/bt capability flags for h700.
 Per-panel default gain presets: not yet measured (neutral defaults).
 
-## Known unresolved: alpha/tinted-bitmap blits
+**What actually works on RG XX panels:** LCD backlight brightness, color temperature,
+white-point correction (displaycal), RGB tuning. The `enhance_*` display controls
+(brightness/contrast/saturation/exposure) are exposed in settings just like tg5040
+**but do nothing on RG XX** — the sysfs attrs exist (00) yet have no visible effect.
+They need per-platform gating, and syncsettings shouldn't bother restoring them
+(09-roadmap #8).
 
-An attempt to normalize the asset sheet and force alpha-blend blits for H700's
-SDL2/SDL_image behavior (`GFX_needsBitmapBlendCompat()` gated in shared `api.c`) was
-committed and **reverted 16 minutes later** — it regressed the known-good rendering.
-The branch deliberately stays on the "pre-alpha graphics stack"; `workspace/all/`
-carries **zero net change** from the experiment. Symptom class to look for when
-revisiting: bitmaps whose alpha should tint/blend rendering opaque (or vice versa)
-where tg5040 renders correctly. Root cause not yet established — likely a pixel-format
-or blend-mode default difference in our SDL2/SDL2_image build. See 09-roadmap.
+## Alpha/tinted-bitmap blits — resolved (it was libpng all along)
+
+During bring-up, graphical glitches were blamed on main's alpha-blending work; a
+compat experiment (`GFX_needsBitmapBlendCompat()` gated in shared `api.c`) was
+committed and reverted 16 minutes later, and the branch stayed pinned on the
+pre-alpha graphics stack. **The real root cause turned out to be the missing 64-bit
+`libpng12` bundle** — SDL2_image dlopens libpng, the stock OS only has a 32-bit copy,
+and the silent dlopen failure corrupted image loading (fixed in `510d3bb1`, see
+pitfall #2 in 01). The alpha-blending code on main was never at fault.
+
+Consequence: the plan is to **rebase/merge the h700 branch back onto current main,
+alpha-blending work included** (09-roadmap #7). `workspace/all/` carries zero net
+change from the reverted experiment, so the rebase is clean on that front; verify
+rendering on device after the merge as the closing check.
 
 ## Boot splash
 

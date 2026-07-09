@@ -1,7 +1,7 @@
 # 09 — Roadmap: from working beta to a 9.5/10 port
 
-Everything below is verified against branch tip `752cefe8` (2026-07-09). Ordered by
-impact within each section.
+Everything below is verified against branch tip `752cefe8` (updated 2026-07-09).
+Ordered by impact within each section.
 
 ## P0 — Correctness / robustness
 
@@ -36,47 +36,64 @@ impact within each section.
    env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
    patch covers GL contexts and that the two layers don't double-rotate; add
    `default-rg28xx.cfg` cfgs.
-7. **Resolve the alpha/tinted-bitmap question** (04) — the reverted experiment means
-   H700 rides a rendering path that *looks* right but differs from what was attempted.
-   Reproduce the original artifact, root-cause it (likely SDL2/SDL2_image
-   pixel-format or blend defaults in our custom build), and either fix in the SDL
-   build (preferred — keeps `workspace/all/` clean) or land a properly-gated shared
-   fix.
-8. **BT audio: ship bluealsa or formally drop it.** The gate-off is clean and
+7. **Rebase/merge the h700 branch back onto main, including the alpha-blending
+   work.** The alpha/tinted-bitmap question is solved: the graphical glitches were
+   caused by the missing 64-bit libpng bundle (SDL2_image's dlopen failing —
+   fixed in `510d3bb1`), **not** by main's alpha-blending changes. The blend-compat
+   revert was treating the wrong suspect. With libpng fixed, re-apply/merge on top
+   of current main and confirm rendering stays clean on device (04).
+8. **Audit Brick-era feature assumptions in shared UI** — NextUI only ever targeted
+   the Brick / Smart Pro, and several UI pieces hardcode that hardware. Known cases
+   on RG XX:
+   - **Input tester pak** shows the Brick's button layout: no analog sticks
+     rendered, R3 assumed always present. Needs device-aware layout (RG40XXV has
+     dual sticks + L3/R3; 34XX/28XX have none).
+   - **Fn switch option** in the settings app — the sliding Fn button doesn't exist
+     on any RG XX device; hide/gate it for h700.
+   - **Display settings** expose brightness/saturation/contrast/exposure enhance
+     controls that **do nothing on RG XX**. What actually works: LCD backlight
+     brightness, color temperature, white-point correction (displaycal), RGB
+     tuning. Gate the dead controls per-platform (and stop syncsettings from
+     "restoring" values that have no effect).
+   Worth a systematic sweep: grep settings.cpp / paks for capability flags that
+   default to "present" and decide each for h700.
+9. **BT audio: ship bluealsa or formally drop it.** The gate-off is clean and
    reversible (drop a `bluealsa` binary in `.system/h700/bin` and the path lights
    up). Building bluez-alsa in the toolchain is the last piece of tg5040 feature
    parity. If dropped instead, remove the dormant bt_init/audiomon plumbing.
-9. **480p UI audit** (04) — systematic pass over fonts, pills, quick switcher, long
-   titles at 640×480 and 720×480. NextUI hadn't rendered at 480p in ~2 years;
-   browsing looks fine but nobody has checked the corners.
-10. **Headphone jack detection** (05) — investigate how stock switches speaker/HP on
+10. **480p UI polish pass** (04) — verdict from real use: **mostly fine, OK for
+    alpha**. No systemic layout breakage; known concrete issue: in some paks
+    (e.g. the Battery pak) the button-hint pills are large enough to overlap each
+    other. Before release, audit every shipped-by-default UI surface at 640×480
+    and 720×480 and fix pill/hint sizing where cramped.
+11. **Headphone jack detection** (05) — investigate how stock switches speaker/HP on
     a live device; may be hardware auto-mute (= nothing to do). Cheap to answer,
     closes a matrix row either way.
-11. **Measure real panel refresh** — `SCREEN_FPS 60.0` is assumed. A vsync-timing
+12. **Measure real panel refresh** — `SCREEN_FPS 60.0` is assumed. A vsync-timing
     test per device takes minutes and protects frame pacing math.
-12. Later: RGcubexx bring-up (720×720, wired but untested), HDMI out (`SetHDMI()` is
+13. Later: RGcubexx bring-up (720×720, wired but untested), HDMI out (`SetHDMI()` is
     a no-op; mechanism documented in 04), RG35XX-family variants, Panel-Fix tool.
 
 ## P2 — Cleanup / refactors / simplifications
 
-13. **Gate the crash-loop network behavior**: after 5 nextui crashes, launch.sh
+14. **Gate the crash-loop network behavior**: after 5 nextui crashes, launch.sh
     brings up WiFi+SSH for 300 s unconditionally — great for beta, a mild security
     surprise for release. Tie it to the `debug-keep-network` flag (or a
     `.userdata` setting) before calling the port done.
-14. **Dedupe boot/installer shell code** — `boot/boot.sh` and `install/boot.sh`
+15. **Dedupe boot/installer shell code** — `boot/boot.sh` and `install/boot.sh`
     share mount/splash/log idioms with subtle divergence risk. Extract the common
     helpers into one sourced file inside the shim payload.
-15. **Dedicated h700 toolchain image, revisited** (01) — a thin
-    `FROM tg5040-toolchain` layer pre-baking the pinned SDL2 (and bluealsa if #8
+16. **Dedicated h700 toolchain image, revisited** (01) — a thin
+    `FROM tg5040-toolchain` layer pre-baking the pinned SDL2 (and bluealsa if #9
     ships) removes the pitfall classes 1–3 in 01 structurally and cuts CI time. Do
     it when the next external dep lands.
-16. **Trim remaining tg5040 residue in the skeleton** — sweep h700 paks/cfgs for
+17. **Trim remaining tg5040 residue in the skeleton** — sweep h700 paks/cfgs for
     trimui-isms and stale comments (the big items — reboot_next, -brick cfgs,
     libUMP/libasound bundling — are already gone).
-17. **settings glib check** — settings.elf links the sysroot's glib and empirically
+18. **settings glib check** — settings.elf links the sysroot's glib and empirically
     loads against the device's 2.72; add a one-line `ldd`-against-stock-rootfs CI
     check (01's bundling rule) so an SDK bump can't silently break it.
-18. **Wire richer battery metrics** (optional) — `time_to_empty_now`/`voltage_now`/
+19. **Wire richer battery metrics** (optional) — `time_to_empty_now`/`voltage_now`/
     `charge_counter` exist on the PMIC; batmon's SQLite would get better data for a
     trivial PLAT extension.
 

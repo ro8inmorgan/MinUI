@@ -35,7 +35,7 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 ### Display
 - `/dev/fb0`: 640×480 (virtual_size `640,480`); modes list includes `U:1280x1024p-59`, `U:640x480p-75`, `U:640x480p-59` (HDMI modes appear here)
 - Allwinner **disp2** driver: `/dev/disp` char device present
-- `/sys/class/disp/disp/attr/` contains: `color_temperature`, `enhance_bright`, `enhance_contrast`, `enhance_saturation`, `enhance_mode`, `xres`, `yres`, … — near-identical attribute set to TG5040 (same disp2 driver family)
+- `/sys/class/disp/disp/attr/` contains: `color_temperature`, `enhance_bright`, `enhance_contrast`, `enhance_saturation`, `enhance_mode`, `xres`, `yres`, … — near-identical attribute set to TG5040 (same disp2 driver family). ⚠ `color_temperature` works; the `enhance_*` attrs accept writes but have **no visible effect** on RG XX panels (unlike tg5040)
 - **No `/sys/class/backlight`** — brightness via `/dev/disp` ioctl `DISP_LCD_SET_BRIGHTNESS` (0x102), args `{0, raw 0-255, 0, 0}`. Confirmed working in the shipped port (level curve in 03). There is also a `brightness` file under the AXP battery sysfs used by the stock `brightCtrl.bin` daemon — we kill that daemon at launch.
 - Gamma LUT ioctls `DISP_LCD_SET_GAMMA_TABLE (0x10b)` / `GAMMA_CORRECTION_ENABLE (0x10c)` / `DISABLE (0x10d)` — **confirmed working**: displaycal RGB gains visibly act, persist, and survive sleep + game launch on RG40XXV.
 - Boot arg: `lcd_type=boe` (panel vendor in cmdline — may vary per unit)

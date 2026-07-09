@@ -69,5 +69,8 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 2. **Untested device matrix** — 34XXSP/28XX/cube code paths have never met hardware.
 3. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
    Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
-4. **Alpha-blit unknown** — rendering differs from what a compat experiment expected;
-   currently looks right, root cause unowned (04).
+4. **Brick-era assumptions in shared UI** — Input tester shows Brick's layout, an
+   Fn-switch setting exists for hardware RG XX doesn't have, and dead enhance
+   display controls are exposed; needs a capability-flag sweep (09-roadmap #8).
+   (Formerly listed here: the alpha-blit unknown — resolved; it was the missing
+   64-bit libpng, and the branch will rebase onto main incl. alpha blending, 04.)

@@ -87,10 +87,12 @@ open/closed per poll and could drop the wake press between polls.
   correct by ear; the control's TLV metadata is garbage). `lineout volume` secondary.
 - **Mute**: `SPK` switch off + store/restore volume (no `/sys/class/speaker/mute` on
   H700). h700 is included in `hasMuteToggle()` in settings.cpp.
-- **Color temperature**: `/sys/class/disp/disp/attr/color_temperature`, plus
-  `enhance_contrast` / `enhance_saturation` / `enhance_bright` — same disp2 attrs as
-  tg5040. All `scale*()` switches carry `default:` cases (a draft could hit
-  uninitialized values on out-of-range input).
+- **Color temperature**: `/sys/class/disp/disp/attr/color_temperature` — works
+  (tested ✅). The sibling `enhance_contrast` / `enhance_saturation` /
+  `enhance_bright` attrs are also written, **but have no visible effect on RG XX
+  panels** — those settings need gating off for h700 (09-roadmap #8). All
+  `scale*()` switches carry `default:` cases (a draft could hit uninitialized
+  values on out-of-range input).
 - **DisplayCal**: same gamma-LUT ioctls as tg5040 (0x10b/0x10c/0x10d) — worked 1:1 as
   predicted; tested passing on RG40XXV including persistence across sleep and game
   launch.
