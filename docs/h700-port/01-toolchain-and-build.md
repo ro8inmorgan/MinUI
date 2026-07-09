@@ -37,6 +37,14 @@ prefix that `makefile.env` puts first. Configure highlights (see `workspace/h700
   and for alsa-shared/image-shared dlopen to work at all. (An early draft disabled
   both; don't.)
 - No udev (`SDL_JOYSTICK_DISABLE_UDEV=1` is also exported at runtime — see 03).
+- **`patches/sdl2-h700.patch` is applied after clone** (stamped, like the
+  NextCommander patch). The fork's "Batocera patches" commit removed the heuristic
+  joystick classification from `SDL_EVDEV_GuessDeviceClass()` (Batocera classifies
+  via udev), which — combined with our no-udev build — made `SDL_NumJoysticks()`
+  permanently return 0 for the built-in pad. NextUI never noticed (it reads evdev
+  raw — 03), but pure-SDL apps like NextCommander got no input at all. The patch
+  restores classification via a `BTN_GAMEPAD`/`BTN_JOYSTICK` check (the upstream
+  check wouldn't match anyway: the pad exposes no ABS_X/ABS_Y).
 
 ### Runtime library bundling (`platform/makefile.copy`)
 Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted for:

@@ -32,6 +32,13 @@ Bluetooth controllers. Reasons discovered during bring-up:
 - SDL joystick enumeration of the built-in pad is unreliable on the stock image
   (udev interplay); SDL is built without udev and `SDL_JOYSTICK_DISABLE_UDEV=1` is
   exported — that fixed startup hangs but made js enumeration of gpio-keys flaky.
+  Root cause found later (2026-07-09, Files-app freeze): the SDL fork's Batocera
+  patches deleted the joystick heuristic in `SDL_EVDEV_GuessDeviceClass()`, so the
+  no-udev fallback path never classified any device as a joystick. Fixed by
+  `workspace/h700/patches/sdl2-h700.patch` (see 01); SDL joystick enumeration of
+  the built-in pad now works. Note the fork assigns SDL button indices in
+  ascending evdev-keycode order, so the pad's ESC/VOL−/VOL+ (1/114/115) occupy
+  indices 0–2 and the gamepad cluster starts at index 3 (A=3 … MENU=11).
 - evdev codes are needed for keymon and wake handling anyway.
 
 Implementation: `poll_evdev_input()` scans/reads `/dev/input/event0..11` directly with

@@ -17,7 +17,9 @@ REQUIRES_FILEMGR=other/NextCommander
 REQUIRES_SDL2=other/sdl2
 SDL2_COMMIT=d4a7d7503524cc469fe775242f3f925d4dd56c88
 FILEMGR_PATCH=patches/NextCommander-h700.patch
-FILEMGR_STAMP=.patched-h700-v2
+FILEMGR_STAMP=.patched-h700-v3
+SDL2_PATCH=patches/sdl2-h700.patch
+SDL2_PATCH_STAMP=.patched-h700-v1
 SDL2_STAMP=.configured-nextui-h700-v3
 
 all: readmes
@@ -27,6 +29,7 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart unzip
+	cd $(REQUIRES_SDL2) && ([ -f $(SDL2_PATCH_STAMP) ] || (git checkout -- src/core/linux/SDL_evdev_capabilities.c && git apply ../../$(SDL2_PATCH) && rm -f $(SDL2_STAMP) && touch $(SDL2_PATCH_STAMP)))
 	cd $(REQUIRES_SDL2) && ([ -f $(SDL2_STAMP) ] || ([ ! -f Makefile ] || make clean))
 	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --enable-alsa-shared --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-libudev --disable-power --enable-filesystem --disable-sensor --disable-locale --enable-loadso --enable-shared --disable-static --disable-libsamplerate-shared && touch $(SDL2_STAMP)
 	grep -q '^#define SDL_VIDEO_DRIVER_MALI 1' $(REQUIRES_SDL2)/include/SDL_config.h
@@ -39,7 +42,7 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	# SDL2_image dlopens libpng12.so.0 at runtime; the H700 stock OS only has
 	# a 32-bit copy under /mnt/vendor/lib, so bundle the toolchain's 64-bit one
 	cp -L $(PREFIX)/lib/libpng12.so.0 $(REQUIRES_SDL2)/output/
-	cd $(REQUIRES_FILEMGR) && ([ -f $(FILEMGR_STAMP) ] || (git checkout -- Makefile && git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch $(FILEMGR_STAMP)))
+	cd $(REQUIRES_FILEMGR) && ([ -f $(FILEMGR_STAMP) ] || (git checkout -- . && git apply --unidiff-zero ../../$(FILEMGR_PATCH) && touch $(FILEMGR_STAMP)))
 	cd $(REQUIRES_FILEMGR) && ([ -f output/.platform-h700 ] || make clean PLATFORM=h700)
 	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=h700 && touch output/.platform-h700
 	cd boot && sh build.sh
