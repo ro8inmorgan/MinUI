@@ -48,7 +48,7 @@
 | Pak Store install | ⬜ |
 | OTA update flow | ⬜ |
 | BT controller pairing + input | ⬜ |
-| Bootlogo pak: preset carousel, apply (writes `mmcblk0p2`), first-apply `original.bmp` backup, restore | ⬜ (ported 2026-07-09; needs one apply/restore cycle on hardware) |
+| Bootlogo pak: preset carousel, apply (writes `mmcblk0p2`), first-apply `original.bmp` backup, restore | ✅ user-tested on RG40XXV 2026-07-09: apply works, `original.bmp` backup captured; reboot after apply is a bit slow but acceptable |
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
 | RG34XXSP: general H700 port + 720×480 UI | ✅ user-tested; works like RG40XXV |
