@@ -55,6 +55,11 @@ Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted 
 Rule of thumb: `ldd` every shipped .elf against a clean stock rootfs; bundle exactly
 the misses, nothing more.
 
+CI now applies that rule to the highest-risk h700 GUI binary:
+`workspace/h700/check-settings-ldd.sh` runs `ldd` for `settings.elf` in an Ubuntu
+22.04/Jammy arm64 runtime with `.system/h700/lib` first, and fails on unresolved
+libraries or missing gio/glib linkage.
+
 ### Updater detection (multi-platform SD cards)
 `skeleton/BOOT/common/updater` detects H700 via `grep -q sun50iw9
 /proc/device-tree/model` **before** the `*"0xd03"*` cpuinfo case — H700's cpuinfo is

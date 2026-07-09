@@ -54,5 +54,6 @@ Untested so far: RetroAchievements login/unlock, Pak Store install, OTA update f
 ## Diagnostics
 
 `PLAT_wifiDiagnosticsEnabled/Enable` + BT equivalents: tg5040 mechanism (verbose logs
-under `$LOGS_PATH`) carried over. The launch.sh `debug-keep-network` flag file keeps
-WiFi+SSH up regardless of settings — the primary dev-loop tool (08).
+under `$LOGS_PATH`) carried over. H700 intentionally does not add its own keep-network
+flag or crash-loop SSH rescue path for alpha; collect logs from TF2 after poweroff or
+use stock SSH while the device is already reachable.

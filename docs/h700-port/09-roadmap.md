@@ -86,26 +86,29 @@ Ordered by impact within each section.
 
 ## P2 — Cleanup / refactors / simplifications
 
-14. **Gate the crash-loop network behavior**: after 5 nextui crashes, launch.sh
-    brings up WiFi+SSH for 300 s unconditionally — great for beta, a mild security
-    surprise for release. Tie it to the `debug-keep-network` flag (or a
-    `.userdata` setting) before calling the port done.
-15. **Dedupe boot/installer shell code** — `boot/boot.sh` and `install/boot.sh`
-    share mount/splash/log idioms with subtle divergence risk. Extract the common
-    helpers into one sourced file inside the shim payload.
-16. **Dedicated h700 toolchain image, revisited** (01) — a thin
+14. **~~Remove the crash-loop network behavior~~ Done (2026-07-09)** — after 5
+    `nextui.elf` crashes, launch.sh now logs the limit, removes `/tmp/nextui_exec`,
+    and powers off instead of bringing up WiFi/SSH.
+15. **~~Dedupe boot/installer shell code~~ Done (2026-07-09)** — `boot/boot.sh`
+    and `install/boot.sh` now share mount/compat/log helpers via
+    `workspace/h700/shim-common.sh`, packaged in both the self-extracting boot shim
+    payload and `.tmp_update/h700/`.
+16. **Dedicated h700 toolchain image, revisited — deferred for alpha** (01) — a thin
     `FROM tg5040-toolchain` layer pre-baking the pinned SDL2 (and bluealsa if #9
     ships) removes the pitfall classes 1–3 in 01 structurally and cuts CI time. Do
     it when the next external dep lands.
-17. **Trim remaining tg5040 residue in the skeleton** — sweep h700 paks/cfgs for
-    trimui-isms and stale comments (the big items — reboot_next, -brick cfgs,
-    libUMP/libasound bundling — are already gone).
-18. **settings glib check** — settings.elf links the sysroot's glib and empirically
-    loads against the device's 2.72; add a one-line `ldd`-against-stock-rootfs CI
-    check (01's bundling rule) so an SDK bump can't silently break it.
-19. **Wire richer battery metrics** (optional) — `time_to_empty_now`/`voltage_now`/
-    `charge_counter` exist on the PMIC; batmon's SQLite would get better data for a
-    trivial PLAT extension.
+17. **~~Trim remaining tg5040 residue in the skeleton~~ Done (2026-07-09)** —
+    h700 paks/cfgs are clear of `default-brick`, `reboot_next`, `libUMP`, bundled
+    `libasound`, and TrimUI-only skeleton comments; stale commented `&>` redirects
+    in the h700 tool launchers were replaced with POSIX `> ./log.txt 2>&1` logging.
+18. **~~settings glib check~~ Done (2026-07-09)** — CI/release now build h700 and
+    run `workspace/h700/check-settings-ldd.sh` in a Jammy container against
+    `settings.elf` with the h700 bundled lib path, failing on unresolved libs or
+    missing gio/glib linkage.
+19. **Wire richer battery metrics — deferred for alpha** (optional) —
+    `time_to_empty_now`/`voltage_now`/`charge_counter` exist on the PMIC; batmon's
+    SQLite would get better data for a trivial PLAT extension, but the alpha cleanup
+    keeps battery schemas unchanged.
 
 ## What "9.5/10" looks like
 

@@ -10,71 +10,30 @@ SYSTEM_PATH="$SDCARD_PATH/.system"
 USERDATA_PATH="$SDCARD_PATH/.userdata/h700"
 LOGS_PATH="$USERDATA_PATH/logs"
 INSTALL_LOG="$LOGS_PATH/install.txt"
-DEBUG_KEEP_NETWORK_PATH="$USERDATA_PATH/debug-keep-network"
-DEBUG_WIFI_CONF="$USERDATA_PATH/debug-wifi.conf"
+SCRIPT_DIR="$(dirname "$0")"
+COMMON_PATH="$SCRIPT_DIR/$PLATFORM/shim-common.sh"
 
-if ! mountpoint -q "$SDCARD_PATH" && [ ! -L "$SDCARD_PATH" ]; then
-	if [ -e "$SDCARD_PATH" ]; then
-		mount --bind "$REAL_SDCARD_PATH" "$SDCARD_PATH" 2>/dev/null || true
-	else
-		ln -s "$REAL_SDCARD_PATH" "$SDCARD_PATH" 2>/dev/null || true
-	fi
+if [ ! -f "$COMMON_PATH" ]; then
+	echo "install: missing $COMMON_PATH $(date)" >> /tmp/nextui-h700-install.log 2>/dev/null || true
+	exit 1
 fi
+SHIM_LOG_PATH="$INSTALL_LOG"
+SHIM_LOG_PREFIX="install: "
+SHIM_LOG_DATES=1
+. "$COMMON_PATH"
+
+ensure_compat_path "$REAL_SDCARD_PATH" "$SDCARD_PATH"
 
 export LD_LIBRARY_PATH="$SYSTEM_PATH/$PLATFORM/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 export PATH="$SYSTEM_PATH/$PLATFORM/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-cd "$(dirname "$0")/$PLATFORM" || exit 1
+cd "$SCRIPT_DIR/$PLATFORM" || exit 1
 
 mkdir -p "$LOGS_PATH"
 echo "install: starting $(date)" > "$INSTALL_LOG"
 
 log_install() {
-	echo "install: $* $(date)" >> "$INSTALL_LOG"
-}
-
-read_debug_wifi_value() {
-	key="$1"
-	[ -f "$DEBUG_WIFI_CONF" ] || return 0
-	sed -n "s/^$key=//p" "$DEBUG_WIFI_CONF" | tail -n 1 | sed 's/^"//;s/"$//' | tr -d '\r'
-}
-
-connect_debug_wifi() {
-	[ -f "$DEBUG_WIFI_CONF" ] || return 0
-	DEBUG_WIFI_SSID="$(read_debug_wifi_value SSID)"
-	DEBUG_WIFI_PASSWORD="$(read_debug_wifi_value PASSWORD)"
-	DEBUG_WIFI_IFACE="$(read_debug_wifi_value INTERFACE)"
-	[ -n "$DEBUG_WIFI_IFACE" ] || DEBUG_WIFI_IFACE="wlan0"
-	if [ -z "$DEBUG_WIFI_SSID" ]; then
-		log_install "debug-wifi.conf present without SSID="
-		return 0
-	fi
-
-	log_install "connecting debug wifi SSID=$DEBUG_WIFI_SSID IFACE=$DEBUG_WIFI_IFACE"
-	for attempt in 1 2 3; do
-		nmcli dev wifi rescan ifname "$DEBUG_WIFI_IFACE" >> "$INSTALL_LOG" 2>&1 || true
-		if [ -n "$DEBUG_WIFI_PASSWORD" ]; then
-			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" password "$DEBUG_WIFI_PASSWORD" ifname "$DEBUG_WIFI_IFACE" >> "$INSTALL_LOG" 2>&1 && return 0
-		else
-			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" ifname "$DEBUG_WIFI_IFACE" >> "$INSTALL_LOG" 2>&1 && return 0
-		fi
-		log_install "debug wifi attempt $attempt failed"
-		sleep 2
-	done
-}
-
-start_debug_network() {
-	log_install "starting stock network services for debug"
-	rfkill.elf unblock wifi >> "$INSTALL_LOG" 2>&1 || rfkill unblock wifi >> "$INSTALL_LOG" 2>&1 || true
-	systemctl start NetworkManager >> "$INSTALL_LOG" 2>&1 || true
-	nmcli networking on >> "$INSTALL_LOG" 2>&1 || true
-	nmcli radio wifi on >> "$INSTALL_LOG" 2>&1 || true
-	connect_debug_wifi
-	systemctl start ssh >> "$INSTALL_LOG" 2>&1 ||
-		systemctl start sshd >> "$INSTALL_LOG" 2>&1 ||
-		/usr/sbin/sshd >> "$INSTALL_LOG" 2>&1 ||
-		true
-	ip addr show >> "$INSTALL_LOG" 2>&1 || true
+	shim_log "$@"
 }
 
 show_progress() {
@@ -86,11 +45,7 @@ show_progress() {
 
 show_progress "Installing..."
 sh "$SYSTEM_PATH/$PLATFORM/bin/governor.sh" performance 2>/dev/null || true
-if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] || [ -f "$DEBUG_WIFI_CONF" ]; then
-	start_debug_network
-else
-	systemctl stop NetworkManager 2>/dev/null || true
-fi
+systemctl stop NetworkManager 2>/dev/null || true
 killall brightCtrl.bin cexpert 2>/dev/null || true
 
 for pakz in $PAKZ_PATH; do

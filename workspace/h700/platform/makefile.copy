@@ -9,6 +9,7 @@ $(PLATFORM):
 	cp ./workspace/$@/boot/output/dmenu.bin ./build/SYSTEM/$@/dat/
 	mkdir -p ./build/BOOT/common/$@/
 	cp ./workspace/$@/install/*.png ./build/BOOT/common/$@/
+	cp ./workspace/$@/shim-common.sh ./build/BOOT/common/$@/
 	cp ./workspace/all/show2/build/$@/show2.elf ./build/BOOT/common/$@/
 	cp ./workspace/$@/other/unzip60/unzip ./build/BOOT/common/$@/
 	cp -a ./workspace/$@/other/sdl2/output/libSDL2*.so* ./build/SYSTEM/$@/lib/

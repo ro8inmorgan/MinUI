@@ -65,6 +65,9 @@ Notable implementation details (`boot/boot.sh`):
   `INSERT NEXTUI TF2 CARD`, `NEXTUI INSTALL MISSING`, `STOCK TARGET REQUIRED`.
   (The old port's per-panel raw-BMP `dd` scheme was dropped — rendered text needs no
   per-resolution assets. Post-install, SDL-based `show2.elf` takes over as usual.)
+- **Shared helpers**: `shim-common.sh` is packed into the self-extracting payload and
+  sourced after extraction, so boot and installer share TF2 mount/repair, `/mnt/SDCARD`
+  compatibility, and logging helpers.
 - **TF2 mount**: tries vfat → exfat → auto; on failure runs `repair_tf2()` —
   `fsck.fat -a` or `fsck.exfat -a` chosen by `blkid` — then retries once.
 - **Update trigger**: boots into the installer when `MinUI.zip` **or any `*.pakz`** is
@@ -89,7 +92,7 @@ Notable implementation details (`boot/boot.sh`):
 
 ## `MinUI.pak/launch.sh` (the master runtime script)
 
-Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~264 lines):
+Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~206 lines):
 - `export PLATFORM=h700`, path exports, `/mnt/SDCARD` compat symlink.
 - **Device detection**: `RGXX_MODEL=$(strings /mnt/vendor/bin/dmenu.bin | grep -m1 ^RG)`
   → `DEVICE` case (rg28xx / rg34xx / cube / rg40xx default). Confirmed working on 2026
@@ -107,7 +110,6 @@ Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~2
   `/tmp/next` chaining.
 - Poweroff/reboot via sentinel files: `/tmp/poweroff` → `poweroff`, `/tmp/reboot` →
   `reboot` (systemd handles clean unmounts — works; no `poweroff_next` port needed).
-- Diagnostics affordances: a `debug-keep-network` flag file keeps SSH/WiFi up, and
-  after 5 consecutive nextui crashes the loop brings up networking + SSH for 300 s so
-  a bricked-UI device is still reachable. (Currently always-on in the release path —
-  see 09-roadmap about gating it.)
+- Crash-loop handling: after 5 consecutive `nextui.elf` crashes, the loop logs the
+  crash limit, removes `/tmp/nextui_exec`, and falls through to poweroff. H700 does
+  not ship an automatic WiFi/SSH rescue path in the release runtime.

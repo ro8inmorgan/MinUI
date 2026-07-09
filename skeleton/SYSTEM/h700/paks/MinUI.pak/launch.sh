@@ -31,8 +31,6 @@ export LOGS_PATH="$USERDATA_PATH/logs"
 export HOOKS_PATH="$USERDATA_PATH/.hooks"
 export DATETIME_PATH="$SHARED_USERDATA_PATH/datetime.txt"
 export HOME="$USERDATA_PATH"
-DEBUG_KEEP_NETWORK_PATH="$USERDATA_PATH/debug-keep-network"
-DEBUG_WIFI_CONF="$USERDATA_PATH/debug-wifi.conf"
 LAUNCH_LOG="$LOGS_PATH/launch.txt"
 
 export PATH="$SYSTEM_PATH/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -54,56 +52,6 @@ for gles_path in /usr/lib/libGLESv2.so /usr/lib/libGLESv2.so.2 /usr/lib/libGLESv
 		break
 	fi
 done
-
-read_debug_wifi_value() {
-	key="$1"
-	[ -f "$DEBUG_WIFI_CONF" ] || return 0
-	sed -n "s/^$key=//p" "$DEBUG_WIFI_CONF" | tail -n 1 | sed 's/^"//;s/"$//' | tr -d '\r'
-}
-
-connect_debug_wifi() {
-	[ -f "$DEBUG_WIFI_CONF" ] || return 0
-	DEBUG_WIFI_SSID="$(read_debug_wifi_value SSID)"
-	DEBUG_WIFI_PASSWORD="$(read_debug_wifi_value PASSWORD)"
-	DEBUG_WIFI_IFACE="$(read_debug_wifi_value INTERFACE)"
-	[ -n "$DEBUG_WIFI_IFACE" ] || DEBUG_WIFI_IFACE="wlan0"
-	if [ -z "$DEBUG_WIFI_SSID" ]; then
-		echo "launch: debug-wifi.conf present without SSID=" >> "$LAUNCH_LOG"
-		return 0
-	fi
-
-	echo "launch: connecting debug wifi SSID=$DEBUG_WIFI_SSID IFACE=$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG"
-	for attempt in 1 2 3; do
-		nmcli dev wifi rescan ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 || true
-		if [ -n "$DEBUG_WIFI_PASSWORD" ]; then
-			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" password "$DEBUG_WIFI_PASSWORD" ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 && return 0
-		else
-			nmcli --wait 20 dev wifi connect "$DEBUG_WIFI_SSID" ifname "$DEBUG_WIFI_IFACE" >> "$LAUNCH_LOG" 2>&1 && return 0
-		fi
-		echo "launch: debug wifi attempt $attempt failed" >> "$LAUNCH_LOG"
-		sleep 2
-	done
-}
-
-start_debug_network() {
-	echo "launch: starting stock network services for debug" >> "$LAUNCH_LOG"
-	rfkill.elf unblock wifi >> "$LAUNCH_LOG" 2>&1 || rfkill unblock wifi >> "$LAUNCH_LOG" 2>&1 || true
-	systemctl start NetworkManager >> "$LAUNCH_LOG" 2>&1 || true
-	nmcli networking on >> "$LAUNCH_LOG" 2>&1 || true
-	nmcli radio wifi on >> "$LAUNCH_LOG" 2>&1 || true
-	if [ -f "$DEBUG_WIFI_CONF" ]; then
-		connect_debug_wifi
-	elif [ -s "$USERDATA_PATH/wifi/wpa_supplicant.conf" ] && [ -x "$SYSTEM_PATH/etc/wifi/wifi_init.sh" ]; then
-		echo "launch: starting NextUI wpa_supplicant config for debug" >> "$LAUNCH_LOG"
-		"$SYSTEM_PATH/etc/wifi/wifi_init.sh" start >> "$LAUNCH_LOG" 2>&1 || true
-	fi
-	systemctl start ssh >> "$LAUNCH_LOG" 2>&1 ||
-		systemctl start sshd >> "$LAUNCH_LOG" 2>&1 ||
-		/usr/sbin/sshd >> "$LAUNCH_LOG" 2>&1 ||
-		true
-	sleep 2
-	ip addr show >> "$LAUNCH_LOG" 2>&1 || true
-}
 
 log_runtime_state() {
 	echo "launch: runtime state $(date)" >> "$LAUNCH_LOG"
@@ -147,11 +95,7 @@ if [ -f /mnt/vendor/muos1.ini ] || [ -f /mnt/vendor/muos2.ini ]; then
 fi
 
 killall brightCtrl.bin cexpert 2>/dev/null || true
-if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] || [ -f "$DEBUG_WIFI_CONF" ]; then
-	start_debug_network
-else
-	systemctl stop NetworkManager 2>/dev/null || true
-fi
+systemctl stop NetworkManager 2>/dev/null || true
 if loginctl show-logind >/dev/null 2>&1; then
 	mkdir -p /run/systemd/logind.conf.d /run/systemd/system 2>/dev/null || true
 	cat > /run/systemd/logind.conf.d/nextui-h700.conf << EOF
@@ -188,9 +132,7 @@ else
 fi
 
 wifion=$(nextval.elf wifi | sed -n 's/.*"wifi": \([0-9]*\).*/\1/p')
-if [ -f "$DEBUG_KEEP_NETWORK_PATH" ] || [ -f "$DEBUG_WIFI_CONF" ]; then
-	echo "launch: skipping NextUI wifi init for debug" >> "$LAUNCH_LOG"
-elif [ "$wifion" = "0" ]; then
+if [ "$wifion" = "0" ]; then
 	"$SYSTEM_PATH/etc/wifi/wifi_init.sh" stop > /dev/null 2>&1 &
 else
 	"$SYSTEM_PATH/etc/wifi/wifi_init.sh" start > /dev/null 2>&1 &
@@ -232,10 +174,8 @@ while [ -f "$EXEC_PATH" ]; do
 	if [ "$EXIT_CODE" != "0" ]; then
 		CRASH_COUNT=$((CRASH_COUNT + 1))
 		if [ "$CRASH_COUNT" -ge 5 ]; then
-			echo "launch: crash limit reached; keeping system up for diagnostics" >> "$LAUNCH_LOG"
+			echo "launch: crash limit reached; powering off" >> "$LAUNCH_LOG"
 			rm -f "$EXEC_PATH"
-			start_debug_network
-			sleep 300
 			continue
 		fi
 	else

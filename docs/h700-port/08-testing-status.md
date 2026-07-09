@@ -13,8 +13,8 @@
 - The stock OS runs sshd with a full Ubuntu userland — iterate by `scp`ing freshly
   built `.elf`s into `.system/h700/bin` and restarting the launch loop. No SD-card
   shuffling after first install.
-- Drop the `debug-keep-network` flag file (see launch.sh) to keep WiFi+SSH up during
-  testing; 5 consecutive nextui crashes also auto-start SSH for 300 s.
+- Repeated `nextui.elf` crashes now log the crash limit and power off. Use TF2 logs
+  for crash-loop debugging; the release runtime powers off instead of starting SSH.
 
 ## Validation matrix (status as of 2026-07-09, RG40XXV unless noted)
 
