@@ -13,5 +13,7 @@ tar -czf data fbsplash unzip shim-common.sh
 cat ../$SOURCE > $TARGET
 echo BINARY >> $TARGET
 cat data >> $TARGET
-echo >> $TARGET
 chmod +x $TARGET
+
+PAYLOAD_LINE=$(($(grep -na '^BINARY' "$TARGET" | cut -d: -f1 | head -1) + 1))
+tail -n +"$PAYLOAD_LINE" "$TARGET" | gzip -t
