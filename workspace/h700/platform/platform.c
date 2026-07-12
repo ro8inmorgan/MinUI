@@ -214,7 +214,11 @@ static void detect_device(void) {
 
 void PLAT_initPlatform(void) {
 	detect_device();
-	should_rotate = is_rg28xx;
+	// NOTE: should_rotate must stay 0 even on the RG28XX. Its portrait panel is
+	// handled entirely by the mali SDL driver (SDL_ROTATION=1 in launch.sh), so
+	// the app-side coordinate space is plain 640x480 landscape; setting the flag
+	// makes setRectToAspectRatio() swap axes a second time and break minarch's
+	// Aspect/Fullscreen scaling.
 }
 
 static SDL_Joystick **joysticks = NULL;

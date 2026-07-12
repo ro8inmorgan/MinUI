@@ -64,6 +64,8 @@ extern int dev_has_rstick;
 #define CODE_R1			309
 #define CODE_L2			314
 #define CODE_R2			315
+#define CODE_L4			CODE_NA
+#define CODE_R4			CODE_NA
 #define CODE_L3			(dev_has_lstick ? 313 : CODE_NA)
 #define CODE_R3			(dev_has_rstick ? 316 : CODE_NA)
 
@@ -93,6 +95,8 @@ extern int dev_has_rstick;
 #define JOY_R1			5
 #define JOY_L2			10
 #define JOY_R2			11
+#define JOY_L4			JOY_NA
+#define JOY_R4			JOY_NA
 #define JOY_L3			(dev_has_lstick ? 9 : JOY_NA)
 #define JOY_R3			(dev_has_rstick ? 12 : JOY_NA)
 
@@ -150,6 +154,11 @@ extern int dev_has_rstick;
 #define BOOTLOGO_PARTITION "/dev/mmcblk0p2"
 // presets are keyed by panel resolution, not device name
 #define BOOTLOGO_RESOLUTION_DIRS 1
+// The RG28XX panel is mounted portrait: the UI is rotated onto it by the SDL
+// driver, but the bootloader blits bootlogo.bmp panel-native, so the 480x640
+// presets are authored 90° CCW and must be rotated CW to preview how they
+// will actually appear at boot.
+#define BOOTLOGO_PREVIEW_ROTATE_CW (is_rg28xx)
 
 ///////////////////////////////
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <signal.h>
@@ -30,6 +31,12 @@ static void sigHandler(int sig)
 #define BOOTLOGO_PARTITION "/dev/mmcblk0p1"
 #endif
 
+// platforms whose bootloader blits the logo panel-native onto a rotated panel
+// set this so previews are rotated to match the boot-time appearance
+#ifndef BOOTLOGO_PREVIEW_ROTATE_CW
+#define BOOTLOGO_PREVIEW_ROTATE_CW 0
+#endif
+
 static SDL_Surface *screen;
 
 SDL_Surface** images;
@@ -37,6 +44,30 @@ char **image_paths;
 static char basepath[MAX_PATH];
 static int selected = 0;
 static int count = 0;
+
+// returns a 90°-clockwise-rotated copy of the preset (or the original on
+// failure) so the preview matches what the rotated panel shows at boot
+static SDL_Surface* rotatePreviewCW(SDL_Surface* src)
+{
+    SDL_Surface* conv = SDL_ConvertSurfaceFormat(src, SDL_PIXELFORMAT_ARGB8888, 0);
+    if (!conv)
+        return src;
+    SDL_Surface* dst = SDL_CreateRGBSurfaceWithFormat(0, conv->h, conv->w, 32, SDL_PIXELFORMAT_ARGB8888);
+    if (!dst) {
+        SDL_FreeSurface(conv);
+        return src;
+    }
+    uint32_t* src_pixels = conv->pixels;
+    uint32_t* dst_pixels = dst->pixels;
+    int src_stride = conv->pitch / 4;
+    int dst_stride = dst->pitch / 4;
+    for (int y = 0; y < conv->h; y++)
+        for (int x = 0; x < conv->w; x++)
+            dst_pixels[x * dst_stride + (conv->h - 1 - y)] = src_pixels[y * src_stride + x];
+    SDL_FreeSurface(conv);
+    SDL_FreeSurface(src);
+    return dst;
+}
 
 int loadImages()
 {
@@ -69,6 +100,8 @@ int loadImages()
                 char path[MAX_PATH];
                 snprintf(path, sizeof(path), "%s%s", basepath, ent->d_name);
                 SDL_Surface *bmp = IMG_Load(path);
+                if (bmp && BOOTLOGO_PREVIEW_ROTATE_CW)
+                    bmp = rotatePreviewCW(bmp);
                 if (bmp) {
                     count++;
                     images = realloc(images, sizeof(SDL_Surface*) * count);
@@ -191,7 +224,7 @@ int main(int argc, char *argv[])
                 // render the selected image, centered on screen
                 SDL_Surface *image = images[selected];
                 if (image->w > screen->w || image->h > screen->h) {
-                    // aspect-fit oversized presets (e.g. rg28xx portrait logos on a landscape UI)
+                    // aspect-fit oversized presets (e.g. custom logos larger than the UI)
                     int fit_w = screen->w;
                     int fit_h = image->h * screen->w / image->w;
                     if (fit_h > screen->h) {
