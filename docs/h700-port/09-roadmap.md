@@ -1,7 +1,7 @@
 # 09 — Roadmap: from alpha candidate to a 9.5/10 port
 
-Everything below is verified against branch tip `4c754b7`, with hardware results
-recorded through 2026-07-10.
+Everything below is verified against branch tip `956ed34`, with hardware results
+recorded through 2026-07-13.
 Ordered by impact within each section.
 
 ## P0 — Correctness / robustness
@@ -39,14 +39,18 @@ Ordered by impact within each section.
    governor changes, displaycal persistence, RetroAchievements, Files, Recently
    Played, game switcher, and the primary 8/16-bit systems are hardware-tested.
    Remaining: fix POWER waking through a closed lid; decide whether charging should
-   continue to suppress deep sleep; diagnose missing 720×480 Bootlogo previews, PS1
+   continue to suppress deep sleep; diagnose PS1
    launch crashes, the FBNeo missing-BIOS lockup, and MD auto-governor/render-setting
    sensitivity; decide whether per-Emu `default-rg34xx.cfg` files are needed. Track
-   core coverage in [10](10-core-game-matrix.md).
-6. **RG28XX rotation validation** — plumbing exists on both layers (SDL_ROTATION=1
-   env + `should_rotate` GL path, 04). Verify on hardware that the malifbdev-rot
-   patch covers GL contexts and that the two layers don't double-rotate; add
-   `default-rg28xx.cfg` cfgs.
+   core coverage in [10](10-core-game-matrix.md). (~~720×480 Bootlogo previews~~
+   fixed 2026-07-13 — see #13a.)
+6. **~~RG28XX rotation validation~~ Done (2026-07-12)** — hardware answered both
+   questions: the malifbdev-rot driver *does* rotate the GL path (SDL_ROTATION=1
+   suffices end-to-end), and the two layers *did* double-rotate — the app-side
+   `should_rotate` swap broke minarch Aspect/Fullscreen scaling and was removed
+   (rotation is driver-level only now; postmortem in 04). UI, game scaling, and
+   bootlogo apply are user-verified; bootlogo previews are rotated to boot
+   orientation. Still open: decide whether `default-rg28xx.cfg` cfgs are needed.
 7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch was rebased
    onto main including the alpha-blending work. Upstream main has advanced since, so
    rebase once more before the final merge/release candidate. (The alpha/tinted-
@@ -115,18 +119,20 @@ Ordered by impact within each section.
     displaycal.h; confirm exact `RGXX_MODEL` strings for RG35xx family / RG40xxH
     while at it).
 
-13a. **Bootlogo pak: partial** — `Bootlogo.pak` builds and ships for
-    h700: full tg5040 preset catalog regenerated as 24-bit BMPs per panel
+13a. **Bootlogo pak: working on 3 of 4 resolutions** — `Bootlogo.pak` builds and
+    ships for h700: full tg5040 preset catalog regenerated as 24-bit BMPs per panel
     resolution (`640x480`, `720x480`, `480x640` rotated for RG28XX, `720x720`),
     folder picked via `$DEVICE`; writes `bootlogo.bmp` to `mmcblk0p2` and backs up
     the stock logo as `original.bmp` on first apply (02, 03). User-tested on
     RG40XXV: 640×480 apply + `original.bmp` backup verified, and the original appears
     in the carousel. Restore was not explicitly selected but uses the same apply path;
-    the post-apply reboot is a bit slow but acceptable. On RG34XXSP, the 720×480 pak
-    shows no preview images. The packaged BMPs are valid, correctly sized, and
-    non-black, so this is a runtime loading/rendering issue rather than blank assets;
-    applying or restoring was not attempted there. The 480×640 and 720×720 paths
-    still need hardware testing.
+    the post-apply reboot is a bit slow but acceptable. RG34XXSP 720×480 previews
+    were absent with the alpha1.1 binary; fixed with the current build
+    (2026-07-13, verified on-device — 04) and the pak now has load/path diagnostics,
+    an on-screen empty state, and an empty-list apply guard. RG28XX 480×640 apply is
+    user-verified (logo upright at boot) and previews are now rotated to match boot
+    orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`, 04). Remaining: SP backup/restore
+    exercise, and the 720×720 path (no cube device available).
 
 ## P2 — Cleanup / refactors / simplifications
 

@@ -6,7 +6,7 @@
 |---|---|---|
 | RG40XXV | Probed live | Primary bring-up device |
 | RG34XXSP | User-tested | General parity with RG40XXV; sleep/wake + lid validated here |
-| RG28XX | Not yet tested | Rotation validation target |
+| RG28XX | User-tested | Rotation validated: UI, game scaling, bootlogo apply working |
 | RGcubexx | No device available | External alpha-validation target |
 | TrimUI Brick TG5040 | Probed live | Regression reference (behavioral 1:1 comparisons) |
 
@@ -17,7 +17,7 @@
 - Repeated `nextui.elf` crashes now log the crash limit and power off. Use TF2 logs
   for crash-loop debugging; the release runtime powers off instead of starting SSH.
 
-## Validation matrix (status as of 2026-07-10, RG40XXV unless noted)
+## Validation matrix (status as of 2026-07-13, RG40XXV unless noted)
 
 ✅ tested & passed ⚠️ tested, has issues ⬜ untested ➖ explicitly out of alpha scope ✖ not implemented
 
@@ -54,12 +54,13 @@
 | OTA update flow | ➖ explicitly excluded from alpha scope; testing is not applicable for this release |
 | BT controller pairing + input | ⬜ |
 | Bootlogo pak, RG40XXV 640×480 | ✅ carousel/apply/backup tested; restore inferred via same apply path |
-| Bootlogo pak, RG34XXSP 720×480 | ⚠️ pak opens with no visible presets. Source BMPs are valid and non-black; runtime path/loading/rendering needs investigation. Apply/restore not attempted |
+| Bootlogo pak, RG34XXSP 720×480 | ✅ fixed 2026-07-13 — all 23 presets load and render with the current build (verified via SSH-driven run + framebuffer capture; the failing binary was alpha1.1-era). Pak now logs path/count/load errors and shows the searched path on screen when empty; apply guarded against an empty list |
+| Bootlogo pak, RG28XX 480×640 | ✅ apply user-tested: logo renders upright at boot. Previews were shown panel-native (90° off) and are now rotated to boot orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`) |
 | BT A2DP audio | ✖ gated off (`NO_BT_AUDIO`, no bluealsa shipped — 05/07) |
 | Headphone jack detection | ✖ not wired (05) |
 | RG34XXSP: general H700 port + 720×480 UI | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus work well; resolution-specific overlays untested |
 | RG34XXSP: lid sleep/wake | ⚠️ lid close and open work; deep suspend requires power as expected, but power also wakes light sleep while the lid is closed |
-| RG28XX: rotated UI + games | ⬜ (plumbing in place, unvalidated — 04) |
+| RG28XX: rotated UI + games | ✅ user-tested — UI correct; minarch Aspect/Fullscreen were broken by app-side double-rotation, fixed by removing `should_rotate` (rotation is driver-level only — 04) |
 | RGcubexx: 720×720 | ⬜ no device available; intentionally an external alpha-validation target |
 
 ### Performance
@@ -98,7 +99,8 @@ Detailed results and the remaining system backlog are tracked in
 - Diagnose PS1 launch and retest multiple formats/titles with the required BIOS.
 - Reproduce the MD Auto CPU behavior with exact shader, scale, and interpolation
   combinations.
-- After the preview bug is fixed, test 720×480 Bootlogo apply, backup, and restore.
+- Test 720×480 Bootlogo backup and restore (previews and apply now work; the
+  first-apply `original.bmp` backup and restoring it haven't been exercised on SP).
 - Test BT controller pairing/input, battery percentage accuracy, and overnight drain.
 - Run clean uninstall, SIGUSR1 shutdown, dirty-card recovery, and muOS/stockmod
   coexistence on this hardware where practical.
@@ -128,6 +130,16 @@ Detailed results and the remaining system backlog are tracked in
   11. `workspace/all/common/api.c`/`api.h` — `PWR_requestSleep()` (lid sleep) and
   `SND_quit()` in `PWR_enterSleep` (close ALSA before suspend; see 06). Both are
   platform-agnostic changes — watch them when rebasing onto main.
+  12. `workspace/all/bootlogo/bootlogo.c` — load/path/count diagnostics, on-screen
+  empty-state, empty-list apply guard, and the optional
+  `BOOTLOGO_PREVIEW_ROTATE_CW` preview-rotation hook (defaults off; only h700's
+  platform.h defines it, for the RG28XX).
+- **New-button defines must land in every platform.h.** The tg5050 L4/R4 work added
+  `CODE_L4/R4` + `JOY_L4/R4` references to shared `api.c` and `BUTTON_L4/R4` to
+  `minput.c`; h700 didn't build until the `*_NA` defines were added (`d738014`,
+  `956ed34`). When main grows a button, grep every `platform/platform.h` for the
+  new `BUTTON_/CODE_/JOY_` names — and verify with a full `make PLATFORM=h700`
+  (single-pak builds don't compile `minput.c` and will miss `BUTTON_*` gaps).
 - **Re-run the 00-device-facts probes after each Anbernic stock-firmware update.**
   Paths have been stable historically, but `dmenu_ln`/muOS hooks are
   stockmod-version-dependent, and the model-string detector reads a stock binary.

@@ -27,7 +27,7 @@ The stack:
 |---|---|---|---|
 | RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
 | RG34XXSP | 720×480 3:2 | 720×480 | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus tested-good; resolution-specific overlays untested |
-| RG28XX | 480×640 portrait | 640×480 logical | rotation plumbed, untested (below) |
+| RG28XX | 480×640 portrait | 640×480 logical | ✅ user-tested — driver-level rotation, UI + game scaling verified (below) |
 | RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
 
 ### 480p UI — mostly fine, polish pass pending
@@ -40,19 +40,34 @@ distinct: the Input tester is now device-aware, the dead
 display controls are hidden/verified, and Fn-switch settings are gated off on h700.
 The broader capability sweep remains a useful regression check (09-roadmap #8).
 
-## RG28XX rotation — implemented, unvalidated
+## RG28XX rotation — validated: driver-level only (2026-07-12)
 
-Both planned layers were plumbed:
-1. **SDL level**: launch.sh exports `SDL_ROTATION=1` when `DEVICE=rg28xx`
-   (consumed by the malifbdev-rot driver — rotating in the backend was the repo's
-   whole reason to exist).
-2. **GL level**: `platform.c` sets `should_rotate = is_rg28xx`, feeding
-   `generic_video.c`'s existing rotation handling (dst-rect w/h swap in present).
+Hardware testing answered both open questions, and the answer retired one of the
+two planned layers:
 
-Unknown until hardware testing: whether the malifbdev-rot patch covers the *GL
-context* path (the original concern was it might only rotate the non-GL blitter),
-and whether the two layers interact correctly (both active could double-rotate).
-Treat the whole path as unverified.
+1. **SDL level (the only layer)**: launch.sh exports `SDL_ROTATION=1` when
+   `DEVICE=rg28xx`, consumed by the malifbdev-rot driver. It **does** cover the GL
+   context path — the entire 640×480 landscape frame is rotated onto the portrait
+   panel at present time. The app-side coordinate space is plain 640×480 landscape;
+   no NextUI code needs to know the panel is rotated.
+2. **GL level — removed.** `platform.c` initially also set `should_rotate =
+   is_rg28xx`, feeding `generic_video.c`'s dst-rect w/h swap in
+   `setRectToAspectRatio()`. The feared double-rotation was real: the UI path
+   doesn't go through that function so menus looked fine, but minarch scaling
+   broke — Aspect produced an undersized rect fitting neither axis (480×360 inside
+   640×480), and Fullscreen stretched into a 480×640 rect that filled only the left
+   75% of the screen with the bottom clipped. Removing the flag fixed both modes,
+   user-verified on hardware (`d738014`). A NOTE in `PLAT_initPlatform` documents
+   why `should_rotate` must stay 0. (That flag was originally minarch's
+   TATE/vertical-arcade content-rotation hook — a feature since removed — not a
+   panel-orientation flag; h700 is the only platform that ever set it.)
+
+One consequence for the Bootlogo pak: the bootloader blits `bootlogo.bmp`
+panel-native (unrotated), so the 480×640 presets are authored 90° CCW in file
+space. The pak now rotates previews 90° CW on the RG28XX
+(`BOOTLOGO_PREVIEW_ROTATE_CW` in platform.h, default-off for other devices) so the
+carousel shows what the panel will actually display at boot; apply itself was
+already correct (user-verified: applied logo renders upright at power-on).
 
 ## HDMI — detection wired, output switching not
 
@@ -117,12 +132,20 @@ reverted experiment, so the rebase was clean on that front. Game switcher and bo
 rendering are clean at 720×480; screenshots and resolution-specific overlays remain to
 be checked. Upstream main has since advanced, so rebase once more before final merge.
 
-## Bootlogo preset previews
+## Bootlogo preset previews — resolved (2026-07-13)
 
-The 640×480 catalog works on RG40XXV. On RG34XXSP the pak opens but renders no preset
-images from `720x480/`. The source BMPs are valid 720×480×24 files and direct inspection
-shows non-black content, so this is a runtime path/loading/rendering problem rather than
-blank generated assets. Applying/restoring a logo was not attempted on RG34XXSP.
+The 640×480 catalog works on RG40XXV. The RG34XXSP "no visible presets" issue is
+fixed: driving the pak remotely over SSH on the SP with the current branch build
+showed all 23 `720x480/` presets loading and the carousel rendering correctly
+(verified via framebuffer capture); user-confirmed working. The failing binary was
+the alpha1.1-era `bootlogo.elf` (built from a pre-commit working tree); the exact
+defect in that binary was never pinned because current source no longer reproduces
+it. To keep this class of failure diagnosable, `bootlogo.c` now logs the preset
+search path, per-file `IMG_Load` failures, and the final count to the pak's
+`log.txt`, renders the searched path on screen when nothing loads, and guards
+scroll/apply against an empty preset list (apply previously dereferenced a NULL
+array). RG28XX previews are rotated to boot orientation (see rotation section
+above). The 720×720 path still needs hardware testing (no cube available).
 
 ## Boot splash
 

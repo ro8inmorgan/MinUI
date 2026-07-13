@@ -4,15 +4,18 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Status (2026-07-10): ready for an alpha release, with documented RG34XXSP issues.**
+**Status (2026-07-13): ready for an alpha release, with documented RG34XXSP issues.**
 RG40XXV has broad hardware coverage. RG34XXSP now passes the complete 720×480 UI
 sweep, box art, Files, Input, Recently Played, game switcher, RetroAchievements,
-displaycal persistence, manual governor changes, lid sleep/wake, and GB/GBC/GBA/FC/SFC.
+displaycal persistence, manual governor changes, lid sleep/wake, Bootlogo, and
+GB/GBC/GBA/FC/SFC. RG28XX is now user-tested: driver-level rotation validated,
+minarch Aspect/Fullscreen scaling fixed (a double-rotation bug), and Bootlogo
+apply + rotated previews working.
 Open RG34XXSP issues are PS1 launch crashes, an FBNeo missing-BIOS lockup, MD Auto CPU
-scaling sensitivity, missing 720×480 Bootlogo previews, POWER waking through a closed
+scaling sensitivity, POWER waking through a closed
 lid, and charging remaining in light sleep by current shared policy. Screenshots,
 resolution-specific overlays, battery accuracy/overnight drain, recovery paths, and
-RG28XX/RGcubexx hardware coverage remain untested. The cube is intentionally an
+RGcubexx hardware coverage remain untested. The cube is intentionally an
 external alpha-validation target. BT audio, Pak Store, and OTA update are explicitly
 outside this alpha scope. Full status is in [08](08-testing-status.md), priorities in
 [09](09-roadmap.md), and emulator coverage in [10](10-core-game-matrix.md).
@@ -67,18 +70,19 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
 | Install | TF1 gets one file; NextUI on TF2; no TF1-only mode | ✅ as planned; TF1 writes mountpoint+cmp guarded |
 | **Splash** | per-panel raw-BMP `dd` assets | **Deviation:** `fbsplash` text renderer — no per-resolution assets needed (02) |
-| RG28XX rotation | SDL-level first, GL hook fallback | Both layers plumbed; unvalidated (04) |
+| RG28XX rotation | SDL-level first, GL hook fallback | ✅ SDL/driver level alone is correct; the GL hook double-rotated and broke minarch scaling — removed after hardware testing (04) |
 | HDMI | stretch goal | Detection wired; `SetHDMI()` no-op — still a stretch goal (04) |
 
 ## Top open risks
 
 1. **RG34XXSP runtime issues** — PS1 launch crashes, FBNeo can trap MinArch after a
-   missing-BIOS failure, MD Auto CPU scaling is render-setting-sensitive, Bootlogo
-   previews are absent at 720×480, and POWER can wake through the closed lid.
+   missing-BIOS failure, MD Auto CPU scaling is render-setting-sensitive, and POWER
+   can wake through the closed lid. (Bootlogo previews at 720×480: fixed 2026-07-13.)
 2. **Partially tested robustness matrix** — clean uninstall, dirty-SD recovery,
    SIGUSR1 shutdown, battery accuracy, screenshots, and overnight drain need runs.
-3. **Partially tested device matrix** — RG40XXV and RG34XXSP are working; RG28XX
-   rotation still needs hardware validation, and RGcubexx is an external alpha target.
+3. **Partially tested device matrix** — RG40XXV, RG34XXSP, and RG28XX are working
+   (RG28XX rotation/scaling validated 2026-07-12); RGcubexx is an external alpha
+   target.
 4. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
    Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
 5. **Shared-UI capability regressions** — the Input tester is device-aware, dead

@@ -7,7 +7,9 @@ constants from the old rg35xxplus port (`git show 8cd78866:...`).
 
 One platform serves all devices: `DEVICE`/`RGXX_MODEL` env (set by launch.sh, see 02)
 → `detect_device()` sets `is_rg28xx / is_rg34xx / is_cube` globals that drive
-resolution and rotation, plus `dev_has_lstick / dev_has_rstick` capability flags
+resolution and the bootlogo preview rotation (panel rotation itself is handled
+entirely by the SDL driver via `SDL_ROTATION=1`; nothing app-side rotates — 04),
+plus `dev_has_lstick / dev_has_rstick` capability flags
 that drive stick availability — the tg5040 `is_brick` pattern.
 
 Analog stick matrix (verified against Retro Catalog/Anbernic specs 2026-07, RG40XXV
@@ -176,8 +178,9 @@ target), with the picodrive LTO/patch-hygiene fixes noted in 01.
   — bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`
   builds for h700 with resolution-keyed preset folders (`640x480`, `720x480`,
   `480x640`, `720x720`) selected via `$DEVICE`, writes `bootlogo.bmp` to `mmcblk0p2`
-  (`BOOTLOGO_PARTITION` in `platform.h`), and backs up the stock logo as
-  `original.bmp` on first apply (see 02 for the TF1-write-policy exception)
+  (`BOOTLOGO_PARTITION` in `platform.h`), backs up the stock logo as
+  `original.bmp` on first apply (see 02 for the TF1-write-policy exception), and on
+  the RG28XX rotates previews to boot orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`, 04)
 - `trimui_inputd` interactions (turbo, gpio 5V export)
 
 New vs tg5040: `rfkill/` — a minimal from-scratch `/dev/rfkill` ioctl tool (~120

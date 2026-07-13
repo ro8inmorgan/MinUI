@@ -13,7 +13,7 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 | TrimUI Brick (TG5040, A133P) | Probed live | Reference — NextUI runs perfectly |
 | Anbernic RG40XXV (H700) | Probed live | Port target #1 (was running stockmod) — **primary tested device** |
 | Anbernic RG34XXSP (H700) | User-tested | Port target #2 (clamshell, lid sensor) — strong 720×480/UI parity; core and lid edge cases tracked in 08 |
-| Anbernic RG28XX (H700) | Not yet tested | Port target #3 (rotated 480×640 panel) |
+| Anbernic RG28XX (H700) | User-tested | Port target #3 (rotated 480×640 panel) — rotation, game scaling, and bootlogo validated 2026-07-12 |
 
 ## RG40XXV (H700) — probed live
 
@@ -213,7 +213,9 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
 ## Facts still unverified (need hardware/testing)
 1. Why RG34XXSP power-key release wakes light sleep while `hallkey=0` even though
    `PLAT_shouldWake()` contains a closed-lid gate.
-2. RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path end-to-end.
+2. ~~RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path
+   end-to-end.~~ Resolved 2026-07-12: SDL_ROTATION=1 rotates the whole GL frame at
+   the driver; app space is 640×480 landscape (`should_rotate` must stay 0 — 04).
 3. Headphone jack detection on 2026 firmware (old note: `jack_state` never changes).
 4. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
 5. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.
