@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <errno.h>
+#include <string.h>
 #include <signal.h>
 #include <msettings.h>
 
@@ -90,8 +92,9 @@ int loadImages()
     }
 #endif
 
-    // grab all bmp files in the directory and load them with IMG_Load, 
+    // grab all bmp files in the directory and load them with IMG_Load,
     // keep them in an array of SDL_Surface pointers
+    LOG_info("loading presets from %s (DEVICE=%s)\n", basepath, device ? device : "(unset)");
     DIR *dir;
     struct dirent *ent;
     if ((dir = opendir(basepath)) != NULL) {
@@ -100,26 +103,28 @@ int loadImages()
                 char path[MAX_PATH];
                 snprintf(path, sizeof(path), "%s%s", basepath, ent->d_name);
                 SDL_Surface *bmp = IMG_Load(path);
-                if (bmp && BOOTLOGO_PREVIEW_ROTATE_CW)
-                    bmp = rotatePreviewCW(bmp);
-                if (bmp) {
-                    count++;
-                    images = realloc(images, sizeof(SDL_Surface*) * count);
-                    images[count-1] = bmp;
-                    image_paths = realloc(image_paths, sizeof(char*) * count);
-                    image_paths[count-1] = strdup(path);
+                if (!bmp) {
+                    LOG_error("failed to load %s: %s\n", path, IMG_GetError());
+                    continue;
                 }
+                if (BOOTLOGO_PREVIEW_ROTATE_CW)
+                    bmp = rotatePreviewCW(bmp);
+                count++;
+                images = realloc(images, sizeof(SDL_Surface*) * count);
+                images[count-1] = bmp;
+                image_paths = realloc(image_paths, sizeof(char*) * count);
+                image_paths[count-1] = strdup(path);
             }
         }
         closedir(dir);
     } else {
-        // could not open directory
-        LOG_error("could not open directory");
+        LOG_error("could not open %s: %s\n", basepath, strerror(errno));
         if (CFG_getHaptics()) {
             VIB_triplePulse(5, 150, 200);
         }
         return 0;
     }
+    LOG_info("loaded %i presets\n", count);
     return count;
 }
 
@@ -163,21 +168,21 @@ int main(int argc, char *argv[])
         }
         else
         {
-            if (PAD_justRepeated(BTN_LEFT))
+            if (PAD_justRepeated(BTN_LEFT) && count > 0)
             {
                 selected -= 1;
                 if (selected<0)
                     selected = count - 1;
                 dirty = 1;
             }
-            else if (PAD_justRepeated(BTN_RIGHT))
+            else if (PAD_justRepeated(BTN_RIGHT) && count > 0)
             {
                 selected += 1;
                 if (selected>=count)
                     selected = 0;
                 dirty = 1;
             }
-            else if (PAD_justPressed(BTN_A))
+            else if (PAD_justPressed(BTN_A) && count > 0)
             {
                 // apply with system calls
                 // BOOT_PATH=/mnt/boot/
@@ -246,6 +251,12 @@ int main(int argc, char *argv[])
                         image->h};
                     SDL_BlitSurface(image, NULL, screen, &image_rect);
                 }
+            }
+            else {
+                // surface the reason on-screen so it can be diagnosed without pulling logs
+                char msg[MAX_PATH + 32];
+                snprintf(msg, sizeof(msg), "No presets found in\n%s", basepath);
+                GFX_blitMessage(font.small, msg, screen, NULL);
             }
 
             GFX_blitButtonGroup((char *[]){"L/R", "SCROLL", NULL}, 0, screen, 0);
