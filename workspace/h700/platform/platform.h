@@ -38,6 +38,8 @@ extern int dev_has_rstick;
 #define BUTTON_R2		BUTTON_NA
 #define BUTTON_L3		BUTTON_NA
 #define BUTTON_R3		BUTTON_NA
+#define BUTTON_L4		BUTTON_NA
+#define BUTTON_R4		BUTTON_NA
 
 #define BUTTON_MENU		BUTTON_NA
 #define BUTTON_MENU_ALT	BUTTON_NA
