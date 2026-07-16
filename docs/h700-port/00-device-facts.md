@@ -123,9 +123,15 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   stops NetworkManager and owns its own wpa_supplicant instance (07)
 - **WiFi does not recover on its own after `mem` suspend** — confirmed; the suspend
   script bounces it on resume (06/07)
-- Bluetooth: `rtl_btlpm` module, `bluetoothd` (BlueZ 5.64), `rtk_hciattach -n -s 115200
-  ttyS1 rtk_h5` already running at boot — no re-attach needed
-- Ubuntu 22.04 ships **no bluealsa** and **no udhcpc** (DHCP = `dhclient`)
+- Bluetooth: `rtl_btlpm` module and stock BlueZ (5.66 on clean 2026 RG40XXV;
+  5.64 was observed on earlier firmware). The stock frontend normally runs
+  `rtk_hciattach -n -s 115200 ttyS1 rtk_h5`, but NextUI replaces that frontend
+  before it performs the attach, so the H700 init script must invoke the vendor
+  `setBluetooth.sh` path itself.
+- The clean 2026 RG40XXV image contains bluealsa and its ALSA plugins, contrary to
+  the earlier probe recorded here. H700 A2DP remains deliberately gated off and
+  NextUI does not depend on or start bluealsa. Ubuntu has no `udhcpc` (DHCP =
+  `dhclient`).
 
 ### Storage & partitions (TF1 = the stock OS card)
 ```

@@ -62,7 +62,7 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; 720×480 UI and box art pass, resolution-specific overlays untested |
 | **Input** | SDL joystick route | **Deviation:** raw evdev primary (SDL js enumeration unreliable on stock image); SDL kept for BT pads (03) |
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
-| **BT audio** | build + ship bluealsa | **Deviation:** gated off this alpha (`NO_BT_AUDIO`); re-enable path documented (05/07) |
+| **BT audio** | build + ship bluealsa | **Deviation:** gated off this alpha (`NO_BT_AUDIO`); clean 2026 RG40XXV stock already contains bluealsa, but cross-firmware validation is still required (05/07) |
 | Sleep | `echo mem` + tg5040-style wrapper | ⚠ repeated sleep/wake, in-game resume, and power-off auto-resume pass; charging intentionally stays in light sleep (06) |
 | Lid | hallkey → PLAT lid API | ⚠ close/open works, but POWER can wake RG34XXSP while the lid remains closed |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |

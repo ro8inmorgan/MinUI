@@ -86,10 +86,14 @@ Ordered by impact within each section.
      nit: syncsettings still "restores" the no-op enhance values on resume.
    Worth a systematic sweep: grep settings.cpp / paks for capability flags that
    default to "present" and decide each for h700.
-9. **BT audio: ship bluealsa or formally drop it.** The gate-off is clean and
-   reversible (drop a `bluealsa` binary in `.system/h700/bin` and the path lights
-   up). Building bluez-alsa in the toolchain is the last piece of tg5040 feature
-   parity. If dropped instead, remove the dormant bt_init/audiomon plumbing.
+9. **BT audio: validate stock bluealsa or formally drop it.** The clean 2026
+   RG40XXV image already contains bluealsa 4.1 and its ALSA plugins, while earlier
+   firmware probing reported it absent. Controller discovery, pairing, connection,
+   and SDL attachment now pass on RG40XXV. Test A2DP across supported stock firmware;
+   only package bluealsa if the stock component is missing or incompatible. Until
+   then `NO_BT_AUDIO` remains and H700's init script does not start bluealsa. Raw
+   external-controller button normalization is shared with tg5040/tg5050 and belongs
+   in a separate cross-platform change.
 10. **480p UI polish pass** (04) — verdict from real use on RG40XXV and RG34XXSP:
     **good for alpha**. The 720×480 Home UI, Battery, Game Tracker, Input, Clock,
     Settings, on-screen keyboard, Files, and in-game menus all work well. Box art is

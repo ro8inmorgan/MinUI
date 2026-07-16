@@ -39,6 +39,7 @@
 | Rumble (moto on/off) | ✅ |
 | WiFi scan/connect/forget | ✅ |
 | WiFi survives sleep; NTP sync | ✅ |
+| BT adapter init + controller pairing/attachment | ✅ RG40XXV: vendor UART attach creates `hci0`; stock BlueZ 5.66 discovers, pairs, trusts, and connects a DualSense; NextUI opens it as an SDL joystick plus `/dev/input/event3`; five restart cycles passed without duplicate attach/daemon processes. Raw button semantics remain a platform-agnostic tg5040/tg5050/H700 mapping issue and are out of scope for this branch |
 | Deep sleep (auto/manual) + wake | ⚠️ core paths work on RG34XXSP and RG40XXV, including in-game resume and power-off auto-resume. RG34XXSP POWER can wake the device while the lid is closed; charging intentionally prevents deep sleep in shared code (06) |
 | Files app (NextCommander): input, scaling, first-frame render | ✅ tested on RG40XXV and RG34XXSP; PPU 2 retained for alpha |
 | Input pak: per-device stick layout | ✅ RG40XXV shows working L3 only; RG34XXSP shows working L3/R3. Analog movement is not visualized by the existing Input pak and is out of scope for this port |

@@ -55,17 +55,18 @@ on a live device. Until then: no jack-based switching in NextUI.
 
 ## Bluetooth audio — deliberately disabled this beta
 
-Plan was to build and ship `bluez-alsa` (Ubuntu 22.04 doesn't include it). **Shipped
-decision: gate BT audio off instead**:
+The clean 2026 RG40XXV stock image contains bluealsa 4.1 and its ALSA plugins, while
+earlier firmware probing reported it absent. **The shipped decision remains to gate
+BT audio off** until the stock stack is validated across supported firmware:
 - settings built with `-DNO_BT_AUDIO` for h700 → BT samplerate menu hidden
   (`btmenu.cpp` made null-safe for the missing item)
-- `audiomon` refuses A2DP sinks unless a `bluealsa` binary exists (it doesn't)
-- `bt_init.sh` still starts bluealsa *if present*, so dropping a built bluealsa into
-  `.system/h700/bin` lights the path up again
+- `audiomon` refuses A2DP sinks unless a `bluealsa` binary exists
+- `bt_init.sh` does not start bluealsa even when the stock image contains it
 - `skeleton/BASE/README.txt` tells users BT audio is off in this beta
 
-BT controller input still works through SDL (07). Shipping bluealsa is the path to
-re-enable audio — see 09-roadmap.
+BT controller input still works through SDL (07). Validate the stock BlueZ controller
+path first, then separately decide whether to rely on the stock bluealsa stack or ship
+it — see 09-roadmap.
 
 ## Sample rates
 
