@@ -22,6 +22,12 @@ endif
 PATCH = git apply
 PROCS = -j4
 
+# The top-level PLATFORM command-line variable propagates through recursive make
+# calls and otherwise overrides PicoDrive's internal `PLATFORM = libretro`
+# assignment. Pass the intended value explicitly so its libretro frontend/VFS
+# objects are included in clean builds.
+picodrive_FLAGS += PLATFORM=libretro
+
 ###############################
 
 BUILD_ROOT=../../$(PLATFORM)/cores
