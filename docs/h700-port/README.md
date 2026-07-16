@@ -16,8 +16,10 @@ scaling sensitivity, POWER waking through a closed
 lid, and charging remaining in light sleep by current shared policy. Screenshots,
 resolution-specific overlays, battery accuracy/overnight drain, recovery paths, and
 RGcubexx hardware coverage remain untested. The cube is intentionally an
-external alpha-validation target. BT audio, Pak Store, and OTA update are explicitly
-outside this alpha scope. Full status is in [08](08-testing-status.md), priorities in
+external alpha-validation target. BT audio now uses the stock BlueALSA stack without
+bundling a second userspace implementation and is under hardware validation;
+Pak Store and OTA update are explicitly outside this alpha
+scope. Full status is in [08](08-testing-status.md), priorities in
 [09](09-roadmap.md), and emulator coverage in [10](10-core-game-matrix.md).
 
 These docs began as the implementation plan and were restructured after the
@@ -34,7 +36,7 @@ and the lessons that transfer to future platform ports.
 | [02-boot-and-installer.md](02-boot-and-installer.md) | dmenu.bin hijack, boot shim, installer, SD layout, uninstall |
 | [03-platform-layer.md](03-platform-layer.md) | `workspace/h700/`: platform.c/h, input (evdev-primary), libmsettings, keymon, cores |
 | [04-video-display.md](04-video-display.md) | SDL2+Mali/GLES stack, geometry, rotation, HDMI, displaycal, the alpha-blit question |
-| [05-audio.md](05-audio.md) | ALSA path, the dlopen'd-libasound bug story, volume/mute quirks, BT-audio gating |
+| [05-audio.md](05-audio.md) | ALSA path, the dlopen'd-libasound bug story, volume/mute quirks, BT-audio lifecycle |
 | [06-power-sleep-battery.md](06-power-sleep-battery.md) | Sleep design, lid/charging edge cases, battery, governors |
 | [07-wifi-bluetooth.md](07-wifi-bluetooth.md) | NextUI-owned wpa_supplicant, DHCP/creds handling, BT status |
 | [08-testing-status.md](08-testing-status.md) | Validation matrix with real results, regression guardrails, shared-code touch list |
@@ -62,7 +64,7 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; 720×480 UI and box art pass, resolution-specific overlays untested |
 | **Input** | SDL joystick route | **Deviation:** raw evdev primary (SDL js enumeration unreliable on stock image); SDL kept for BT pads (03) |
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
-| **BT audio** | build + ship bluealsa | **Deviation:** gated off this alpha (`NO_BT_AUDIO`); clean 2026 RG40XXV stock already contains bluealsa, but cross-firmware validation is still required (05/07) |
+| **BT audio** | build + ship bluealsa | **Deviation:** use stock BlueALSA 4.2.0, ALSA plugins, SBC, and BlueZ without bundling replacements; AirPods 4 ANC SBC playback passes on RG40XXV after an H700-only ALSA-option omission and native-volume initialization, with automatic reconnect/suspend validation pending (05/07) |
 | Sleep | `echo mem` + tg5040-style wrapper | ⚠ repeated sleep/wake, in-game resume, and power-off auto-resume pass; charging intentionally stays in light sleep (06) |
 | Lid | hallkey → PLAT lid API | ⚠ close/open works, but POWER can wake RG34XXSP while the lid remains closed |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |

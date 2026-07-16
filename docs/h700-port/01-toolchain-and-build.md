@@ -110,7 +110,9 @@ future stock-OS port:
 The reuse costs above are all *solved*, and the SDL2 build is pinned and cached. A thin
 image `FROM tg5040-toolchain` pre-baking SDL2 + a jammy-matched libasound would remove
 pitfall classes 1–3 structurally and speed CI — worth doing if the platform accumulates
-more external deps (e.g. shipping bluealsa, see 07/09-roadmap), not before.
+more external deps. Bluetooth audio uses the stock H700 BlueALSA daemon, ALSA plugins,
+SBC runtime, and BlueZ without copying them from the shared toolchain (see
+05/07/09-roadmap).
 
 ## Build outputs
 

@@ -36,7 +36,7 @@ RetroAchievements login and unlock work on RG34XXSP, including credential entry 
 the on-screen keyboard. Pak Store and OTA update are explicitly excluded from the alpha
 scope; testing is not applicable and they are not alpha release gates.
 
-## Bluetooth (as shipped — system BlueZ, controller transport working, audio gated off)
+## Bluetooth (as shipped — system BlueZ, controller transport and stock A2DP enabled)
 
 - NextUI uses the stock BlueZ stack → no `btmanager`/upgrade-pakz. A clean 2026
   RG40XXV reports 5.66 for both `bluetoothd` and `bluetoothctl`; earlier firmware
@@ -51,10 +51,14 @@ scope; testing is not applicable and they are not alpha release gates.
   links fine, loads on device). It is the persistent pairing agent and owns the
   pairable window; the init script does not create a short-lived `bluetoothctl`
   agent.
-- **BT audio: deliberately not shipped this beta** — the clean 2026 RG40XXV stock
-  image does contain bluealsa 4.1 and its ALSA plugins, contrary to the earlier
-  probe, but `-DNO_BT_AUDIO` remains and `bt_init.sh` does not start it. Controller
-  pairing is the first validation gate; full story in 05 and 09-roadmap.
+- **BT audio: stock-first A2DP enabled** — the clean 2026 RG40XXV stock image has
+  BlueALSA 4.2.0, its ALSA plugins/configuration, and its D-Bus policy. `bt_init.sh`
+  starts `bluealsa -p a2dp-source --a2dp-volume --initial-volume=100` after BlueZ is
+  ready and verifies `org.bluealsa`. The H700 `audiomon` build omits only the
+  `delay 0` setting rejected by the stock plugin; its remaining behavior is shared.
+  BlueALSA, its ALSA plugins, SBC, and BlueZ all remain stock and are not bundled or
+  replaced. AirPods 4 ANC playback is verified; automatic reconnect and suspend/resume
+  are tracked in 05/08.
 - BT controller transport is verified on RG40XXV: Settings discovers, pairs, trusts,
   connects, and exposes a DualSense as an SDL joystick and evdev input device.
   Button semantics are not fully normalized because the shared tg5040/tg5050/H700

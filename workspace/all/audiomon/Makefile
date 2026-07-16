@@ -28,6 +28,9 @@ CCXX= $(CROSS_COMPILE)g++
 CXXFLAGS += -Wall -O2 -I. -I../common/ -I../../$(PLATFORM)/platform/ -I$(PREFIX)/include/dbus-1.0 -I$(PREFIX)/lib/dbus-1.0/include
 LDFLAGS += $$(pkg-config --libs dbus-1 libudev)
 CXXFLAGS += -I$(PREFIX_LOCAL)/include -DPLATFORM=\"$(PLATFORM)\" $$(pkg-config --cflags dbus-1 libudev)
+ifeq ($(PLATFORM),h700)
+CXXFLAGS += -DH700_BLUEALSA_NO_DELAY
+endif
 LDFLAGS += -L$(PREFIX_LOCAL)/lib -lmsettings
 
 SRCS = audiomon.cpp

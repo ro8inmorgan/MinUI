@@ -53,20 +53,39 @@ speaker/HP (possibly hardware auto-mute, in which case nothing is needed). To
 investigate: diff `amixer contents` and watch input devices while plugging headphones
 on a live device. Until then: no jack-based switching in NextUI.
 
-## Bluetooth audio — deliberately disabled this beta
+## Bluetooth audio — stock-first A2DP enabled
 
-The clean 2026 RG40XXV stock image contains bluealsa 4.1 and its ALSA plugins, while
-earlier firmware probing reported it absent. **The shipped decision remains to gate
-BT audio off** until the stock stack is validated across supported firmware:
-- settings built with `-DNO_BT_AUDIO` for h700 → BT samplerate menu hidden
-  (`btmenu.cpp` made null-safe for the missing item)
-- `audiomon` refuses A2DP sinks unless a `bluealsa` binary exists
-- `bt_init.sh` does not start bluealsa even when the stock image contains it
-- `skeleton/BASE/README.txt` tells users BT audio is off in this beta
+The clean 2026 RG40XXV stock image contains BlueALSA 4.2.0, its ALSA PCM/control
+plugins, `/etc/alsa/conf.d/20-bluealsa.conf`, and the system D-Bus policy. A live
+startup probe confirmed that `bluealsa -p a2dp-source` acquires `org.bluealsa` and
+registers two SBC source endpoints below `/org/bluez/hci0`.
 
-BT controller input still works through SDL (07). Validate the stock BlueZ controller
-path first, then separately decide whether to rely on the stock bluealsa stack or ship
-it — see 09-roadmap.
+H700 now follows the tg5040 lifecycle with a stock-only implementation:
+- `bt_init.sh` starts BlueALSA only after `hci0` and stock BlueZ are ready, waits for
+  its D-Bus name, enables native A2DP volume, initializes the remote transport at a
+  nonzero volume, and logs useful startup failures
+- `/usr/bin/bluealsa`, the ALSA PCM/control plugins, SBC runtime, ALSA configuration,
+  and BlueZ all come from the stock firmware; none are bundled or replaced
+- settings exposes the existing maximum-sampling-rate control (the H700-specific
+  `NO_BT_AUDIO` build gate is removed)
+- shared `audiomon` selects the connected device and writes `$HOME/.asoundrc`; MinArch's
+  existing device watcher then reopens SDL audio against the stock `bluealsa` PCM. The
+  H700 build alone omits the `delay 0` option rejected by its stock BlueALSA plugin;
+  tg5040 and tg5050 output is unchanged
+- disabling Bluetooth stops BlueALSA before BlueZ; no `bluetoothd`, `bluetoothctl`,
+  or other BlueZ component is bundled or replaced
+
+AirPods 4 ANC pairing, A2DP connection, automatic internal-speaker muting/restoration,
+SBC transport, and user-audible game audio are verified on RG40XXV. The original silent
+stream was not a 44.1/48 kHz problem: BlueZ created the AirPods transport with absolute
+volume zero. Setting its `MediaTransport1.Volume` to 127 made the already-running stream
+audible. The shipped daemon flags now initialize that value natively. An A2DP PCM
+publication race was also observed during an artificial daemon restart while the device
+remained logically connected; it is not handled by an H700-only shared-code workaround
+unless a normal connection flow reproduces it. Final automatic reconnect, game-switching,
+and suspend/resume passes are still pending because the shared test unit was returned to
+HDMI testing. Firmware without a runnable stock BlueALSA is logged as controller-only
+rather than augmented with another userspace stack; see 09-roadmap.
 
 ## Sample rates
 

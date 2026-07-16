@@ -128,10 +128,12 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   `rtk_hciattach -n -s 115200 ttyS1 rtk_h5`, but NextUI replaces that frontend
   before it performs the attach, so the H700 init script must invoke the vendor
   `setBluetooth.sh` path itself.
-- The clean 2026 RG40XXV image contains bluealsa and its ALSA plugins, contrary to
-  the earlier probe recorded here. H700 A2DP remains deliberately gated off and
-  NextUI does not depend on or start bluealsa. Ubuntu has no `udhcpc` (DHCP =
-  `dhclient`).
+- The clean 2026 RG40XXV image contains BlueALSA 4.2.0, its ALSA PCM/control
+  plugins, ALSA configuration, and D-Bus policy, contrary to the earlier probe
+  recorded here. Its `a2dp-source` profile successfully registers SBC media
+  endpoints with stock BlueZ. NextUI uses these stock components directly and does
+  not bundle or replace BlueALSA, its ALSA plugins, SBC, or BlueZ. Ubuntu has no
+  `udhcpc` (DHCP = `dhclient`).
 
 ### Storage & partitions (TF1 = the stock OS card)
 ```

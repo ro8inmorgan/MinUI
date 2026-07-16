@@ -10,10 +10,12 @@ fi
 DEVICE_NAME="Anbernic ${RGXX_MODEL:-RG XX} (NextUI)"
 VENDOR_BT_SCRIPT="/mnt/vendor/ctrl/setBluetooth.sh"
 BTCTL="/usr/bin/bluetoothctl"
+BLUEALSA="/usr/bin/bluealsa"
 HCI_PATH="/sys/class/bluetooth/hci0"
 VENDOR_LOCK="/tmp/.init_bt"
 NEXTUI_LOCK="/tmp/nextui-bt-init.lock"
 HCI_LOG="/tmp/nextui-rtk_hciattach.log"
+BLUEALSA_LOG="/tmp/nextui-bluealsa.log"
 LOG_DIR="${LOGS_PATH:-/mnt/SDCARD/.userdata/h700/logs}"
 LOG_FILE="$LOG_DIR/bluetooth.txt"
 
@@ -143,6 +145,81 @@ wait_for_bluez_adapter() {
 	return 1
 }
 
+power_on_adapter() {
+	bt_power_tries=0
+	while [ "$bt_power_tries" -lt 5 ]; do
+		if "$BTCTL" show 2>/dev/null | grep -q 'Powered: yes'; then
+			return 0
+		fi
+		if "$BTCTL" power on >> "$LOG_FILE" 2>&1; then
+			sleep 1
+			if "$BTCTL" show 2>/dev/null | grep -q 'Powered: yes'; then
+				return 0
+			fi
+		fi
+		bt_power_tries=$((bt_power_tries + 1))
+		sleep 1
+	done
+	return 1
+}
+
+bluealsa_dbus_ready() {
+	if command -v busctl >/dev/null 2>&1; then
+		busctl --system list 2>/dev/null | grep -q 'org\.bluealsa'
+	else
+		pidof bluealsa >/dev/null 2>&1
+	fi
+}
+
+start_bluealsa() {
+	if [ ! -x "$BLUEALSA" ]; then
+		log "Stock bluealsa is missing or not executable; Bluetooth audio will be disabled"
+		return 1
+	fi
+
+	if pidof bluealsa >/dev/null 2>&1; then
+		if bluealsa_dbus_ready; then
+			return 0
+		fi
+		log "bluealsa is running without its D-Bus service; restarting it"
+		killall bluealsa >> "$LOG_FILE" 2>&1 || true
+		sleep 1
+	fi
+
+	bt_bluealsa_version="$($BLUEALSA --version 2>&1)"
+	if [ $? -ne 0 ]; then
+		log "Stock bluealsa cannot run: $bt_bluealsa_version"
+		return 1
+	fi
+	log "Starting bluealsa $bt_bluealsa_version with A2DP source and native volume support"
+	: > "$BLUEALSA_LOG"
+	# Some headsets (including AirPods 4) create their BlueZ transport at
+	# absolute volume zero. Let BlueALSA initialize and control that transport
+	# volume instead of relying only on the local ALSA mixer.
+	"$BLUEALSA" -p a2dp-source --a2dp-volume --initial-volume=100 < /dev/null >> "$BLUEALSA_LOG" 2>&1 &
+	bt_bluealsa_pid=$!
+
+	bt_bluealsa_tries=0
+	while [ "$bt_bluealsa_tries" -lt 5 ]; do
+		if ! kill -0 "$bt_bluealsa_pid" 2>/dev/null; then
+			log "bluealsa exited during startup"
+			tail -n 80 "$BLUEALSA_LOG" >> "$LOG_FILE" 2>&1 || true
+			return 1
+		fi
+		if bluealsa_dbus_ready; then
+			log "Bluetooth A2DP source is ready"
+			return 0
+		fi
+		bt_bluealsa_tries=$((bt_bluealsa_tries + 1))
+		sleep 1
+	done
+
+	log "Timed out waiting for the bluealsa D-Bus service"
+	tail -n 80 "$BLUEALSA_LOG" >> "$LOG_FILE" 2>&1 || true
+	kill "$bt_bluealsa_pid" 2>/dev/null || true
+	return 1
+}
+
 start_bt() {
 	log "Starting Bluetooth for ${RGXX_MODEL:-unknown H700 model}"
 
@@ -184,7 +261,7 @@ start_bt() {
 		return 1
 	fi
 
-	if ! "$BTCTL" power on >> "$LOG_FILE" 2>&1; then
+	if ! power_on_adapter; then
 		log "Failed to power on the BlueZ adapter"
 		return 1
 	fi
@@ -199,6 +276,7 @@ start_bt() {
 	if ! "$BTCTL" show 2>/dev/null | grep -q 'Pairable: yes'; then
 		log "Adapter is powered; Settings will make it pairable while its persistent agent is open"
 	fi
+	start_bluealsa || log "Controller Bluetooth is ready, but Bluetooth audio is unavailable"
 
 	log "Bluetooth is ready"
 	return 0
@@ -213,8 +291,7 @@ stop_bt() {
 	fi
 	killall bluetoothctl 2>/dev/null || true
 
-	# A2DP remains disabled for H700. Stop a stock or development bluealsa
-	# instance left by an older NextUI build, but do not restart it.
+	# Stop the stock A2DP media endpoint before stopping BlueZ.
 	killall bluealsa 2>/dev/null || true
 
 	systemctl stop bluetooth >> "$LOG_FILE" 2>&1 || killall bluetoothd 2>/dev/null || true
