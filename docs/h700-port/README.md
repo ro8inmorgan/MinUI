@@ -4,15 +4,16 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Status (2026-07-13): ready for an alpha release, with documented RG34XXSP issues.**
+**Status (2026-07-17): ready for an alpha release, with documented RG34XXSP issues.**
 RG40XXV has broad hardware coverage. RG34XXSP now passes the complete 720×480 UI
 sweep, box art, Files, Input, Recently Played, game switcher, RetroAchievements,
 displaycal persistence, manual governor changes, lid sleep/wake, Bootlogo, and
 GB/GBC/GBA/FC/SFC. RG28XX is now user-tested: driver-level rotation validated,
 minarch Aspect/Fullscreen scaling fixed (a double-rotation bug), and Bootlogo
 apply + rotated previews working.
-Open RG34XXSP issues are PS1 launch crashes, an FBNeo missing-BIOS lockup, MD Auto CPU
-scaling sensitivity, POWER waking through a closed
+The apparent RG34XXSP PS1 launch regression was a stale/corrupted core artifact and a
+clean rebuild fixed it. Open RG34XXSP issues are an FBNeo missing-BIOS lockup, MD Auto
+CPU scaling sensitivity, POWER waking through a closed
 lid, and charging remaining in light sleep by current shared policy. Screenshots,
 resolution-specific overlays, battery accuracy/overnight drain, recovery paths, and
 RGcubexx hardware coverage remain untested. The cube is intentionally an
@@ -73,12 +74,12 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Install | TF1 gets one file; NextUI on TF2; no TF1-only mode | ✅ as planned; TF1 writes mountpoint+cmp guarded |
 | **Splash** | per-panel raw-BMP `dd` assets | **Deviation:** `fbsplash` text renderer — no per-resolution assets needed (02) |
 | RG28XX rotation | SDL-level first, GL hook fallback | ✅ SDL/driver level alone is correct; the GL hook double-rotated and broke minarch scaling — removed after hardware testing (04) |
-| HDMI | stretch goal | Detection wired; `SetHDMI()` no-op — still a stretch goal (04) |
+| HDMI | stretch goal | ✅ RG40XXV menu/game output, audio routing, and in-game hotplug pass in both directions; boot-with-cable, other models, and unusual EDIDs remain follow-ups (04) |
 
 ## Top open risks
 
-1. **RG34XXSP runtime issues** — PS1 launch crashes, FBNeo can trap MinArch after a
-   missing-BIOS failure, MD Auto CPU scaling is render-setting-sensitive, and POWER
+1. **RG34XXSP runtime issues** — FBNeo can trap MinArch after a missing-BIOS failure,
+   MD Auto CPU scaling is render-setting-sensitive, and POWER
    can wake through the closed lid. (Bootlogo previews at 720×480: fixed 2026-07-13.)
 2. **Partially tested robustness matrix** — clean uninstall, dirty-SD recovery,
    SIGUSR1 shutdown, battery accuracy, screenshots, and overnight drain need runs.

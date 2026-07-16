@@ -154,8 +154,9 @@ open/closed per poll and could drop the wake press between polls.
 - **DisplayCal**: same gamma-LUT ioctls as tg5040 (0x10b/0x10c/0x10d) — worked 1:1 as
   predicted; tested passing on RG40XXV including persistence across sleep and game
   launch.
-- **HDMI**: `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state,...}` so
-  detection works; **`SetHDMI()` is an empty no-op** — no output switching (04).
+- **HDMI**: `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state,...}` and
+  `SetHDMI()` switches disp0, framebuffer/layer geometry, and the ALSA route. Menu,
+  game, audio, and in-game hotplug in both directions pass on RG40XXV (04).
 - **Jack detection**: not wired (path exists but historically dead — 00).
 - Debug printfs were stripped/commented for release; remaining prints are error paths.
 

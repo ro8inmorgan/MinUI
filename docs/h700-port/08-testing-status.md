@@ -17,7 +17,7 @@
 - Repeated `nextui.elf` crashes now log the crash limit and power off. Use TF2 logs
   for crash-loop debugging; the release runtime powers off instead of starting SSH.
 
-## Validation matrix (status as of 2026-07-13, RG40XXV unless noted)
+## Validation matrix (status as of 2026-07-17, RG40XXV unless noted)
 
 ✅ tested & passed ⚠️ tested, has issues ⬜ untested ➖ explicitly out of alpha scope ✖ not implemented
 
@@ -46,6 +46,7 @@
 | Recently Played + game switcher | ✅ tested on RG40XXV and RG34XXSP |
 | Screenshots | ⬜ testing planned |
 | Box art | ✅ tested at 720×480 on RG34XXSP |
+| HDMI output | ⚠️ RG40XXV + TV passes menu/game output and in-game hotplug in both directions, including audio routing. Boot-with-cable, other H700 models, and displays that reject the fixed 1080p60 mode remain untested; HDMI is a stretch feature rather than a beta gate (04) |
 | Clean uninstall (delete dmenu.bin → pristine stock) | ⬜ |
 | Battery % accuracy vs stock | ⬜ |
 | Charging detection/indicator; sleep while charging | ⚠️ indicator works on RG34XXSP; charging permits light sleep but shared power code deliberately suppresses deep sleep |
@@ -58,6 +59,7 @@
 | Bootlogo pak, RG34XXSP 720×480 | ✅ fixed 2026-07-13 — all 23 presets load and render with the current build (verified via SSH-driven run + framebuffer capture; the failing binary was alpha1.1-era). Pak now logs path/count/load errors and shows the searched path on screen when empty; apply guarded against an empty list |
 | Bootlogo pak, RG28XX 480×640 | ✅ apply user-tested: logo renders upright at boot. Previews were shown panel-native (90° off) and are now rotated to boot orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`) |
 | BT A2DP audio | ⚠ AirPods 4 ANC pair/connect and user-audible SBC game audio pass on RG40XXV; internal speaker mutes/restores correctly. Confirmed blockers were the H700 stock plugin rejecting `delay 0` and BlueZ transport volume initializing to zero—not 44.1/48 kHz. H700 now uses only stock BlueALSA with native volume; final automatic reconnect/game-switch/suspend-resume tests remain (05/07) |
+| BT maximum sampling rate | ⚠ Matches tg5040 and defaults to 48000 Hz. AirPods accepted both 44100 and 48000 during probing, so the option is a compatibility escape hatch rather than a fix for the observed silence. Verify the rebuilt Settings UI changes and persists the value. The inherited connection test also sees controller-only ACL links; at the 48000 default this is harmless, while a future audio-specific detector is a cross-platform cleanup rather than an H700 beta blocker |
 | Headphone jack detection | ✖ not wired (05) |
 | RG34XXSP: general H700 port + 720×480 UI | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus work well; resolution-specific overlays untested |
 | RG34XXSP: lid sleep/wake | ⚠️ lid close and open work; deep suspend requires power as expected, but power also wakes light sleep while the lid is closed |
@@ -67,7 +69,8 @@
 ### Performance
 | Item | Status |
 |---|---|
-| GBA/SNES/PS1 full speed with vsync, no audio underruns | ✅ on RG40XXV; RG34XXSP PS1 currently crashes during launch |
+| GBA/SNES full speed with vsync, no audio underruns | ✅ on RG40XXV and in tested RG34XXSP games |
+| PS1 launch/performance | ✅ on RG40XXV and RG34XXSP. The apparent RG34XXSP launch regression was a stale/corrupted core artifact; a clean core rebuild fixed it |
 | Frame pacing / tearing / input lag vs stock RA | ✅ gameplay-tested on RG40XXV; no visible pacing, tearing, latency, or audio issues (not instrumented) |
 | Manual governor changes don't stutter audio | ✅ tested in-game on RG34XXSP |
 | Auto governor load/frequency selection | ⚠️ MD can remain near 480 MHz and slow down depending on shader/scaling; stock shader + 3× + linear raises ~720 MHz and is smooth. Powersave/performance are smooth; needs debugging |
@@ -82,8 +85,32 @@ Detailed results and the remaining system backlog are tracked in
 | GB / GBC / GBA / FC / SFC | ✅ games launch and play perfectly |
 | MD / PicoDrive | ⚠️ launches, but some rendering combinations slow down with auto CPU near 480 MHz |
 | FBN / FBNeo | ⚠️ missing BIOS blocked game validation; the error path then left MinArch unable to open its menu or exit |
-| PS / PCSX-ReARMed | ⚠️ crashes back to NextUI during launch for every tested game |
+| PS / PCSX-ReARMed | ✅ launches and plays after a clean core rebuild; the earlier crashes were caused by a stale/corrupted core, not an H700 runtime defect |
 | Remaining shipped cores | ⬜ systematic coverage pending |
+
+### Beta-entry gate summary
+
+The matrix does not require every long-tail row to turn green before beta. The beta
+entry gates are the known user-facing regressions and the safety/lifecycle checks:
+
+- **Core regressions:** fix the FBNeo missing-BIOS lockup; either fix MD Auto CPU
+  slowdown or ship a proven safe default. Run at least
+  a launch/audio/input/menu/exit/save-state smoke test across the remaining shipped
+  core families.
+- **Bluetooth audio lifecycle:** verify automatic reconnect, game-to-game and
+  menu-to-game switching, five suspend/resume cycles, case/disconnect speaker restore,
+  and Settings sample-rate selection/persistence. Controller mapping and the
+  controller-only sample-rate detector are shared-platform follow-ups, not H700 gates.
+- **Power and reversibility:** complete battery-vs-stock accuracy and overnight-drain
+  measurements, decide the closed-lid POWER and charging/light-sleep policies, and
+  pass clean uninstall, SIGUSR1 shutdown, and dirty-card recovery.
+- **Boot policy and basic I/O:** decide whether muOS/stockmod detection warns or
+  hard-stops, test screenshots and resolution-specific overlays, and determine whether
+  the headphone jack is hardware-auto-switched or needs software handling.
+
+RGcubexx/720×720 hardware coverage, HDMI boot/EDID/model expansion, cross-platform
+controller normalization, Pak Store/OTA, per-panel calibration, and the dedicated
+toolchain image remain explicit beta follow-ups unless their scope is promoted.
 
 ### RG34XXSP remaining validation
 
@@ -97,7 +124,8 @@ Detailed results and the remaining system backlog are tracked in
 - Test screenshots and overlays made for 720×480.
 - Retest FBNeo with the required BIOS, and separately preserve the missing-BIOS error
   case as a regression test after it is fixed.
-- Diagnose PS1 launch and retest multiple formats/titles with the required BIOS.
+- Preserve PS1 in the release-candidate smoke pass so a stale or corrupted packaged
+  core cannot recreate the resolved launch failure.
 - Reproduce the MD Auto CPU behavior with exact shader, scale, and interpolation
   combinations.
 - Test 720×480 Bootlogo backup and restore (previews and apply now work; the

@@ -1,8 +1,27 @@
 # 09 — Roadmap: from alpha candidate to a 9.5/10 port
 
-Everything below is verified against branch tip `956ed34`, with hardware results
-recorded through 2026-07-13.
+Everything below is verified against branch tip `a08fbfec`, with hardware results
+recorded through 2026-07-17.
 Ordered by impact within each section.
+
+## Beta entry gates
+
+Beta does not require the full 9.5/10 target at the end of this document, but it should
+not knowingly ship model-breaking core failures or untested recovery/reversibility
+paths. Close these gates, or explicitly descope the affected feature/model:
+
+| Gate | Exit condition |
+|---|---|
+| RG34XXSP core correctness | FBNeo missing-BIOS failure returns control cleanly; MD Auto CPU has a fix or a tested safe default; remaining shipped core families receive a basic launch/audio/input/menu/exit/save smoke pass. PS1 must remain in the release-candidate smoke pass because its former failure was a stale/corrupted core artifact |
+| Bluetooth audio lifecycle | AirPods reconnect without manual D-Bus commands; menu/game and game/game transitions work; speaker restores on disconnect; five suspend/resume cycles pass; the Settings 44100/48000 choice changes and persists |
+| Power confidence | Battery percentage is compared with stock, overnight suspend drain is measured, and the closed-lid POWER plus charging/light-sleep behaviors are fixed or accepted as documented policy |
+| Reversibility and recovery | Clean uninstall, SIGUSR1 shutdown, and dirty-card fsck recovery pass; muOS/stockmod behavior has an explicit warn-versus-stop decision |
+| Release-candidate smoke | Screenshots and resolution-specific overlays pass; headphone-jack behavior is determined; clean H700 and tg5040 builds plus the Jammy `settings.elf` ldd check pass on the release candidate |
+
+Not beta gates unless scope changes: RGcubexx hardware availability, HDMI boot-with-cable
+and odd-EDID/model expansion, cross-platform controller normalization, the inherited
+controller-only sample-rate detector, Pak Store/OTA, per-panel display calibration, and
+a dedicated H700 toolchain image.
 
 ## P0 — Correctness / robustness
 
@@ -39,8 +58,8 @@ Ordered by impact within each section.
    governor changes, displaycal persistence, RetroAchievements, Files, Recently
    Played, game switcher, and the primary 8/16-bit systems are hardware-tested.
    Remaining: fix POWER waking through a closed lid; decide whether charging should
-   continue to suppress deep sleep; diagnose PS1
-   launch crashes, the FBNeo missing-BIOS lockup, and MD auto-governor/render-setting
+   continue to suppress deep sleep; fix the FBNeo missing-BIOS lockup and MD
+   auto-governor/render-setting
    sensitivity; decide whether per-Emu `default-rg34xx.cfg` files are needed. Track
    core coverage in [10](10-core-game-matrix.md). (~~720×480 Bootlogo previews~~
    fixed 2026-07-13 — see #13a.)
@@ -51,9 +70,9 @@ Ordered by impact within each section.
    (rotation is driver-level only now; postmortem in 04). UI, game scaling, and
    bootlogo apply are user-verified; bootlogo previews are rotated to boot
    orientation. Still open: decide whether `default-rg28xx.cfg` cfgs are needed.
-7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch was rebased
-   onto main including the alpha-blending work. Upstream main has advanced since, so
-   rebase once more before the final merge/release candidate. (The alpha/tinted-
+7. **~~Rebase the h700 branch onto main~~ Done (2026-07-09)** — the branch includes
+   main through the current shared-code baseline; rebase again before the release
+   candidate only if main advances. (The alpha/tinted-
    bitmap question was solved: the glitches were the missing 64-bit libpng bundle,
    not main's alpha changes — 04.) Remaining: **confirm rendering stays clean on
    device with the rebased build**: the game switcher and box art are clean at
@@ -93,7 +112,11 @@ Ordered by impact within each section.
    or BlueZ component is bundled. AirPods 4 ANC SBC playback now passes on RG40XXV;
    the confirmed silence blockers were an unsupported `delay 0` ALSA option and zero
    BlueZ transport volume. Complete automatic reconnect, game-switch, and
-   suspend/resume testing. Raw
+   suspend/resume testing. The exposed maximum-sampling-rate option intentionally
+   matches tg5040: 48000 is the default and avoids needless resampling, while 44100 is
+   only a compatibility escape hatch. AirPods negotiated both rates, so this setting
+   was not the fix. Verify its Settings UI/persistence, but keep the inherited
+   any-ACL/controller-only detection issue as a later cross-platform cleanup. Raw
    external-controller button normalization is shared with tg5040/tg5050 and belongs
    in a separate cross-platform change.
 10. **480p UI polish pass** (04) — verdict from real use on RG40XXV and RG34XXSP:
@@ -113,8 +136,9 @@ Ordered by impact within each section.
     input-lag, or audio concerns from tested gameplay.
 
 12a. **Build out the core/game matrix** — the initial RG34XXSP results are now in
-    [10](10-core-game-matrix.md). GB/GBC/GBA/FC/SFC pass; PS1 crashes back to Home for
-    every tested title; FBNeo needs a valid BIOS retest and must not trap MinArch when
+    [10](10-core-game-matrix.md). GB/GBC/GBA/FC/SFC and PS1 pass; the former PS1
+    launch failures were a stale/corrupted core artifact fixed by a clean rebuild.
+    FBNeo needs a valid BIOS retest and must not trap MinArch when
     BIOS is missing; MD needs the Auto-scaling investigation above. Expand coverage
     across the remaining shipped systems and at least one additional H700 model.
 13. Later: RGcubexx bring-up (720×720, wired but no device is available locally;

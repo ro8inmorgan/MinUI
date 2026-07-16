@@ -19,7 +19,7 @@ repeated for that system.
 5. Record the exact game, format, shader, scale, interpolation, CPU profile, and BIOS
    state for every failure.
 
-## RG34XXSP results (2026-07-10)
+## RG34XXSP results (updated 2026-07-17)
 
 | System | Core | Status | Evidence / issue |
 |---|---|---|---|
@@ -30,7 +30,7 @@ repeated for that system.
 | SFC | Snes9x | ✅ | Launch and gameplay perfect |
 | MD | PicoDrive | ⚠️ | Launches, but some shader/scaling combinations leave Auto CPU near 480 MHz and cause slowdown. Stock shader + 3× scale + linear interpolation runs smoothly around 720 MHz; Powersave (~1.1 GHz observed) and Performance (~1.5 GHz) are smooth |
 | FBN | FBNeo | ⚠️ | Required BIOS was absent, so game execution is not validated. After the BIOS error, MinArch would not open its menu or exit; volume and brightness shortcuts still responded |
-| PS | PCSX-ReARMed | ⚠️ | Every tested game crashed back to NextUI during launch. Tested 2–3 games including Tony Hawk's Pro Skater 2 and a Castlevania title |
+| PS | PCSX-ReARMed | ✅ | Launch and gameplay pass after a clean core rebuild. The earlier crashes across 2–3 titles were caused by a stale/corrupted core, not a model-specific runtime defect |
 | 32X | PicoDrive | ⬜ | — |
 | A2600 | Stella 2014 | ⬜ | — |
 | A5200 | a5200 | ⬜ | — |
@@ -63,13 +63,11 @@ repeated for that system.
 
 ## Open investigations
 
-1. **PS1 launch crash:** collect `minarch.txt`, core stderr, ROM format, BIOS presence,
-   and the last log line before return to NextUI.
-2. **FBNeo error recovery:** retest with the required BIOS, then separately reproduce
+1. **FBNeo error recovery:** retest with the required BIOS, then separately reproduce
    the missing-BIOS path and determine why MinArch still processes system shortcuts but
    not MENU/exit.
-3. **MD Auto CPU behavior:** reproduce with exact shader/scale/interpolation combinations
+2. **MD Auto CPU behavior:** reproduce with exact shader/scale/interpolation combinations
    while logging `scaling_cur_freq`, governor, min/max frequency, frame time, and audio
    underruns. Manual governor switching itself is working.
-4. Expand the table across RG40XXV, RG28XX, RGcubexx, and other RG XX variants during
+3. Expand the table across RG40XXV, RG28XX, RGcubexx, and other RG XX variants during
    alpha testing, recording only device-specific differences once a core is known-good.
