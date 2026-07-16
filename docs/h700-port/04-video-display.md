@@ -69,15 +69,66 @@ space. The pak now rotates previews 90° CW on the RG28XX
 carousel shows what the panel will actually display at boot; apply itself was
 already correct (user-verified: applied logo renders upright at power-on).
 
-## HDMI — detection wired, output switching not
+## HDMI — hotplug output switching, user-validated ✅ (RG40XXV + TV, 2026-07-16)
 
-- `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state}` so hotplug
-  *detection* works (hdmimon/rumble-skip logic can fire).
-- `SetHDMI()` is an **empty no-op** — no mode switch / fb re-init / UI restart. Full
-  HDMI out remains a stretch goal. The known mechanism, if ever needed: old port's
-  `hdmimon.sh` via `/sys/kernel/debug/dispdbg` (`switch1 4 10 …`) + `fbset`, 1280×720,
-  audio on ALSA card 2 (`ahubhdmi`). Recover with
+Plug-and-play design: when a cable is (dis)connected the running app quits via the
+existing `GFX_hdmiChanged()` plumbing (nextui inline, minarch `hdmimon()`, settings
+main loop), the relauncher restarts it, and `PLAT_initPlatform()` converges the
+output to the cable state *before* SDL video comes up. Boot-with-cable works the
+same way for free.
+
+- `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state}` — hotplug
+  detection (verified: `cable.0/state` is a bare 0/1; the top-level `state` file is
+  `HDMI=n` text which `getInt` parses as 0, so `cable.0` is the effective check).
+- `SetHDMI()` (libmsettings) now performs the proven old-port sequence in C:
+  blank fb0 → zero fb → `/sys/kernel/debug/dispdbg` `disp0/switch` with param
+  `"4 10 0 0 0x4 0x101 0 0 0 8"` (HDMI type 4, mode 10 = **1080p60 signal**) →
+  `FBIOPUT_VSCREENINFO` to **1280×720** 32bpp double-buffered (the DE
+  hardware-scales the 720p fb to the 1080p signal) → unblank. Unplug reverses to
+  param `"1 0"` (LCD) + panel-native fb dims (RG28XX portrait 480×640!). Idempotent:
+  it reads the live output type from `/sys/class/disp/disp/attr/sys` and no-ops
+  when already correct. `dispdbg` presence verified on RG40XXV (4.9.170).
+- The mali SDL winsys latches fb0 geometry at video init, so the restarted app
+  automatically gets a 1280×720 EGL surface. `hdmi_active` (latched in
+  `PLAT_initPlatform`) drives `FIXED_WIDTH/HEIGHT` → 1280×720, `MAIN_ROW_COUNT` → 10
+  (tg5050's proven 720p/scale-2 layout); minarch rescales games via its runtime
+  `DEVICE_WIDTH` latch. `HAS_HDMI`/`HDMI_*` are defined, which also activates the
+  dormant guards (SCALE_CROPPED downgrade, power-off screen dims).
+- RG28XX: `PLAT_initPlatform` overrides `SDL_ROTATION` to 0 while HDMI is active
+  (fb is landscape then); back to 1 on the panel.
+- Audio: `SetHDMI` routes ALSA `default` to card `ahubhdmi` (card 2, verified on
+  RG40XXV) via `$USERDATA_PATH/.asoundrc`, marker-guarded (`# nextui-hdmi`) so
+  audiomon's Bluetooth/USB routing always wins and we never clobber a file we
+  didn't write.
+- **The hard part (learned the hard way, all validated on RG40XXV):** this BSP's
+  fbdev glue has **no `fb_set_par` hook** — `FBIOPUT_VSCREENINFO` records the var
+  and nothing else, and `sunxi_fb_pan_display` rebuilds only the layer *crop*
+  from the var each flip (never `fb.size`/`screen_win`). The scanout layer's
+  buffer size and output window are only written by the boot-time fb request and
+  by the device-attach path, which *asynchronously restores the previous mode's
+  layer config* — so after a switch the layer is stale: blank-but-backlit panel
+  after unplug (crop exceeds the shrunken fb → DE rejects every pan), shifted +
+  slowed-down picture after in-game plug (stale 640-wide buffer size under a
+  1280-wide crop → per-frame DE errors). Two mechanisms fix it in `SetHDMI()`:
+  1. `waitForOutput()` — the dispdbg switch is async (~700ms for LCD panel init;
+     "attached ok" in dmesg); poll `attr/sys` for the target output before
+     touching the fb.
+  2. `commitLayerGeometry()` — read-modify-write the fb0 layer (`/dev/disp`
+     `DISP_LAYER_GET_CONFIG`/`SET_CONFIG` 0x48/0x47, channel 1 layer 0, structs
+     in `libmsettings/sunxi_display2_min.h`) with the correct buffer size, crop
+     and screen window, **verify by read-back and retry until it sticks** —
+     whichever commit lands last wins against the attach path's restore; commit
+     again after unblank. The blob's pans then keep the crop in sync (they copy
+     the committed config).
+- Validated end-to-end: plug/unplug in launcher and in-game (autosave →
+  auto-resume), repeated cycles, game scaling correct at 1280×720. An earlier
+  "audio stutter on TV" symptom was collateral from the stale-layer DE errors,
+  not GPU load. Not yet covered: RG28XX/cube/SP models, boot-with-cable, odd
+  EDIDs (if a display rejects mode 10, mode 5 = 720p60 is the one-line
+  fallback). Old reference:
   `git show 8cd78866:skeleton/SYSTEM/rg35xxplus/bin/hdmimon.sh`.
+- Unplug takes ~4-5s to restore: the deliberate `sleep(4)` debounce in the
+  shared hdmimon/nextui handlers plus the switch itself. Could be tuned later.
 
 ## DisplayCal — ported 1:1, tested ✅
 

@@ -1239,11 +1239,14 @@ int main(int argc, char *argv[])
                 // present
                 GFX_flip(ctx.screen);
                 ctx.dirty = false;
-
-                // hdmimon();
             }
             else
                 GFX_sync();
+
+            // exit so the relauncher can re-init video at the new output
+            // resolution (no-op on platforms whose GetHDMI() is stubbed)
+            if (GFX_hdmiChanged())
+                appQuit = true;
         }
 
         delete ctx.menu;

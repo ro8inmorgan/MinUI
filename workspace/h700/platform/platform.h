@@ -14,6 +14,7 @@
 extern int is_rg28xx;
 extern int is_rg34xx;
 extern int is_cube;
+extern int hdmi_active;
 extern int dev_has_lstick;
 extern int dev_has_rstick;
 
@@ -130,9 +131,21 @@ extern int dev_has_rstick;
 
 ///////////////////////////////
 
+// While an HDMI cable is connected the whole app runs at 1280x720 (the fb is
+// hardware-scaled to a 1080p60 signal by the display engine — see SetHDMI in
+// libmsettings). hdmi_active is latched once per process in PLAT_initPlatform,
+// so like is_cube these are constant for the process lifetime; the existing
+// hotplug quit-and-relaunch plumbing restarts apps on cable changes.
+// Values must match HDMI_LOGICAL_* in libmsettings/msettings.c.
+#define HAS_HDMI		1
+#define HDMI_WIDTH		1280
+#define HDMI_HEIGHT		720
+#define HDMI_PITCH		(HDMI_WIDTH * FIXED_BPP)
+#define HDMI_SIZE		(HDMI_PITCH * HDMI_HEIGHT)
+
 #define FIXED_SCALE 	2
-#define FIXED_WIDTH		(is_cube?720:(is_rg34xx?720:640))
-#define FIXED_HEIGHT	(is_cube?720:480)
+#define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:(is_cube?720:(is_rg34xx?720:640)))
+#define FIXED_HEIGHT	(hdmi_active?HDMI_HEIGHT:(is_cube?720:480))
 #define FIXED_BPP		2
 #define FIXED_DEPTH		(FIXED_BPP * 8)
 #define FIXED_PITCH		(FIXED_WIDTH * FIXED_BPP)
@@ -140,7 +153,8 @@ extern int dev_has_rstick;
 
 ///////////////////////////////
 
-#define MAIN_ROW_COUNT (is_cube?8:6)
+// 10 rows at 720p/scale-2 matches tg5050 (same resolution and scale)
+#define MAIN_ROW_COUNT (hdmi_active?10:(is_cube?8:6))
 #define QUICK_SWITCHER_COUNT 3
 #define PADDING 5
 

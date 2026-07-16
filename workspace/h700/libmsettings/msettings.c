@@ -14,6 +14,7 @@
 
 #include "displaycal.h"
 #include "msettings.h"
+#include "sunxi_display2_min.h"
 
 ///////////////////////////////////////
 
@@ -832,7 +833,237 @@ void SetAudioSink(int value) {
 	SetVolume(GetVolume());
 }
 
-void SetHDMI(int value){}
+// HDMI output switching (sunxi disp2, kernel 4.9 BSP). The dispdbg debugfs
+// interface flips disp0 between the LCD and the HDMI TX; the framebuffer is
+// then resized so the mali EGL winsys (which latches fb0 geometry at video
+// init) comes up at the matching resolution on the next app start. Sequence
+// and parameters replicate the old rg35xxplus port's hdmimon.sh (proven on
+// this hardware family): HDMI is a 1080p60 signal fed by a 1280x720 fb that
+// the display engine hardware-scales up. Callers are expected to restart the
+// UI afterwards; the switch itself must run while no EGL surface exists.
+
+#define DISPDBG_PATH "/sys/kernel/debug/dispdbg"
+#define FB_BLANK_PATH "/sys/class/graphics/fb0/blank"
+// must match HDMI_WIDTH/HDMI_HEIGHT in platform.h
+#define HDMI_LOGICAL_WIDTH 1280
+#define HDMI_LOGICAL_HEIGHT 720
+// dispdbg switch params: "<output type> <mode> ..." — type 4=HDMI, mode 10=1080p60; type 1=LCD
+#define DISP_SWITCH_HDMI_PARAM "4 10 0 0 0x4 0x101 0 0 0 8"
+#define DISP_SWITCH_LCD_PARAM "1 0"
+#define ASOUNDRC_HDMI_MARKER "# nextui-hdmi"
+
+static void panelSize(int* w, int* h) {
+	char* device = getenv("DEVICE");
+	char* model = getenv("RGXX_MODEL");
+	*w = 640; *h = 480;
+	if (exactMatch("RGcubexx", model) || exactMatch("cube", device)) { *w = 720; *h = 720; }
+	else if (exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model) || exactMatch("rg34xx", device)) { *w = 720; *h = 480; }
+	else if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) { *w = 480; *h = 640; } // panel is mounted portrait
+}
+
+// the live output type, read back from the disp driver so a stale state file
+// can never desync us from the hardware
+static int hdmiOutputActive(void) {
+	char buffer[4096] = {0};
+	FILE* file = fopen("/sys/class/disp/disp/attr/sys", "r");
+	if (!file) return 0;
+	size_t len = fread(buffer, 1, sizeof(buffer)-1, file);
+	fclose(file);
+	buffer[len] = '\0';
+	return strstr(buffer, "hdmi output") != NULL;
+}
+
+// The dispdbg switch is asynchronous and slow — the LCD panel init sequence
+// alone takes ~700ms ("attached ok" in dmesg). The fb geometry set below is
+// what rebuilds the DE layer against the new output, so it must not run until
+// the attach has completed or the rebuild is computed against the old output
+// and the panel shows a stale (blank) layer.
+static void waitForOutput(int hdmi) {
+	for (int i = 0; i < 60; i++) { // up to 3s
+		if (hdmiOutputActive() == hdmi) break;
+		usleep(50000);
+	}
+	usleep(150000); // settle margin after the attach shows up in sysfs
+}
+
+static void dispdbgSwitch(char* param) {
+	putFile(DISPDBG_PATH "/name", "disp0");
+	putFile(DISPDBG_PATH "/command", "switch");
+	putFile(DISPDBG_PATH "/param", param);
+	putFile(DISPDBG_PATH "/start", "1");
+}
+
+static void clearFramebuffer(void) {
+	int fd = open("/dev/fb0", O_WRONLY);
+	if (fd < 0) return;
+	char zeros[4096] = {0};
+	while (write(fd, zeros, sizeof(zeros)) > 0);
+	close(fd);
+}
+
+static void setFramebufferSize(int w, int h) {
+	int fd = open("/dev/fb0", O_RDWR);
+	if (fd < 0) return;
+	struct fb_var_screeninfo vinfo;
+	if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == 0) {
+		// zero geometry first ("fbset -g 0 0 0 0 32" in the old port) so the
+		// driver drops the old allocation before sizing the new one
+		vinfo.xres = vinfo.yres = vinfo.xres_virtual = vinfo.yres_virtual = 0;
+		vinfo.bits_per_pixel = 32;
+		ioctl(fd, FBIOPUT_VSCREENINFO, &vinfo); // failure is fine, best effort
+		usleep(250000);
+		vinfo.xres = w;
+		vinfo.yres = h;
+		vinfo.xres_virtual = w;
+		vinfo.yres_virtual = h * 2; // double buffered
+		vinfo.bits_per_pixel = 32;
+		// FORCE so set_par runs (and rebuilds the DE layer for the new output)
+		// even when the geometry is unchanged
+		vinfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+		if (ioctl(fd, FBIOPUT_VSCREENINFO, &vinfo) < 0)
+			fprintf(stderr, "SetHDMI: FBIOPUT_VSCREENINFO %dx%d failed: %s\n", w, h, strerror(errno));
+	}
+	close(fd);
+}
+
+// The fbdev glue in this BSP has no set_par hook: FBIOPUT only records the new
+// var, and pan_display only rewrites the layer *crop* from it — the scanout
+// layer's buffer dimensions and output window are never updated by any fbdev
+// call. Left alone, whichever values the switch path last committed stay live
+// (blank panel after unplug, page-offset ghosting after plug). So after every
+// switch we read-modify-write the fb0 layer ourselves with the geometry that
+// matches the new framebuffer and output; the blob's per-flip pans then keep
+// the crop in sync against our committed config.
+// The switch path restores the previous mode's layer config on device attach,
+// asynchronously and sometimes AFTER we've already written ours — whichever
+// commit lands last wins. So: commit, read back, and retry until it sticks.
+// (The app hasn't started yet when this runs, so there are no competing pans.)
+static void commitLayerGeometry(int fbW, int fbH, int outW, int outH) {
+	int fd = open("/dev/disp", O_RDWR);
+	if (fd < 0) return;
+	struct disp_layer_config config;
+	unsigned long param[4] = {0, (unsigned long)&config, 1, 0};
+	int applied = 0;
+	for (int attempt = 0; attempt < 20 && !applied; attempt++) { // up to ~2s
+		memset(&config, 0, sizeof(config));
+		config.channel = 1; // fb0 is bound to channel 1, layer 0 (FBIO_ALLOC in dev_fb.c)
+		config.layer_id = 0;
+		if (ioctl(fd, DISP_LAYER_GET_CONFIG, param) < 0) {
+			fprintf(stderr, "SetHDMI: DISP_LAYER_GET_CONFIG failed: %s\n", strerror(errno));
+			break;
+		}
+		config.enable = 1;
+		for (int i = 0; i < 3; i++) {
+			config.info.fb.size[i].width = fbW;
+			config.info.fb.size[i].height = fbH * 2; // whole double buffer
+		}
+		config.info.fb.crop.x = 0;
+		config.info.fb.crop.y = ((long long)fbH) << 32; // page 1; pans re-sync it every flip
+		config.info.fb.crop.width = ((long long)fbW) << 32;
+		config.info.fb.crop.height = ((long long)fbH) << 32;
+		config.info.screen_win.x = 0;
+		config.info.screen_win.y = 0;
+		config.info.screen_win.width = outW;
+		config.info.screen_win.height = outH;
+		if (ioctl(fd, DISP_LAYER_SET_CONFIG, param) < 0) {
+			fprintf(stderr, "SetHDMI: DISP_LAYER_SET_CONFIG failed: %s\n", strerror(errno));
+			break;
+		}
+		usleep(100000); // let the vsync apply run (and any late restore overwrite us)
+		memset(&config, 0, sizeof(config));
+		config.channel = 1;
+		config.layer_id = 0;
+		if (ioctl(fd, DISP_LAYER_GET_CONFIG, param) < 0)
+			break;
+		applied = config.info.fb.size[0].width == (unsigned)fbW
+			&& config.info.screen_win.width == (unsigned)outW;
+	}
+	if (!applied)
+		fprintf(stderr, "SetHDMI: layer geometry %dx%d->%dx%d did not stick\n", fbW, fbH, outW, outH);
+	close(fd);
+}
+
+// route ALSA "default" to the HDMI TX while connected; only ever touch an
+// .asoundrc we wrote ourselves so audiomon's Bluetooth/USB routing wins
+static void setHDMIAudioRoute(int on) {
+	char* home = getenv("USERDATA_PATH");
+	if (!home) home = getenv("HOME");
+	if (!home) return;
+	char path[512];
+	snprintf(path, sizeof(path), "%s/.asoundrc", home);
+
+	char buffer[64] = {0};
+	FILE* file = fopen(path, "r");
+	if (file) {
+		fread(buffer, 1, sizeof(buffer)-1, file);
+		fclose(file);
+		if (!prefixMatch(ASOUNDRC_HDMI_MARKER, buffer)) return; // not ours
+	}
+
+	if (on) {
+		putFile(path,
+			ASOUNDRC_HDMI_MARKER "\n"
+			"pcm.!default {\n"
+			"    type plug\n"
+			"    slave.pcm {\n"
+			"        type hw\n"
+			"        card ahubhdmi\n"
+			"    }\n"
+			"}\n"
+			"ctl.!default {\n"
+			"    type hw\n"
+			"    card ahubhdmi\n"
+			"}\n");
+	}
+	else if (file) unlink(path); // only removes the file when it carried our marker
+}
+
+void SetHDMI(int value) {
+	value = value ? 1 : 0;
+	if (hdmiOutputActive() == value) {
+		setHDMIAudioRoute(value); // keep audio routing consistent even when the output already matches
+		return;
+	}
+
+	putFile(FB_BLANK_PATH, "4");
+	clearFramebuffer();
+
+	dispdbgSwitch(value ? DISP_SWITCH_HDMI_PARAM : DISP_SWITCH_LCD_PARAM);
+	waitForOutput(value);
+
+	// 1080p60 signal (mode 10): the DE scales the 720p fb up to it
+	int fbW = HDMI_LOGICAL_WIDTH, fbH = HDMI_LOGICAL_HEIGHT, outW = 1920, outH = 1080;
+	if (!value) {
+		panelSize(&fbW, &fbH);
+		outW = fbW;
+		outH = fbH;
+	}
+	setFramebufferSize(fbW, fbH);
+	commitLayerGeometry(fbW, fbH, outW, outH);
+	usleep(250000);
+	putFile(FB_BLANK_PATH, "0");
+	commitLayerGeometry(fbW, fbH, outW, outH); // unblank can trigger another restore; re-verify
+
+	// Re-enabling the LCD brings it up with whatever backlight/LUT state the
+	// driver has, and the usual apply happened while the panel was disabled
+	// (InitSettings runs before GFX_init/PLAT_initPlatform in nextui), so the
+	// panel stays dark unless we re-apply here, after the switch.
+	if (!value) {
+		if (settings) {
+			SetBrightness(GetBrightness());
+			SetColortemp(GetColortemp());
+			applyDisplayCalSettings();
+		}
+		else {
+			// process hasn't mapped the settings shm yet (e.g. minarch races a
+			// cable change during startup); a visible panel beats a dark one,
+			// the correct value is re-applied on the next InitSettings
+			SetRawBrightness(96);
+		}
+	}
+
+	setHDMIAudioRoute(value);
+}
 
 void SetMute(int value) {
 	settings->mute = value;

@@ -112,8 +112,10 @@ Ordered by impact within each section.
     BIOS is missing; MD needs the Auto-scaling investigation above. Expand coverage
     across the remaining shipped systems and at least one additional H700 model.
 13. Later: RGcubexx bring-up (720×720, wired but no device is available locally;
-    external validation is an explicit purpose of the alpha), HDMI out (`SetHDMI()` is
-    a no-op; mechanism documented in 04), RG35XX-family variants (displaycal presets
+    external validation is an explicit purpose of the alpha), HDMI out (done,
+    user-validated on RG40XXV incl. in-game hotplug both directions; remaining:
+    other models, boot-with-cable, odd EDIDs — 04), RG35XX-family variants
+    (displaycal presets
     + `DEVICE=rg35xx` mapping already plumbed — 04), Panel-Fix tool, **per-panel
     displaycal calibration** (measure each device, fill in the neutral presets in
     displaycal.h; confirm exact `RGXX_MODEL` strings for RG35xx family / RG40xxH
