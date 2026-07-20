@@ -191,12 +191,13 @@ start_bluealsa() {
 		log "Stock bluealsa cannot run: $bt_bluealsa_version"
 		return 1
 	fi
-	log "Starting bluealsa $bt_bluealsa_version with A2DP source and native volume support"
+	log "Starting bluealsa $bt_bluealsa_version with A2DP source"
 	: > "$BLUEALSA_LOG"
-	# Some headsets (including AirPods 4) create their BlueZ transport at
-	# absolute volume zero. Let BlueALSA initialize and control that transport
-	# volume instead of relying only on the local ALSA mixer.
-	"$BLUEALSA" -p a2dp-source --a2dp-volume --initial-volume=100 < /dev/null >> "$BLUEALSA_LOG" 2>&1 &
+	# Keep BlueALSA's default volume mode. BaseOS BlueZ does not expose the
+	# transport Volume property early enough for --a2dp-volume, leaving some
+	# headsets (including AirPods 4) at absolute volume zero. The default mode
+	# publishes the mixer control that libmsettings updates after connection.
+	"$BLUEALSA" -p a2dp-source --initial-volume=100 < /dev/null >> "$BLUEALSA_LOG" 2>&1 &
 	bt_bluealsa_pid=$!
 
 	bt_bluealsa_tries=0

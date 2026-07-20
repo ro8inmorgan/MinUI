@@ -1366,7 +1366,7 @@ void SetRawColortemp(int val) { // 0 - 255
 
 // Find the first A2DP playback volume control via amixer
 static int get_a2dp_simple_control_name(char *buf, size_t buflen) {
-    FILE *fp = popen("amixer scontrols", "r");
+    FILE *fp = popen("amixer -D bluealsa scontrols 2>/dev/null", "r");
     if (!fp) return 0;
 
     char line[256];
@@ -1450,10 +1450,16 @@ void SetRawVolume(int val) { // in: 0-100
     if (GetAudioSink() == AUDIO_SINK_BLUETOOTH) {
         // bluealsa is a mixer plugin, not exposed as a separate card
         char ctl_name[128] = {0};
-        if (get_a2dp_simple_control_name(ctl_name, sizeof(ctl_name))) {
-			char cmd[256];
+        int found = 0;
+        for (int tries = 0; tries < 20; tries++) {
+            if ((found = get_a2dp_simple_control_name(ctl_name, sizeof(ctl_name))))
+                break;
+            usleep(100000);
+        }
+        if (found) {
+            char cmd[256];
             // Update volume on the device
-            snprintf(cmd, sizeof(cmd), "amixer sset \"%s\" -M %d%% > /dev/null 2>&1", ctl_name, val);
+            snprintf(cmd, sizeof(cmd), "amixer -D bluealsa sset \"%s\" -M %d%% > /dev/null 2>&1", ctl_name, val);
             system(cmd);
 			//printf("Set '%s' to %d%%\n", ctl_name, val); fflush(stdout);
         }

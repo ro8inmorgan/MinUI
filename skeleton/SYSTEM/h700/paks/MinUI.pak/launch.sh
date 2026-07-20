@@ -62,6 +62,24 @@ log_runtime_state() {
 	ls -l /usr/lib/libEGL.so* /usr/lib/libGLESv2.so* /usr/lib/aarch64-linux-gnu/libEGL.so* /usr/lib/aarch64-linux-gnu/libGLESv2.so* >> "$LAUNCH_LOG" 2>&1 || true
 }
 
+ensure_system_dbus() {
+	[ -S /run/dbus/system_bus_socket ] && return 0
+	command -v dbus-daemon >/dev/null 2>&1 || return 1
+
+	mkdir -p /run/dbus
+	if [ ! -s /run/machine-id ] && command -v dbus-uuidgen >/dev/null 2>&1; then
+		dbus-uuidgen > /run/machine-id 2>/dev/null || true
+	fi
+	dbus-daemon --system >/dev/null 2>&1 || true
+
+	dbus_tries=0
+	while [ ! -S /run/dbus/system_bus_socket ] && [ "$dbus_tries" -lt 20 ]; do
+		sleep 0.1 2>/dev/null || sleep 1
+		dbus_tries=$((dbus_tries + 1))
+	done
+	[ -S /run/dbus/system_bus_socket ]
+}
+
 if [ -f "/tmp/poweroff" ]; then
 	poweroff
 	exit 0
@@ -122,6 +140,7 @@ keymon.elf > "$LOGS_PATH/keymon.txt" 2>&1 &
 batmon.elf > "$LOGS_PATH/batmon.txt" 2>&1 &
 
 rm -f "$USERDATA_PATH/.asoundrc"
+ensure_system_dbus || echo "launch: system D-Bus unavailable; audio device monitoring may be disabled" >> "$LAUNCH_LOG"
 audiomon.elf > "$LOGS_PATH/audiomon.txt" 2>&1 &
 
 bluetoothon=$(nextval.elf bluetooth | sed -n 's/.*"bluetooth": \([0-9]*\).*/\1/p')
