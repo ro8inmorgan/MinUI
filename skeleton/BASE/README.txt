@@ -36,17 +36,13 @@ TRIMUI SMART PRO / TRIMUI BRICK
 
 Copy the "trimui" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
-ANBERNIC RG XX H700 (ALPHA)
+ANBERNIC RG XX (H700) DEVICES
 
-For RG40XXV/RG40XXH-style two-card stock OS setups, copy "MinUI.zip" (without unzipping) to the root of the TF2 card that contains your Roms.
+Copy "MinUI.zip" (without unzipping) to the root of the SD card.
 
-Then copy "h700/dmenu.bin" to the root of the stock TF1 card's user-visible ROMs partition. Removing that "dmenu.bin" file uninstalls the boot hijack and returns the device to stock boot.
+Copy the "dmenu.bin" file (found inside the "h700" folder) to the root of your stock OS card's ROMS partition. You can delete it later to uninstall and return to stock.
 
-If your stock card has a stockmod or muOS boot selector, choose the stock frontend target before testing NextUI. muOS override files can prevent the stock dmenu hijack from running.
-
-This H700 alpha includes Bluetooth controller pairing and uses the stock firmware's BlueALSA components for Bluetooth audio; BlueALSA and BlueZ are not bundled or replaced. Pak Store and OTA updating are outside this alpha's scope.
-
-Known RG34XXSP alpha issues: PlayStation games currently return to Home on launch; the Bootlogo tool shows no previews at 720x480; an FBNeo launch with missing BIOS can leave MinArch unable to open its menu or exit; the power button can wake the device while the lid is closed; and Mega Drive performance with the Auto CPU profile can depend on shader/scaling settings. Charging uses light sleep rather than deep suspend by design. These issues do not affect the tested GB, GBC, GBA, FC, or SFC paths.
+IMPORTANT: In the stock OS, set the user interface theme to "old style" (default) — not "MU style 1" or "MU style 2", otherwise NextUI will not start.
 
 MIYOO FLIP
 
@@ -71,6 +67,11 @@ TRIMUI SMART PRO / TRIMUI BRICK
 TRIMUI BRICK / BRICK PRO / SMART PRO S
 
   Buttons with no action of their own can be assigned a pak to launch: L3/R3 on the Brick, L4/R4 on the Brick Pro, and HOME on the Brick Pro and Smart Pro S. Assign them under Settings > Assignments. Assignments only apply in the main menu, not in-game. HOME no longer acts as a second menu button.
+
+ANBERNIC RG XX
+
+  Menu button: Quick menu
+  Select button: Game switcher
 
 ----------------------------------------
 Quicksave & auto-resume
