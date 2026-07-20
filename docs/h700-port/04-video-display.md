@@ -26,16 +26,22 @@ The stack:
 | Device | Panel | FIXED_W×H | Status |
 |---|---|---|---|
 | RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
-| RG34XXSP | 720×480 3:2 | 720×480 | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher and in-game menus tested-good; resolution-specific overlays untested |
+| RG34XXSP | 720×480 3:2 | 720×480 | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher, in-game menus; UI scaling tested-good |
 | RG28XX | 480×640 portrait | 640×480 logical | ✅ user-tested — driver-level rotation, UI + game scaling verified (below) |
-| RGcubexx | 720×720 | 720×720 | wired (`is_cube`), untested |
+| RGcubexx | 720×720 | 720×720 | wired (`is_cube`); general UI scaling community-validated; full matrix not walked locally |
 
 ### 480p UI — mostly fine, polish pass pending
 These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
 rendered at 480p for ~2 years. Real-use verdict on RG40XXV and RG34XXSP: **no systemic
 breakage — OK for alpha**. The broad 720×480 surface sweep is now clean, including the
-keyboard used for RetroAchievements credentials. Screenshots and resolution-specific
-overlays remain untested; no suitable 720×480 overlay asset was available. Related but
+keyboard used for RetroAchievements credentials. Screenshots pass on RG34XXSP.
+**UI scaling** across panels is good: 640×480, 720×480, and rotated 480×640 tested
+locally; 720×720 (RGcubexx) confirmed by a Discord community tester — no graphical
+issues worth tracking. **Panel-matched overlay assets** are a separate content gap:
+the release only ships empty `Overlays/<system>/` dirs plus two GBA PNGs at
+**1024×768** (TrimUI Brick), not 640×480 / 720×480 / 480×640 / 720×720. The overlay
+GLES path itself already runs on Mali (shaders/effects row); shipping H700-sized
+overlay packs is optional content, not a beta code gate. Related but
 distinct: the Input tester is now device-aware, the dead
 display controls are hidden/verified, and Fn-switch settings are gated off on h700.
 The broader capability sweep remains a useful regression check (09-roadmap #8).
@@ -180,7 +186,9 @@ pitfall #2 in 01). The alpha-blending code on main was never at fault.
 Consequence: the h700 branch was **rebased onto main with the alpha-blending work
 included** (done 2026-07-09). `workspace/all/` carried zero net change from the
 reverted experiment, so the rebase was clean on that front. Game switcher and box-art
-rendering are clean at 720×480; screenshots and resolution-specific overlays remain to
+rendering are clean at 720×480; screenshots pass on RG34XXSP; multi-panel UI scaling
+passes (see geometry table); panel-matched overlay assets are not shipped (Brick-sized
+GBA only); remaining polish items remain to
 be checked. Upstream main has since advanced, so rebase once more before final merge.
 
 ## Bootlogo preset previews — resolved (2026-07-13)
@@ -196,7 +204,8 @@ search path, per-file `IMG_Load` failures, and the final count to the pak's
 `log.txt`, renders the searched path on screen when nothing loads, and guards
 scroll/apply against an empty preset list (apply previously dereferenced a NULL
 array). RG28XX previews are rotated to boot orientation (see rotation section
-above). The 720×720 path still needs hardware testing (no cube available).
+above). The 720×720 path has community UI-scaling validation; full cube UI/core matrix
+still needs a local or broader external pass.
 
 ## Boot splash
 

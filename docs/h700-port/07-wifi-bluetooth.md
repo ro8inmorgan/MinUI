@@ -57,8 +57,10 @@ scope; testing is not applicable and they are not alpha release gates.
   ready and verifies `org.bluealsa`. The H700 `audiomon` build omits only the
   `delay 0` setting rejected by the stock plugin; its remaining behavior is shared.
   BlueALSA, its ALSA plugins, SBC, and BlueZ all remain stock and are not bundled or
-  replaced. AirPods 4 ANC playback is verified; automatic reconnect and suspend/resume
-  are tracked in 05/08.
+  replaced. AirPods 4 ANC playback was verified earlier on RG40XXV. Full lifecycle
+  remainder (reconnect, game-switch, suspend/resume, sample-rate Settings UI) is
+  **blocked** as of 2026-07-20: BT scan/pair broken on stock and BaseOS
+  (device/firmware) — tracked in 05/08.
 - BT controller transport is verified on RG40XXV: Settings discovers, pairs, trusts,
   connects, and exposes a DualSense as an SDL joystick and evdev input device.
   Button semantics are not fully normalized because the shared tg5040/tg5050/H700

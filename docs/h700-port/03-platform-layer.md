@@ -121,14 +121,14 @@ open/closed per poll and could drop the wake press between polls.
 |---|---|
 | Video | `#include "generic_video.c"` — custom SDL2 mali driver does the rest (04) |
 | Battery | `axp2202-battery/capacity` + `axp2202-usb/online`, coarse bucketing in shared code — identical to tg5040 |
-| CPU speed | `governor.sh` via `system()`: auto=schedutil, performance=max 1512000, powersave=conservative capped mid-range. Manual changes work. RG34XXSP MD testing exposed render-setting-sensitive auto frequencies (often 480 MHz when slow; ~720 MHz when smooth), still under investigation. Single A53 cluster → `PLAT_pinToCores` no-op |
+| CPU speed | `governor.sh` via `system()`: auto=schedutil, performance=max 1512000, powersave=conservative capped mid-range. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
 | CPU temp | thermal_zone0 |
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
 | GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
 | LEDs | `MAX_LIGHTS 0`, all `PLAT_setLed*` stubs — hardware has no RGB LEDs. `work_led` used only as sleep/backlight indicator |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
-| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP issue: power also wakes light sleep while the lid is closed despite the intended gate. |
+| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP: POWER can wake light sleep with lid closed; deep sleep re-sleeps if lid still closed — accepted beta policy (06). |
 | Model | `PLAT_getModel` → "Anbernic " + `RGXX_MODEL` (copied into a static buffer, not a raw getenv pointer) |
 | Date/time | `timedatectl` / `hwclock` / `date` via snprintf-bounded commands; timezones via `timedatectl set-timezone`/`list-timezones`, NTP via `set-ntp` (systemd-timesyncd) — much cleaner than tg5040's uci |
 | Turbo | `PLAT_canTurbo()=false`, no-ops (tg5040's turbo rides trimui_inputd; no H700 equivalent wired) |

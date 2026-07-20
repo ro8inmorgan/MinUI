@@ -1,27 +1,41 @@
-# 09 — Roadmap: from alpha candidate to a 9.5/10 port
+# 09 — Roadmap: beta1 → RC → 9.5/10 port
 
-Everything below is verified against branch tip `a08fbfec`, with hardware results
-recorded through 2026-07-17.
+Hardware results recorded through 2026-07-20 (beta-prep test walkthrough).
+Branch tip note may lag; treat the matrix in 08/10 as source of truth for status.
 Ordered by impact within each section.
 
-## Beta entry gates
+## beta1 vs RC gates
 
-Beta does not require the full 9.5/10 target at the end of this document, but it should
-not knowingly ship model-breaking core failures or untested recovery/reversibility
-paths. Close these gates, or explicitly descope the affected feature/model:
+beta1 is allowed to ship with documented known issues and incomplete RC polish.
+RC must clear the major defects below (or explicitly re-descope in writing).
 
+### beta1 (ship now)
+| Item | Status for beta1 |
+|---|---|
+| FBNeo missing-BIOS hard-lock | **Known issue** — happy path with BIOS OK; most users fine. Call out in release notes. Fix is **RC**, not beta1-blocking |
+| MD Auto CPU | ✅ fixed |
+| Screenshots, multi-panel UI scaling, headphone hardware route | ✅ |
+| Closed-lid POWER, charging→light-sleep | ✅ accepted policy |
+| Clean uninstall | ➖ not a test row — delete `dmenu.bin` is design-guaranteed reverse install |
+| SIGUSR1 shutdown, dirty-card fsck | ⬜ untested OK for beta1 → **RC polish** |
+| BT audio lifecycle remainder | ⚠ blocked by device BT scan; earlier AirPods playback pass stands |
+| Overnight drain | ⚠ partial first data point; voltage/stock re-test is RC polish |
+| Long-tail EXTRAS cores | ⬜ partial smoke only (see 10) |
+| MU-style theme | ➖ install prerequisite only |
+
+### RC (must close before release candidate)
 | Gate | Exit condition |
 |---|---|
-| RG34XXSP core correctness | FBNeo missing-BIOS failure returns control cleanly; MD Auto CPU has a fix or a tested safe default; remaining shipped core families receive a basic launch/audio/input/menu/exit/save smoke pass. PS1 must remain in the release-candidate smoke pass because its former failure was a stale/corrupted core artifact |
-| Bluetooth audio lifecycle | AirPods reconnect without manual D-Bus commands; menu/game and game/game transitions work; speaker restores on disconnect; five suspend/resume cycles pass; the Settings 44100/48000 choice changes and persists |
-| Power confidence | Battery percentage is compared with stock, overnight suspend drain is measured, and the closed-lid POWER plus charging/light-sleep behaviors are fixed or accepted as documented policy |
-| Reversibility and recovery | Clean uninstall, SIGUSR1 shutdown, and dirty-card fsck recovery pass; muOS/stockmod behavior has an explicit warn-versus-stop decision |
-| Release-candidate smoke | Screenshots and resolution-specific overlays pass; headphone-jack behavior is determined; clean H700 and tg5040 builds plus the Jammy `settings.elf` ldd check pass on the release candidate |
+| FBNeo error recovery | Missing-BIOS (and similar core hard-fail) returns control to MinArch menu/exit without power cycle; regression test preserved |
+| Robustness polish | SIGUSR1 from `launcher.sh stop` end-to-end; dirty-card `fsck.fat` recovery smoke |
+| Prefer | BT lifecycle revalidation when device scan works; overnight drain voltage vs stock; more EXTRAS core smoke; PS1 stays in RC smoke (stale-core regression) |
+| Build | clean H700 + tg5040 builds + Jammy `settings.elf` ldd check on the candidate |
 
-Not beta gates unless scope changes: RGcubexx hardware availability, HDMI boot-with-cable
-and odd-EDID/model expansion, cross-platform controller normalization, the inherited
-controller-only sample-rate detector, Pak Store/OTA, per-panel display calibration, and
-a dedicated H700 toolchain image.
+Not beta1 or RC gates unless scope changes: full RGcubexx matrix walk, H700-sized
+overlay content packs, HDMI boot/EDID/model expansion, cross-platform controller
+normalization, the inherited controller-only sample-rate detector, Pak Store/OTA,
+per-panel display calibration, software HP jack icon, and a dedicated H700 toolchain
+image.
 
 ## P0 — Correctness / robustness
 
@@ -35,19 +49,24 @@ a dedicated H700 toolchain image.
    `PWR_enterSleep`; plus wifi/bt restart moved to `after_async &`). Unblocks the
    overnight-drain test. RG40XXV re-test, in-game sleep/resume, and power-off →
    power-on → running-game resume have since been verified too. Two RG34XXSP edge
-   cases remain: POWER currently wakes the unit while its lid is closed, and charging
-   intentionally keeps the shared power path in light sleep instead of deep suspend.
-2. **Decide muOS/stockmod coexistence policy** (`boot/boot.sh` — currently shows
-   "STOCK TARGET REQUIRED" splash but *continues booting*; launch.sh drops
-   stockmod-warning.txt). Either hard-fail with the splash held on screen, or
-   document why continuing is safe. A user with stockmod installed currently gets a
-   confusing half-boot.
-3. **Run the remaining robustness gauntlet** (08 matrix ⬜ rows): clean uninstall,
-   SIGUSR1 quit, dirty-SD fsck recovery, battery accuracy, screenshots, and overnight
-   drain. Box art, RetroAchievements, Recently Played, and the game switcher are
-   tested-good on RG34XXSP.
-   Pak Store and OTA update are explicitly excluded from the alpha scope; testing is
-   not applicable and they are not alpha release gates.
+   cases: POWER-while-closed is accepted policy (wakes light sleep only; deep sleep
+   re-sleeps if lid still closed). Charging→light-sleep-only is accepted shared product
+   policy for beta (2026-07-20).
+2. **~~Decide muOS/stockmod coexistence policy~~ Closed (2026-07-20)** — reframed.
+   The practical break is the stock **MU style** theme (not a separate product
+   install): it makes `dmenu_ln` skip `/mnt/mmc/dmenu.bin`, so NextUI never starts
+   and no in-shim warning can appear. Documented install prerequisite: use **old
+   style** theme (`skeleton/BASE/README.txt`). The boot-shim “STOCK TARGET
+   REQUIRED” path is effectively unreachable for the same override; leave it as
+   defensive code, no further policy work for beta.
+3. **Robustness gauntlet — scoped 2026-07-20.** Clean uninstall **removed** from the
+   test matrix (delete `dmenu.bin` is sufficient by design). SIGUSR1 quit and
+   dirty-SD `fsck` recovery are **RC polish** (untested OK for beta1). Overnight
+   drain is partial (RG34XXSP ~7% over 8.5 h; voltage/stock re-test = RC polish).
+   Battery % vs stock passes on RG34XXSP; icon-vs-Battery-pak desync after long sleep
+   is post-RC hardening. Screenshots, box art, RetroAchievements, Recently Played,
+   and the game switcher are tested-good on RG34XXSP. Pak Store and OTA remain out
+   of scope.
 4. **~~Document the `digital volume` inversion~~ Done (2026-07-09)** — `100 - val`
    is intentional because the control is an attenuator. Volume UI and levels are
    tested-good on RG40XXV and RG34XXSP from mute through 100% (05).
@@ -57,12 +76,12 @@ a dedicated H700 toolchain image.
 5. **RG34XXSP polish and runtime fixes** — the 720×480 UI, lid sleep/wake, manual
    governor changes, displaycal persistence, RetroAchievements, Files, Recently
    Played, game switcher, and the primary 8/16-bit systems are hardware-tested.
-   Remaining: fix POWER waking through a closed lid; decide whether charging should
-   continue to suppress deep sleep; fix the FBNeo missing-BIOS lockup and MD
-   auto-governor/render-setting
-   sensitivity; decide whether per-Emu `default-rg34xx.cfg` files are needed. Track
-   core coverage in [10](10-core-game-matrix.md). (~~720×480 Bootlogo previews~~
-   fixed 2026-07-13 — see #13a.)
+   Remaining for **RC**: fix FBNeo missing-BIOS hard-lock (happy path OK — known
+   issue for beta1). Decide whether per-Emu `default-rg34xx.cfg` files are needed.
+   Track core coverage in [10](10-core-game-matrix.md). (~~MD Auto CPU~~ fixed
+   2026-07-20. ~~POWER through closed lid~~ and ~~charging suppresses deep sleep~~
+   accepted policy 2026-07-20. ~~720×480 Bootlogo previews~~ fixed 2026-07-13 —
+   see #13a.)
 6. **~~RG28XX rotation validation~~ Done (2026-07-12)** — hardware answered both
    questions: the malifbdev-rot driver *does* rotate the GL path (SDL_ROTATION=1
    suffices end-to-end), and the two layers *did* double-rotate — the app-side
@@ -76,7 +95,8 @@ a dedicated H700 toolchain image.
    bitmap question was solved: the glitches were the missing 64-bit libpng bundle,
    not main's alpha changes — 04.) Remaining: **confirm rendering stays clean on
    device with the rebased build**: the game switcher and box art are clean at
-   720×480. Screenshots and resolution-specific overlays remain to be checked.
+   720×480. Screenshots pass on RG34XXSP; multi-panel UI scaling passes (incl.
+   community 720×720). Panel-matched overlay assets remain unshipped content.
 8. **Audit Brick-era feature assumptions in shared UI** — NextUI only ever targeted
    the Brick / Smart Pro, and several UI pieces hardcode that hardware. Known cases
    on RG XX:
@@ -105,44 +125,43 @@ a dedicated H700 toolchain image.
      nit: syncsettings still "restores" the no-op enhance values on resume.
    Worth a systematic sweep: grep settings.cpp / paks for capability flags that
    default to "present" and decide each for h700.
-9. **BT audio: finish stock-first validation.** Clean RG40XXV stock provides
-   BlueALSA 4.2.0, ALSA plugins/configuration, and D-Bus policy. Daemon startup,
-   `org.bluealsa`, and SBC source endpoint registration pass; H700 now starts the
-   stock daemon and exposes the sampling-rate setting. No BlueALSA, ALSA plugin, SBC,
-   or BlueZ component is bundled. AirPods 4 ANC SBC playback now passes on RG40XXV;
-   the confirmed silence blockers were an unsupported `delay 0` ALSA option and zero
-   BlueZ transport volume. Complete automatic reconnect, game-switch, and
-   suspend/resume testing. The exposed maximum-sampling-rate option intentionally
-   matches tg5040: 48000 is the default and avoids needless resampling, while 44100 is
-   only a compatibility escape hatch. AirPods negotiated both rates, so this setting
-   was not the fix. Verify its Settings UI/persistence, but keep the inherited
-   any-ACL/controller-only detection issue as a later cross-platform cleanup. Raw
-   external-controller button normalization is shared with tg5040/tg5050 and belongs
-   in a separate cross-platform change.
+9. **BT audio: finish stock-first validation (partial / blocked).** Clean RG40XXV
+   stock provides BlueALSA 4.2.0, ALSA plugins/configuration, and D-Bus policy.
+   Daemon startup, `org.bluealsa`, and SBC source endpoint registration pass; H700
+   starts the stock daemon and exposes the sampling-rate setting. No BlueALSA, ALSA
+   plugin, SBC, or BlueZ component is bundled. AirPods 4 ANC SBC playback passed on
+   RG40XXV earlier (silence blockers: unsupported `delay 0` + zero BlueZ transport
+   volume). **Auto reconnect was not tested.** As of 2026-07-20 BT powers on but
+   scans nothing / cannot pair on stock and BaseOS — treat as device/firmware until
+   proven otherwise; do not file as NextUI-only. When discovery works again: complete
+   reconnect, game-switch, and suspend/resume. Settings 44100/48000 is a compatibility
+   escape hatch (AirPods negotiated both). Keep controller-only sample-rate detection
+   and raw controller button normalization as later cross-platform cleanups.
 10. **480p UI polish pass** (04) — verdict from real use on RG40XXV and RG34XXSP:
     **good for alpha**. The 720×480 Home UI, Battery, Game Tracker, Input, Clock,
     Settings, on-screen keyboard, Files, and in-game menus all work well. Box art is
-    clean. Screenshots and resolution-specific overlays remain untested. Keep Files
+    clean. Screenshots pass on RG34XXSP; multi-panel UI scaling passes
+    (640×480 / 720×480 / 480×640 local; 720×720 community). Panel-matched
+    overlay assets are not shipped for H700 (only Brick 1024×768 GBA PNGs). Keep Files
     at PPU 2 for now; PPU 3 may be evaluated later for the RG34XX/SP panel density.
-11. **Headphone jack detection** (05) — investigate how stock switches speaker/HP on
-    a live device; may be hardware auto-mute (= nothing to do). Cheap to answer,
-    closes a matrix row either way.
-12. **Investigate RG34XXSP auto CPU scaling** — manual in-game governor changes work,
-    but MD can slow down when Auto settles near 480 MHz with some shader/render
-    combinations. Stock shader + 3× scale + linear interpolation raised Auto to about
-    720 MHz and ran smoothly; Powersave and Performance selected about 1100/1500 MHz
-    and were also smooth. Determine whether this is workload detection, a core/render
-    interaction, or an Auto policy bug. There are no general frame-pacing, tearing,
-    input-lag, or audio concerns from tested gameplay.
+11. **~~Headphone jack detection~~ Closed for beta (2026-07-20)** (05) — hardware
+    auto-mutes speaker and routes to headphones without NextUI. Software
+    `SetJack` / HP icon / dual volume remains unwired on h700 (Brick has keymon
+    jack monitoring; h700 does not). Treat HP-icon polish as optional post-beta.
+12. **~~Investigate RG34XXSP auto CPU scaling~~ Fixed (2026-07-20)** — MD no longer
+    slows down under Auto; former 480 MHz stall with some render settings is resolved
+    (user-verified). Manual powersave/performance were already fine. No general
+    frame-pacing, tearing, input-lag, or audio concerns from tested gameplay.
 
 12a. **Build out the core/game matrix** — the initial RG34XXSP results are now in
-    [10](10-core-game-matrix.md). GB/GBC/GBA/FC/SFC and PS1 pass; the former PS1
+    [10](10-core-game-matrix.md). GB/GBC/GBA/FC/SFC, MD, and PS1 pass; the former PS1
     launch failures were a stale/corrupted core artifact fixed by a clean rebuild.
-    FBNeo needs a valid BIOS retest and must not trap MinArch when
-    BIOS is missing; MD needs the Auto-scaling investigation above. Expand coverage
-    across the remaining shipped systems and at least one additional H700 model.
-13. Later: RGcubexx bring-up (720×720, wired but no device is available locally;
-    external validation is an explicit purpose of the alpha), HDMI out (done,
+    FBNeo with BIOS is OK; missing-BIOS hard-lock is a **beta1 known issue** and an
+    **RC must-fix**. A2600, MGBA, and SMS also pass (2026-07-20). Expand coverage
+    across remaining EXTRAS systems when practical (not beta1-blocking).
+13. Later: RGcubexx bring-up (720×720 wired; general UI scaling already
+    community-validated — expand to a fuller functional/core walk when a device is
+    available), optional H700-sized overlay content packs, HDMI out (done,
     user-validated on RG40XXV incl. in-game hotplug both directions; remaining:
     other models, boot-with-cable, odd EDIDs — 04), RG35XX-family variants
     (displaycal presets
@@ -163,8 +182,9 @@ a dedicated H700 toolchain image.
     (2026-07-13, verified on-device — 04) and the pak now has load/path diagnostics,
     an on-screen empty state, and an empty-list apply guard. RG28XX 480×640 apply is
     user-verified (logo upright at boot) and previews are now rotated to match boot
-    orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`, 04). Remaining: SP backup/restore
-    exercise, and the 720×720 path (no cube device available).
+    orientation (`BOOTLOGO_PREVIEW_ROTATE_CW`, 04). SP backup/restore pass
+    (user-verified 2026-07-20). Remaining: the 720×720 path (no local cube device;
+    community UI scaling only so far).
 
 ## P2 — Cleanup / refactors / simplifications
 

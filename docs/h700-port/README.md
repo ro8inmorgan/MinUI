@@ -4,24 +4,27 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Status (2026-07-17): ready for an alpha release, with documented RG34XXSP issues.**
+**Status (2026-07-20): ready for beta1 with documented known issues; RC gates listed
+in [09](09-roadmap.md).**
 RG40XXV has broad hardware coverage. RG34XXSP now passes the complete 720×480 UI
 sweep, box art, Files, Input, Recently Played, game switcher, RetroAchievements,
 displaycal persistence, manual governor changes, lid sleep/wake, Bootlogo, and
-GB/GBC/GBA/FC/SFC. RG28XX is now user-tested: driver-level rotation validated,
+GB/GBC/GBA/FC/SFC (plus A2600/MGBA/SMS and MD/PS). RG28XX is now user-tested: driver-level rotation validated,
 minarch Aspect/Fullscreen scaling fixed (a double-rotation bug), and Bootlogo
 apply + rotated previews working.
 The apparent RG34XXSP PS1 launch regression was a stale/corrupted core artifact and a
-clean rebuild fixed it. Open RG34XXSP issues are an FBNeo missing-BIOS lockup, MD Auto
-CPU scaling sensitivity, POWER waking through a closed
-lid, and charging remaining in light sleep by current shared policy. Screenshots,
-resolution-specific overlays, battery accuracy/overnight drain, recovery paths, and
-RGcubexx hardware coverage remain untested. The cube is intentionally an
-external alpha-validation target. BT audio now uses the stock BlueALSA stack without
-bundling a second userspace implementation and is under hardware validation;
-Pak Store and OTA update are explicitly outside this alpha
-scope. Full status is in [08](08-testing-status.md), priorities in
-[09](09-roadmap.md), and emulator coverage in [10](10-core-game-matrix.md).
+clean rebuild fixed it. MD Auto CPU is fixed. FBNeo plays OK with BIOS; missing-BIOS
+hard-lock is a **beta1 known issue** and an **RC must-fix**. Closed-lid POWER and
+charging→light-sleep-only are accepted policies. Screenshots and multi-panel UI
+scaling pass. Battery % vs stock passes (icon-vs-Battery-pak desync after long sleep
+is follow-up). Overnight drain partial (~7% / 8.5 h; voltage/stock re-test = RC
+polish). Clean uninstall removed from the test matrix (delete `dmenu.bin` is
+design-guaranteed). SIGUSR1 and dirty-card recovery are **RC polish** (untested OK
+for beta1). Panel-matched overlay assets not shipped for H700 sizes. Full RGcubexx
+matrix remains external. BT audio used stock BlueALSA with an earlier AirPods pass;
+lifecycle revalidation blocked by device-wide BT scan failure. Pak Store and OTA
+out of scope. Full status: [08](08-testing-status.md), [09](09-roadmap.md),
+[10](10-core-game-matrix.md).
 
 These docs began as the implementation plan and were restructured after the
 implementation landed (branch `h700`) into reference documentation:
@@ -62,12 +65,12 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 | Platform | one `h700`, `DEVICE` env per device | ✅ as planned |
 | Arch / toolchain | 64-bit, reuse tg5040 image | ✅ as planned — with real costs; pitfalls catalogued in 01 |
 | SDL2 | in-tree malifbdev-rot build | ✅ as planned, pinned + config-asserted |
-| Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; 720×480 UI and box art pass, resolution-specific overlays untested |
+| Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; multi-panel UI scaling + box art pass; panel-matched overlay assets not shipped |
 | **Input** | SDL joystick route | **Deviation:** raw evdev primary (SDL js enumeration unreliable on stock image); SDL kept for BT pads (03) |
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
-| **BT audio** | build + ship bluealsa | **Deviation:** use stock BlueALSA 4.2.0, ALSA plugins, SBC, and BlueZ without bundling replacements; AirPods 4 ANC SBC playback passes on RG40XXV after an H700-only ALSA-option omission and native-volume initialization, with automatic reconnect/suspend validation pending (05/07) |
-| Sleep | `echo mem` + tg5040-style wrapper | ⚠ repeated sleep/wake, in-game resume, and power-off auto-resume pass; charging intentionally stays in light sleep (06) |
-| Lid | hallkey → PLAT lid API | ⚠ close/open works, but POWER can wake RG34XXSP while the lid remains closed |
+| **BT audio** | build + ship bluealsa | **Deviation:** use stock BlueALSA 4.2.0, ALSA plugins, SBC, and BlueZ without bundling replacements; AirPods 4 ANC SBC playback passed on RG40XXV after H700-only ALSA-option omission + native-volume init; auto reconnect untested; revalidation blocked by device-wide BT scan/pair failure on stock and BaseOS (05/07) |
+| Sleep | `echo mem` + tg5040-style wrapper | ✅ repeated sleep/wake, in-game resume, and power-off auto-resume pass; charging→light-sleep-only accepted policy (06) |
+| Lid | hallkey → PLAT lid API | ✅ close/open works; POWER-while-closed accepted policy (light sleep only; deep re-sleeps if lid closed) |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |
 | Rumble / LEDs | moto sysfs; MAX_LIGHTS 0 | ✅ as planned; rumble tested-good |
 | Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
@@ -78,20 +81,22 @@ itself lives entirely on TF2. The stock Ubuntu userland is used aggressively
 
 ## Top open risks
 
-1. **RG34XXSP runtime issues** — FBNeo can trap MinArch after a missing-BIOS failure,
-   MD Auto CPU scaling is render-setting-sensitive, and POWER
-   can wake through the closed lid. (Bootlogo previews at 720×480: fixed 2026-07-13.)
-2. **Partially tested robustness matrix** — clean uninstall, dirty-SD recovery,
-   SIGUSR1 shutdown, battery accuracy, screenshots, and overnight drain need runs.
+1. **FBNeo missing-BIOS hard-lock** — major; **RC must-fix**. beta1 ships as known
+   issue (happy path with BIOS OK). MD Auto CPU fixed. Closed-lid POWER and
+   charging→light-sleep accepted policy.
+2. **RC polish (untested OK for beta1)** — SIGUSR1 shutdown, dirty-SD recovery;
+   overnight drain voltage/stock re-test. Clean uninstall not a test row (delete
+   `dmenu.bin`).
 3. **Partially tested device matrix** — RG40XXV, RG34XXSP, and RG28XX are working
-   (RG28XX rotation/scaling validated 2026-07-12); RGcubexx is an external alpha
-   target.
-4. **Stock-OS coupling** — model detection, hijack point, and muOS interplay all read
-   Anbernic's binaries/scripts; a firmware update can move them (guardrails in 08).
+   (RG28XX rotation/scaling validated 2026-07-12); RGcubexx has community UI-scaling
+   validation, with full matrix still external.
+4. **Stock-OS coupling** — model detection and the `dmenu.bin` hijack read Anbernic
+   binaries/scripts; a firmware update can move them. Stock **MU style** themes
+   bypass the hijack entirely (install requires **old style** — 02/08).
 5. **Shared-UI capability regressions** — the Input tester is device-aware, dead
    display controls are hidden/verified, and Fn-switch settings are now gated off.
    Keep the systematic capability sweep as shared UI continues to evolve.
    (Formerly listed here: the alpha-blit unknown — resolved; it was the missing
    64-bit libpng. The branch includes main's alpha blending; game switcher/overlay
-   rendering is clean, with screenshots and resolution-specific overlays still to
-   check, 04.)
+   rendering is clean; screenshots and multi-panel UI scaling pass
+   (incl. community 720×720); panel-matched overlay assets not shipped, 04.)

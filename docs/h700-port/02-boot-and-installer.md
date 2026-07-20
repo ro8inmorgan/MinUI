@@ -6,6 +6,8 @@ The stock launcher wrapper `/mnt/vendor/ctrl/dmenu_ln` prefers **`/mnt/mmc/dmenu
 (the FAT32 ROMs partition of the boot SD, TF1) over the built-in frontend (verified,
 full chain in 00). Placing our own `dmenu.bin` there hijacks boot; deleting it restores
 pure stock. This shipped as designed and is the entire install/uninstall story on TF1.
+No separate uninstall soak test is required: absence of that file is design-guaranteed
+to prevent NextUI from starting on RG XX.
 
 ```
 stock boot:  systemd launcher.service → launcher.sh → loadapp.sh → dmenu_ln
@@ -15,14 +17,23 @@ stock boot:  systemd launcher.service → launcher.sh → loadapp.sh → dmenu_l
                                 NO  → /mnt/vendor/bin/dmenu.bin (stock UI)
 ```
 
-### stockmod / muOS caveat
-`dmenu_ln` checks `/mnt/vendor/muos1.ini` / `muos2.ini` **first** and boots the bundled
-muOS instead if present. The boot shim detects this, logs it, and shows a
-**"STOCK TARGET REQUIRED"** splash; `launch.sh` additionally drops a
-`stockmod-warning.txt` on the SD card. It is currently a warning, **not** a hard fail —
-the user must switch the boot target back to "stock" (or delete the ini) themselves.
-`skeleton/BASE/README.txt` documents this in the H700 install section.
-(Whether to hard-fail instead is an open call — see 09-roadmap.)
+### Stock “MU style” theme caveat (install prerequisite)
+The real hijack break is a **stock UI theme setting**, not a separate muOS install.
+In stock (and stockmod) Settings, **MU style 1 / MU style 2** causes `dmenu_ln` to
+prefer the MU frontend (`muos1.bin` / `muos2.bin`, gated by `/mnt/vendor/muos*.ini`)
+**before** `/mnt/mmc/dmenu.bin` ever runs. Result on hardware: the device boots the
+stock/MU UI normally; NextUI never starts; no splash or warning appears — our shim
+is simply not executed.
+
+There is nothing useful to do from inside NextUI for that path. The install docs
+already state the requirement (`skeleton/BASE/README.txt`): set the stock theme to
+**“old style” (default)**, not MU style. Beta treats this as a documented
+prerequisite, not an open warn-vs-hard-stop decision.
+
+Note: `boot/boot.sh` still has a `muos1.ini`/`muos2.ini` → “STOCK TARGET REQUIRED”
+check (and `launch.sh` can drop `stockmod-warning.txt`), but that path is only
+reachable if our `dmenu.bin` was already selected — which the same override prevents.
+Treat the splash as defensive dead code unless stock’s `dmenu_ln` logic changes.
 
 ## SD card layout: TF1 stays stock, NextUI lives on TF2
 

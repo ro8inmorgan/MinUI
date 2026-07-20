@@ -45,13 +45,17 @@ for libraries that exist on the target.
   `before()` and **restores it in `after()`** on resume (an early version had the
   restore commented out; it's live now).
 
-## Headphone jack — not wired (open)
+## Headphone jack — hardware auto-route works; software detection unused
 
-`snd_soc_sunxi_component_jack/parameters/jack_state` exists but was historically
-"always 0"; never re-tested on 2026 firmware. Unknown how the stock OS switches
-speaker/HP (possibly hardware auto-mute, in which case nothing is needed). To
-investigate: diff `amixer contents` and watch input devices while plugging headphones
-on a live device. Until then: no jack-based switching in NextUI.
+**Hardware (tested):** plugging headphones auto-mutes the speaker and routes audio
+to the jack with no NextUI involvement. Functional audio is correct.
+
+**Software:** Brick-style `SetJack` / separate speaker vs headphones volume / HP
+volume icon are **not** wired on h700 — `keymon` never monitors a jack event, so
+`GetJack()` stays 0 and the volume UI keeps the speaker path. That is cosmetic /
+dual-volume polish only; routing does not depend on it. Optional follow-up if a
+HP icon or independent HP volume is wanted later. (`jack_state` sysfs was
+historically always 0 and was never needed once hardware auto-mute was confirmed.)
 
 ## Bluetooth audio — stock-first A2DP enabled
 
@@ -75,17 +79,23 @@ H700 now follows the tg5040 lifecycle with a stock-only implementation:
 - disabling Bluetooth stops BlueALSA before BlueZ; no `bluetoothd`, `bluetoothctl`,
   or other BlueZ component is bundled or replaced
 
-AirPods 4 ANC pairing, A2DP connection, automatic internal-speaker muting/restoration,
-SBC transport, and user-audible game audio are verified on RG40XXV. The original silent
-stream was not a 44.1/48 kHz problem: BlueZ created the AirPods transport with absolute
-volume zero. Setting its `MediaTransport1.Volume` to 127 made the already-running stream
-audible. The shipped daemon flags now initialize that value natively. An A2DP PCM
-publication race was also observed during an artificial daemon restart while the device
-remained logically connected; it is not handled by an H700-only shared-code workaround
-unless a normal connection flow reproduces it. Final automatic reconnect, game-switching,
-and suspend/resume passes are still pending because the shared test unit was returned to
-HDMI testing. Firmware without a runnable stock BlueALSA is logged as controller-only
-rather than augmented with another userspace stack; see 09-roadmap.
+**Earlier validation (RG40XXV):** AirPods 4 ANC pairing, A2DP connection, automatic
+internal-speaker muting/restoration, SBC transport, and user-audible game audio passed.
+The original silent stream was not a 44.1/48 kHz problem: BlueZ created the AirPods
+transport with absolute volume zero. Setting its `MediaTransport1.Volume` to 127 made
+the already-running stream audible. The shipped daemon flags now initialize that value
+natively. An A2DP PCM publication race was also observed during an artificial daemon
+restart while the device remained logically connected; it is not handled by an
+H700-only shared-code workaround unless a normal connection flow reproduces it.
+
+**Lifecycle remainder blocked (2026-07-20):** auto reconnect, menu/game and game/game
+switching, five suspend/resume cycles, case/disconnect speaker-restore revalidation,
+and Settings sample-rate change+persist were never completed. Revalidation is blocked
+because BT powers on but scans no devices and cannot pair on **both stock OS and
+BaseOS** — a device/firmware environment failure, not a NextUI-only regression.
+Resume the full matrix once discovery works again. Firmware without a runnable stock
+BlueALSA is logged as controller-only rather than augmented with another userspace
+stack; see 09-roadmap.
 
 ## Sample rates
 

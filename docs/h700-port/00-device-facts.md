@@ -99,9 +99,9 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 - `echo mem` suspend works; wake source is the **power button** (AXP2202 PEK).
   **RTC alarm wake does NOT fire** — no timed wake; don't build features on it.
   The shipped sleep/wake path is reliable in repeated RG40XXV/RG34XXSP testing,
-  including in-game resume and power-off auto-resume. RG34XXSP exception: the power
-  button currently wakes light sleep while the lid is closed despite the software
-  lid gate (see 06). Charging intentionally prevents deep sleep in shared code.
+  including in-game resume and power-off auto-resume. RG34XXSP accepted policy: POWER
+  can wake light sleep while the lid is closed; deep sleep re-sleeps if the lid is
+  still closed (06). Charging intentionally prevents deep sleep in shared code.
 - PMIC: **AXP2202** — `/sys/class/power_supply/axp2202-battery/` and `axp2202-usb/`
 - Battery: `capacity`, `status`, `voltage_now`, `temp`, `time_to_empty_now`,
   `time_to_full_now`, `charge_counter`, `health`
@@ -112,7 +112,8 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   - `lowpwr_led`, `led_test`
   - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — polarity verified
     (`1` = open); lid close sleeps and lid open wakes screen-off. Deep suspend still
-    requires power, but power also wakes light sleep while closed (unexpected; open).
+    requires power. POWER can wake light sleep while closed; deep sleep re-sleeps if
+    lid still closed — accepted documented policy (06).
   - `brightness`, `display_id` (panel variant id), `spk_state`, `mcu_esckey`, `nds_esckey`, `boot_mode`
 - `/sys/class/pwm/pwmchip0` exists (alternative rumble path; `moto` is simpler)
 
@@ -169,9 +170,11 @@ Consequences:
 1. Dropping an executable named **`dmenu.bin` onto the FAT ROMs partition (`/mnt/mmc`)**
    makes the stock OS run it instead of its own frontend. No reflashing. This is how the
    shipped port (and old MinUI, and muOS "in-place") installs.
-2. **stockmod caveat:** `muos1.ini`/`muos2.ini` in `/mnt/vendor` *override* the
-   `/mnt/mmc/dmenu.bin` check. The boot shim detects this and shows a "STOCK TARGET
-   REQUIRED" splash (currently non-blocking — see 09-roadmap).
+2. **MU-style theme caveat:** selecting stock/stockmod **MU style 1/2** drops
+   `muos1.ini`/`muos2.ini` under `/mnt/vendor`, which *override* the
+   `/mnt/mmc/dmenu.bin` check so the MU frontend runs instead. NextUI never starts
+   and cannot show a warning from that path. Install requires stock **old style**
+   theme (documented in `skeleton/BASE/README.txt`; see 02).
 3. `/tmp/.next` chain-exec exists in the stock wrapper; NextUI runs its own launch loop.
 4. `launcher.sh stop` kills via `SIGUSR1 dmenu.bin` — the shim `trap`s USR1.
 5. Model detection: `strings /mnt/vendor/bin/dmenu.bin | grep -m1 ^RG` → `RGXX_MODEL`
@@ -219,11 +222,14 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
   clone base.
 
 ## Facts still unverified (need hardware/testing)
-1. Why RG34XXSP power-key release wakes light sleep while `hallkey=0` even though
-   `PLAT_shouldWake()` contains a closed-lid gate.
+1. ~~Why RG34XXSP power-key release wakes light sleep while `hallkey=0`~~ Accepted
+   as beta policy (2026-07-20): light sleep can wake on POWER with lid closed; deep
+   sleep re-sleeps if lid still closed. Optional later hardening (06).
 2. ~~RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path
    end-to-end.~~ Resolved 2026-07-12: SDL_ROTATION=1 rotates the whole GL frame at
    the driver; app space is 640×480 landscape (`should_rotate` must stay 0 — 04).
-3. Headphone jack detection on 2026 firmware (old note: `jack_state` never changes).
+3. ~~Headphone jack detection on 2026 firmware~~ Resolved for beta: hardware
+   auto-mutes speaker and routes to HP without NextUI. Software `SetJack`/icon
+   path remains unwired (optional polish — 05).
 4. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
 5. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.

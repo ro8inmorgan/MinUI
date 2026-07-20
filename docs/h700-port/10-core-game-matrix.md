@@ -19,7 +19,7 @@ repeated for that system.
 5. Record the exact game, format, shader, scale, interpolation, CPU profile, and BIOS
    state for every failure.
 
-## RG34XXSP results (updated 2026-07-17)
+## RG34XXSP results (updated 2026-07-20)
 
 | System | Core | Status | Evidence / issue |
 |---|---|---|---|
@@ -28,11 +28,11 @@ repeated for that system.
 | GBA | gpSP | ✅ | Launch and gameplay perfect |
 | FC | FCEUmm | ✅ | Launch and gameplay perfect |
 | SFC | Snes9x | ✅ | Launch and gameplay perfect |
-| MD | PicoDrive | ⚠️ | Launches, but some shader/scaling combinations leave Auto CPU near 480 MHz and cause slowdown. Stock shader + 3× scale + linear interpolation runs smoothly around 720 MHz; Powersave (~1.1 GHz observed) and Performance (~1.5 GHz) are smooth |
-| FBN | FBNeo | ⚠️ | Required BIOS was absent, so game execution is not validated. After the BIOS error, MinArch would not open its menu or exit; volume and brightness shortcuts still responded |
+| MD | PicoDrive | ✅ | Launch and gameplay good. Former Auto CPU slowdown (some shader/scale combos stuck near 480 MHz) is fixed — user-verified 2026-07-20 |
+| FBN | FBNeo | ⚠️ | With required BIOS: launch and play OK (2026-07-20). Without BIOS: still hard-locks MinArch (no menu/exit; device effectively stuck until power cycle). **beta1:** known issue (happy path). **RC gate:** fix error recovery |
 | PS | PCSX-ReARMed | ✅ | Launch and gameplay pass after a clean core rebuild. The earlier crashes across 2–3 titles were caused by a stale/corrupted core, not a model-specific runtime defect |
 | 32X | PicoDrive | ⬜ | — |
-| A2600 | Stella 2014 | ⬜ | — |
+| A2600 | Stella 2014 | ✅ | Launch and gameplay pass (2026-07-20) |
 | A5200 | a5200 | ⬜ | — |
 | A7800 | ProSystem | ⬜ | — |
 | C128 | VICE x128 | ⬜ | — |
@@ -42,7 +42,7 @@ repeated for that system.
 | FDS | FCEUmm | ⬜ | — |
 | GG | PicoDrive | ⬜ | — |
 | LYNX | Handy | ⬜ | — |
-| MGBA | mGBA | ⬜ | Alternate GBA core |
+| MGBA | mGBA | ✅ | Alternate GBA core — launch and gameplay pass (2026-07-20) |
 | MSX | blueMSX | ⬜ | — |
 | NGP | RACE | ⬜ | — |
 | NGPC | RACE | ⬜ | — |
@@ -56,18 +56,18 @@ repeated for that system.
 | SEGACD | PicoDrive | ⬜ | — |
 | SG1000 | PicoDrive | ⬜ | — |
 | SGB | mGBA | ⬜ | — |
-| SMS | PicoDrive | ⬜ | — |
+| SMS | PicoDrive | ✅ | Launch and gameplay pass (2026-07-20) |
 | SUPA | Supafaust | ⬜ | Alternate SNES core |
 | VB | Mednafen VB | ⬜ | — |
 | VIC | VICE xvic | ⬜ | — |
 
 ## Open investigations
 
-1. **FBNeo error recovery:** retest with the required BIOS, then separately reproduce
-   the missing-BIOS path and determine why MinArch still processes system shortcuts but
-   not MENU/exit.
-2. **MD Auto CPU behavior:** reproduce with exact shader/scale/interpolation combinations
-   while logging `scaling_cur_freq`, governor, min/max frequency, frame time, and audio
-   underruns. Manual governor switching itself is working.
+1. **FBNeo error recovery (RC must-fix; beta1 known issue):** with BIOS = pass.
+   Missing-BIOS still hard-locks MinArch completely. Determine why the core/error
+   path never returns control (menu/exit dead) and fix recovery without requiring a
+   power cycle. Ship beta1 with release-note callout; do not tag RC until fixed.
+2. **~~MD Auto CPU behavior~~ Fixed (2026-07-20):** former slowdown when Auto settled
+   near 480 MHz with some render settings is resolved; MD is green in the matrix.
 3. Expand the table across RG40XXV, RG28XX, RGcubexx, and other RG XX variants during
    alpha testing, recording only device-specific differences once a core is known-good.
