@@ -9,16 +9,13 @@ MODE="$1"
 set_policy() {
 	local policy_path="$1"
 	local governor="$2"
-	local max_type="$3"  # "second_max", "max", or "mid"
+	local max_type="$3"  # "max" or "mid"
 	
 	[ -f "$policy_path/scaling_available_frequencies" ] || return 0
 	FREQS=$(cat "$policy_path/scaling_available_frequencies" | tr ' ' '\n' | grep -v '^$' | sort -n)
 	MIN_FREQ=$(echo "$FREQS" | head -1)
 	
 	case "$max_type" in
-		second_max)
-			MAX_FREQ=$(echo "$FREQS" | tail -2 | head -1)
-			;;
 		max)
 			MAX_FREQ=$(echo "$FREQS" | tail -1)
 			;;
@@ -39,8 +36,10 @@ set_policy() {
 
 case "$MODE" in
 	auto)
-		set_policy /sys/devices/system/cpu/cpufreq/policy0 "schedutil" "second_max"
-		set_policy /sys/devices/system/cpu/cpu0/cpufreq "schedutil" "second_max"
+		# H700's advertised 1.5 GHz ceiling is in-spec, not an overclock. Let
+		# schedutil use the full hardware frequency range when load requires it.
+		set_policy /sys/devices/system/cpu/cpufreq/policy0 "schedutil" "max"
+		set_policy /sys/devices/system/cpu/cpu0/cpufreq "schedutil" "max"
 		;;
 	performance)
 		set_policy /sys/devices/system/cpu/cpufreq/policy0 "performance" "max"

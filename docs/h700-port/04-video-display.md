@@ -44,10 +44,11 @@ tester reported normal general UI scaling on the 720×720 RGCubeXX. Refer to the
 report for the maintained coverage record.
 
 **Panel-matched overlay assets** are a separate content question. The H700 tree ships
-empty `Overlays/<system>/` directories plus two GBA PNGs at
-**1024×768** (TrimUI Brick), not 640×480 / 720×480 / 480×640 / 720×720. The overlay
-GLES path itself runs on Mali. The Input tester is device-aware, ineffective display
-controls are hidden, and Fn-switch settings are disabled on H700.
+empty `Overlays/<system>/` directories plus two GBA PNGs at **1024×768** (TrimUI
+Brick), not assets for H700's three logical rendering resolutions: 640×480 (including
+the driver-rotated RG28XX), 720×480, and 720×720. The overlay GLES path itself runs on
+Mali. The Input tester is device-aware, ineffective display controls are hidden, and
+Fn-switch settings are disabled on H700.
 
 ## RG28XX rotation decision (2026-07-12)
 

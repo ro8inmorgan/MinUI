@@ -134,11 +134,13 @@ by u-boot/stock before our hijack, untouched.
 
 ## CPU governor
 
-`governor.sh` reads the available frequency list: auto=`schedutil` at the
-second-highest advertised frequency, performance=`performance` at the greatest
-advertised frequency, and powersave=`conservative` capped mid-range. Menu vs in-game
-profiles ride the shared settings; performance is forced during game launch. Manual
-in-game changes are clean.
+`governor.sh` reads the available frequency list. Auto uses `schedutil` across the
+full advertised range, performance uses `performance` at the greatest advertised
+frequency, and powersave uses `conservative` capped mid-range. H700's advertised
+1.5 GHz ceiling is in-spec rather than an overclock, so Auto no longer caps its
+maximum one frequency step below that ceiling. Menu vs in-game profiles ride the
+shared settings; performance is forced during game launch. Manual in-game changes
+are clean.
 ~~RG34XXSP MD Auto CPU slowdown~~ Fixed (user-verified 2026-07-20): earlier, some
 shader/scale combos left Auto near 480 MHz and felt slow; that no longer reproduces.
 Manual powersave/performance were already smooth. Single cluster → no core pinning.

@@ -126,7 +126,7 @@ open/closed per poll and could drop the wake press between polls.
 |---|---|
 | Video | `#include "generic_video.c"` — custom SDL2 mali driver does the rest (04) |
 | Battery | `axp2202-battery/capacity` + `axp2202-usb/online`, with coarse bucketing in shared code. Unlike tg5040, H700 charging detection uses `online` alone |
-| CPU speed | `governor.sh` via `system()`: auto=schedutil at the second-highest advertised frequency, performance at the greatest advertised frequency, powersave=conservative capped mid-range. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
+| CPU speed | `governor.sh` via `system()`: auto=schedutil and performance both permit the greatest advertised frequency; powersave=conservative capped mid-range. H700's advertised 1.5 GHz ceiling is in-spec, not an overclock, so Auto no longer caps it one step below maximum. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
 | CPU temp | thermal_zone0 |
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
 | GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |

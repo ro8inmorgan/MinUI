@@ -124,6 +124,7 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 | PERF-02 | Frame pacing, tearing, and input latency | ✅ | RG40XXV | No visible issue during gameplay; result is observational, not instrumented |
 | PERF-03 | Manual CPU governor changes during play | ✅ | RG34XXSP | Powersave/performance changes do not stutter audio |
 | PERF-04 | Automatic governor load/frequency selection | ✅ | RG34XXSP | MD Auto CPU regression is resolved |
+| PERF-05 | Auto governor full-range scaling | ⬜ | Implementation ready; hardware result pending | With Auto selected, `scaling_max_freq` should equal the greatest advertised frequency (about 1.5 GHz) and schedutil should scale up to it under load without new performance, thermal, or audio regressions |
 
 ## Applications and device-specific hardware
 

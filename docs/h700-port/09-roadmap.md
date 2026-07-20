@@ -8,9 +8,10 @@ every test ID points to the canonical report in
 
 ## Current position
 
-Alpha 1, Alpha 2, and Alpha 3 are complete. The port is ready to produce a Beta
-candidate. Functional Beta gates pass; the candidate-specific H700/tg5040 build and
-linkage checks must be recorded against the artifact that will be published.
+Alpha 1, Alpha 2, and Alpha 3 are complete. The port is preparing its Beta candidate.
+The H700 Auto governor now permits the full in-spec 1.5 GHz range; PERF-05 hardware
+validation, the planned per-model out-of-box profiles, and the candidate-specific
+H700/tg5040 build and linkage checks remain.
 
 ## Stage roadmap
 
@@ -22,7 +23,7 @@ these definitions when reading older alpha artifacts and commit notes.
 | Alpha 1 — platform bring-up | Prove stock-card boot, basic display/input/audio, WiFi, and playable cores on the RG40XXV baseline | [BUILD-01](08-testing-status.md#build-and-binary-compatibility), [BOOT-01, BOOT-02](08-testing-status.md#boot-install-and-launcher), [DISP-01](08-testing-status.md#display-and-user-interface), [INPUT-01](08-testing-status.md#input-and-controllers), [AUDIO-01, AUDIO-02](08-testing-status.md#audio), [NET-01](08-testing-status.md#network-and-online-features), [GAME-01](08-testing-status.md#games-and-performance) | ✅ Complete |
 | Alpha 2 — family expansion | Fix sleep/Files/UI regressions and prove real hardware deltas: RG34XXSP panel/lid/sticks, RG28XX rotation, Bootlogo sizes, and shared capability gating | [POWER-01, POWER-03](08-testing-status.md#power-sleep-and-battery), [APP-01](08-testing-status.md#applications-and-device-specific-hardware), [DISP-02, DISP-03, DISP-04, DISP-05, DISP-06, DISP-07](08-testing-status.md#display-and-user-interface), [INPUT-02, INPUT-03](08-testing-status.md#input-and-controllers), [DEV-02, DEV-03, DEV-05, DEV-06, DEV-07](08-testing-status.md#applications-and-device-specific-hardware) | ✅ Complete |
 | Alpha 3 — Beta hardening | Close feature gaps and ambiguous policies: HDMI, Bluetooth controller/audio, screenshots, headphone route, MD Auto CPU, PS1 packaging, and representative core smoke | [DISP-08](08-testing-status.md#display-and-user-interface), [INPUT-05](08-testing-status.md#input-and-controllers), [AUDIO-03, AUDIO-04, AUDIO-05](08-testing-status.md#audio), [GAME-03, GAME-04, GAME-06](08-testing-status.md#games-and-performance), [PERF-04](08-testing-status.md#games-and-performance) | ✅ Complete; partial long-tail rows are classified below |
-| Beta — public validation | Publish the supported H700 family build, collect broader device/firmware evidence, and fix any new critical regression | Beta entry gates below | Ready to cut after candidate checks |
+| Beta — public validation | Publish the supported H700 family build, collect broader device/firmware evidence, and fix any new critical regression | Beta entry gates and planned work below | Preparing: PERF-05, per-model defaults, and candidate checks remain |
 | RC — release qualification | Freeze scope, close recovery checks, validate the packaged candidate, and accept or fix all Beta findings | RC entry gates below | Planned |
 | Release — supported baseline | Promote an RC with no open release blocker and with support/known-issue documentation matching behavior | Release gates below | Planned |
 
@@ -40,6 +41,19 @@ unless the code or hardware differs.
 | HDMI | [DISP-08](08-testing-status.md#display-and-user-interface), [AUDIO-05](08-testing-status.md#audio) | Satisfied |
 | Bluetooth audio | [AUDIO-04](08-testing-status.md#audio) | Satisfied |
 | Core/performance baseline | [GAME-02, GAME-03, GAME-04](08-testing-status.md#games-and-performance), [PERF-01, PERF-04](08-testing-status.md#games-and-performance) | Satisfied |
+| Auto CPU full range | [PERF-05](08-testing-status.md#games-and-performance) | High priority: implementation complete; hardware result pending |
+
+## Beta planned work
+
+| Work | Priority / target | Completion condition |
+|---|---|---|
+| Auto governor full-range scaling | High — ASAP, required for Beta | PERF-05 passes on a representative H700 device |
+| Per-model out-of-box defaults | Planned for Beta | Ship tested H700-model profiles covering shader choice, emulator/core options, and relevant frontend defaults so each model starts with sensible settings |
+
+The per-model profiles are an intentional H700-specific departure from NextUI's
+otherwise barebones cross-platform defaults. Keep the overrides narrow, documented,
+and tested so they improve first-run behavior without silently changing other
+platforms.
 
 Beta does not require every device or long-tail core to be tested. A new Beta finding
 becomes a Beta blocker only when it causes data loss, prevents boot/gameplay on the
@@ -111,11 +125,11 @@ evidence turns one into a supported-baseline defect.
 
 | Enhancement | Scope |
 |---|---|
-| Panel-sized overlay packs | Create H700-native content; the rendering pipeline already passes DISP-05 |
+| H700 overlay packs | Ship useful overlays for 640×480, 720×480, and 720×720 logical output. Target Beta if tested packs are ready; otherwise ship after Release. This is not a Beta gate because the rendering pipeline already passes DISP-05 |
 | Per-panel DisplayCal defaults | Measure panels and replace the neutral presets |
 | Headphone UI | Optional HP icon and independent headphone volume; hardware routing already passes AUDIO-03 |
 | Richer battery metrics | Add voltage, charge-counter, and time-to-empty data to the battery model |
-| Per-device emulator defaults | Decide whether RG34XXSP/RG28XX need dedicated `default-*.cfg` files |
+| Broader per-game tuning | Extend the planned Beta per-model defaults only where a core or title demonstrably needs a narrower override |
 | 720×480 Files density | Evaluate PPU 3; PPU 2 already passes APP-01 |
 
 ## Stretch goals and out-of-scope work
@@ -130,9 +144,11 @@ evidence turns one into a supported-baseline defect.
 
 ## Next actions
 
-1. Build the Beta artifact and record BUILD-01, BUILD-02, and BUILD-03 against it.
-2. Publish Beta with the accepted behaviors and support boundary above.
-3. Triage Beta findings against the blocker definition; add new evidence to 08 rather
+1. Validate PERF-05 on hardware and record the result in 08.
+2. Define, test, and ship the per-model shader/emulator/frontend defaults planned for Beta.
+3. Build the Beta artifact and record BUILD-01, BUILD-02, and BUILD-03 against it.
+4. Publish Beta with the accepted behaviors and support boundary above.
+5. Triage Beta findings against the blocker definition; add new evidence to 08 rather
    than duplicating it here.
-4. Before RC, close ROBUST-01/02 and run the packaged regression smoke.
-5. Promote RC to Release only after the final-artifact and documentation gates pass.
+6. Before RC, close BOOT-03 and ROBUST-01/02 and run the packaged regression smoke.
+7. Promote RC to Release only after the final-artifact and documentation gates pass.
