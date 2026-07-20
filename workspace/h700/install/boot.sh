@@ -26,6 +26,8 @@ ensure_compat_path "$REAL_SDCARD_PATH" "$SDCARD_PATH"
 
 export LD_LIBRARY_PATH="$SYSTEM_PATH/$PLATFORM/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 export PATH="$SYSTEM_PATH/$PLATFORM/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+export PLATFORM
+export RGXX_MODEL="$(strings /mnt/vendor/bin/dmenu.bin 2>/dev/null | grep -m1 '^RG')"
 
 cd "$SCRIPT_DIR/$PLATFORM" || exit 1
 
