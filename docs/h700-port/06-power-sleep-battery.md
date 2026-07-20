@@ -99,6 +99,9 @@ light sleep anyway. The cause is unresolved.
 - `PLAT_getBatteryStatus`: `axp2202-battery/capacity` + `axp2202-usb/online`, coarse
   bucketing in shared code — same paths as tg5040, copied verbatim. Charging detection
   and the UI indicator work on RG34XXSP; percentage accuracy vs stock remains untested.
+- **Not supported:** “Keep awake over USB” (upstream #783). `PLAT_isUSBConnected()` is
+  a stub returning 0; the Settings toggle remains tg5040-only. Charging already blocks
+  deep sleep via `is_charging`; gadget/data keep-awake is not implemented.
 - While charging, lid or power sleep reaches screen-off/light sleep only. This matches
   shared `PWR_waitForWake()` behavior: the charging check deliberately skips
   `PWR_deepSleep()` and checks again a minute later. Decide separately whether H700

@@ -107,6 +107,10 @@ Button semantics: `BTN_RESUME=BTN_X`, `BTN_SLEEP/WAKE=BTN_POWER`,
 `BTN_MOD_BRIGHTNESS=BTN_MENU`, `BTN_MOD_COLORTEMP=BTN_SELECT`, dedicated
 `BTN_MOD_PLUS/MINUS` on the volume keys — parity with tg5040 conventions.
 
+**Not supported:** user-assignable FN1/FN2/HOME pak-launch actions (upstream #788).
+H700 has no dedicated FN1/FN2/HOME buttons, so `BTN_FN*` are `BTN_NONE` with empty
+names (Settings hides the Assignments menu; main-menu FN presses are no-ops).
+
 `PLAT_shouldWake` keeps a **persistent** `wake_fd` on event0 (opened once
 O_NONBLOCK|O_CLOEXEC, drained per poll, closed in `PLAT_quitInput`) — an early version
 open/closed per poll and could drop the wake press between polls.

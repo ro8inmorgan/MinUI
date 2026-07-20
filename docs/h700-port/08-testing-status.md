@@ -34,6 +34,8 @@
 | Fresh-install defaults: brightness 4, displaycal off/neutral | ✅ verified on RG40XXV (deleted msettings.bin + reboot) |
 | Dead enhance controls (contrast/saturation/exposure) hidden on h700 | ✅ code-gated and visually verified on RG40XXV 2026-07-09 |
 | Fn-switch settings hidden on h700 | ✅ capability-gated; RG XX devices have no Fn switch |
+| FN1/FN2/HOME assignable pak actions | ➖ not supported (no dedicated keys; `BTN_FN*` stubs) |
+| Keep awake over USB | ➖ not supported (`PLAT_isUSBConnected` stub; tg5040-only UI) |
 | Shaders (all shipped .glsl), overlays, effects on Mali-G31 | ✅ |
 | Volume UI + levels, mute through 100% | ✅ tested on RG40XXV and RG34XXSP; no known issues |
 | Rumble (moto on/off) | ✅ |
@@ -163,12 +165,11 @@ toolchain image remain explicit beta follow-ups unless their scope is promoted.
   empty-state, empty-list apply guard, and the optional
   `BOOTLOGO_PREVIEW_ROTATE_CW` preview-rotation hook (defaults off; only h700's
   platform.h defines it, for the RG28XX).
-- **New-button defines must land in every platform.h.** The tg5050 L4/R4 work added
-  `CODE_L4/R4` + `JOY_L4/R4` references to shared `api.c` and `BUTTON_L4/R4` to
-  `minput.c`; h700 didn't build until the `*_NA` defines were added (`d738014`,
-  `956ed34`). When main grows a button, grep every `platform/platform.h` for the
-  new `BUTTON_/CODE_/JOY_` names — and verify with a full `make PLATFORM=h700`
-  (single-pak builds don't compile `minput.c` and will miss `BUTTON_*` gaps).
+- **New-button / platform-API stubs must land on every platform.** The tg5050 L4/R4
+  work and later main features (`BTN_FN*` #788, `PLAT_isUSBConnected` #783) break
+  h700 until matching defines/stubs exist. When main grows a button or `PLAT_*`
+  hook, grep every `platform/platform.h` / `platform.c` — and verify with a full
+  `make PLATFORM=h700` (single-pak builds miss some translation units).
 - **Re-run the 00-device-facts probes after each Anbernic stock-firmware update.**
   Paths have been stable historically, but `dmenu_ln`/muOS hooks are
   stockmod-version-dependent, and the model-string detector reads a stock binary.

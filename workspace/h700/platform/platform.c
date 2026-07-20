@@ -608,6 +608,12 @@ void PLAT_getBatteryStatusFine(int *is_charging, int *charge)
 	}
 }
 
+int PLAT_isUSBConnected(void)
+{
+	// Not implemented for this platform yet.
+	return 0;
+}
+
 void PLAT_enableBacklight(int enable) {
 	if (enable) {
 		putInt("/sys/class/power_supply/axp2202-battery/work_led", 0);

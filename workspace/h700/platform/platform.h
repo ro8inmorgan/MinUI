@@ -109,6 +109,16 @@ extern int dev_has_rstick;
 #define JOY_MINUS		15
 
 ///////////////////////////////
+// USER-ASSIGNABLE BUTTONS
+// H700 devices have no dedicated FN1/FN2/HOME buttons for pak launch actions.
+#define BTN_FN1			BTN_NONE
+#define BTN_FN2			BTN_NONE
+#define BTN_FN3			BTN_NONE
+#define BTN_FN1_NAME	""
+#define BTN_FN2_NAME	""
+#define BTN_FN3_NAME	""
+
+///////////////////////////////
 
 #define AXIS_L2			AXIS_NA
 #define AXIS_R2			AXIS_NA
