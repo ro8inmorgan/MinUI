@@ -1,13 +1,17 @@
 # 02 — Boot Hijack, Installer & SD Layout
 
+Reference for the stock boot chain, takeover mechanism, storage policy, installer,
+and runtime launcher. Current tests live in [08](08-testing-status.md); lifecycle
+gates live in [09](09-roadmap.md).
+
 ## How NextUI takes over the stock OS (no reflash, fully reversible)
 
 The stock launcher wrapper `/mnt/vendor/ctrl/dmenu_ln` prefers **`/mnt/mmc/dmenu.bin`**
 (the FAT32 ROMs partition of the boot SD, TF1) over the built-in frontend (verified,
 full chain in 00). Placing our own `dmenu.bin` there hijacks boot; deleting it restores
 pure stock. This shipped as designed and is the entire install/uninstall story on TF1.
-No separate uninstall soak test is required: absence of that file is design-guaranteed
-to prevent NextUI from starting on RG XX.
+The rollback invariant is simple: when that file is absent, `dmenu_ln` cannot select
+NextUI. BOOT-04 records the corresponding design inspection; 09 owns its gate policy.
 
 ```
 stock boot:  systemd launcher.service → launcher.sh → loadapp.sh → dmenu_ln
@@ -27,8 +31,8 @@ is simply not executed.
 
 There is nothing useful to do from inside NextUI for that path. The install docs
 already state the requirement (`skeleton/BASE/README.txt`): set the stock theme to
-**“old style” (default)**, not MU style. Beta treats this as a documented
-prerequisite, not an open warn-vs-hard-stop decision.
+**“old style” (default)**, not MU style. The maintained decision is to document this
+as an install prerequisite; a warn-or-hard-stop path cannot run before the override.
 
 Note: `boot/boot.sh` still has a `muos1.ini`/`muos2.ini` → “STOCK TARGET REQUIRED”
 check (and `launch.sh` can drop `stockmod-warning.txt`), but that path is only
@@ -78,8 +82,9 @@ Notable implementation details (`boot/boot.sh`):
 - Logs to `/tmp/nextui-h700.log` by default; only writes a log to TF1 if it is a real
   mountpoint, truncating per boot (no unbounded growth on the stock card).
 - **Splash**: `fbsplash` (`boot/fbsplash.c`, ~180 lines) mmaps `/dev/fb0` and renders
-  text with a built-in 5×7 bitmap font — zero library dependencies, works before
-  anything is extracted. Messages: `INSTALLING NEXTUI`, `UPDATING NEXTUI`,
+  text with a built-in 5×7 bitmap font. It is statically bundled and safe for early
+  boot; the shim extracts the embedded payload before invoking it. Messages:
+  `INSTALLING NEXTUI`, `UPDATING NEXTUI`,
   `INSERT NEXTUI TF2 CARD`, `NEXTUI INSTALL MISSING`, `STOCK TARGET REQUIRED`.
   (The old port's per-panel raw-BMP `dd` scheme was dropped — rendered text needs no
   per-resolution assets. Post-install, SDL-based `show2.elf` takes over as usual.)
@@ -88,11 +93,12 @@ Notable implementation details (`boot/boot.sh`):
   compatibility, and logging helpers.
 - **TF2 mount**: tries vfat → exfat → auto; on failure runs `repair_tf2()` —
   `fsck.fat -a` or `fsck.exfat -a` chosen by `blkid` — then retries once.
-- **Update trigger**: boots into the installer when `MinUI.zip` **or any `*.pakz`** is
-  present at the SD root. If `.tmp_update/h700.sh` is missing (fresh card), it
-  bootstrap-extracts only `.tmp_update/*` from the zip first, then delegates — **the
-  zip is left in place for the installer to own** (an early version deleted the zip
-  before the installer ran, which left stale files forever).
+- **Update trigger**: `MinUI.zip` always enters the update path. If
+  `.tmp_update/h700.sh` is missing (fresh card), the shim bootstrap-extracts only
+  `.tmp_update/*` from that zip first, then delegates — **the zip is left in place for
+  the installer to own**. Root-level `*.pakz` files also invoke the installer when an
+  executable `.tmp_update/h700.sh` is already present; a pakz alone cannot bootstrap
+  a fresh card.
 - Then `exec`s `.system/h700/paks/MinUI.pak/launch.sh`; any failure falls back to the
   stock frontend.
 - Prefers the stock OS's `unzip` when present; the embedded static helper is the
@@ -110,7 +116,7 @@ Notable implementation details (`boot/boot.sh`):
 
 ## `MinUI.pak/launch.sh` (the master runtime script)
 
-Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~206 lines):
+Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~225 lines):
 - `export PLATFORM=h700`, path exports, `/mnt/SDCARD` compat symlink.
 - **Device detection**: `RGXX_MODEL=$(strings /mnt/vendor/bin/dmenu.bin | grep -m1 ^RG)`
   → `DEVICE` case (rg28xx / rg34xx / cube / rg40xx default). Confirmed working on 2026
@@ -131,3 +137,13 @@ Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~2
 - Crash-loop handling: after 5 consecutive `nextui.elf` crashes, the loop logs the
   crash limit, removes `/tmp/nextui_exec`, and falls through to poweroff. H700 does
   not ship an automatic WiFi/SSH rescue path in the release runtime.
+
+## Maintainer development loop
+
+- The stock OS runs sshd with a full Ubuntu userland. After the first install, copy
+  freshly built `.elf` files into `.system/h700/bin` and restart the launch loop;
+  routine iteration does not require moving SD cards.
+- The bounded crash loop writes its diagnostics before powering off. Retrieve logs
+  from TF2, or use stock SSH while the device is already reachable.
+- Test the self-extracting shim and installer as separate layers: the shim owns early
+  mount/repair/fallback, while `.tmp_update/h700.sh` owns the update transaction.

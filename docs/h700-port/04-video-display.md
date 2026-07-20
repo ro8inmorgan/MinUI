@@ -1,6 +1,11 @@
 # 04 — Video, Display, Rotation, HDMI, DisplayCal
 
-## Architecture (worked exactly as designed)
+This chapter records the H700 display stack, the decisions behind it, and the
+hardware evidence that established those decisions. The current test results and
+per-device coverage live in [08 — Testing status](08-testing-status.md); release
+criteria and deferrals live in [09 — Roadmap](09-roadmap.md).
+
+## Rendering architecture
 
 NextUI renders via `workspace/all/common/generic_video.c`: SDL2 window →
 `SDL_GL_CreateContext` → GLES 3 shader pipeline → `SDL_GL_SwapWindow`. The H700
@@ -19,34 +24,32 @@ The stack:
   trap, see 01). `generic_video.c` gained hard error checks: SDL init / window /
   renderer / GL-context failures now `exit(1)` instead of limping on — on a device
   with no display fallback, failing loudly into the bounded crash-restart loop beats
-  a black screen; the release path powers off after the crash limit.
+  a black screen; the launcher powers off after the crash limit.
 
-## Per-device geometry
+## Panel geometry and scaling context
 
-| Device | Panel | FIXED_W×H | Status |
+| Device | Panel | FIXED_W×H | Implementation / evidence |
 |---|---|---|---|
-| RG40XXV | 640×480 4:3 | 640×480 | ✅ shipped, tested |
-| RG34XXSP | 720×480 3:2 | 720×480 | ✅ Battery, Game Tracker, Input, Clock, Settings, Files, keyboard, box art, game switcher, in-game menus; UI scaling tested-good |
-| RG28XX | 480×640 portrait | 640×480 logical | ✅ user-tested — driver-level rotation, UI + game scaling verified (below) |
-| RGcubexx | 720×720 | 720×720 | wired (`is_cube`); general UI scaling community-validated; full matrix not walked locally |
+| RG40XXV | 640×480 4:3 | 640×480 | Native landscape reference panel |
+| RG34XXSP | 720×480 3:2 | 720×480 | Broad UI and scaling evidence gathered during bring-up |
+| RG28XX | 480×640 portrait | 640×480 logical | Driver-level rotation; see the rotation decision below |
+| RGcubexx | 720×720 | 720×720 | `is_cube` geometry path; community scaling feedback available |
 
-### 480p UI — mostly fine, polish pass pending
+### 480p UI observations and overlay assets
 These panels are ~half the resolution of tg5040 (1280×720 / 1024×768); NextUI hadn't
-rendered at 480p for ~2 years. Real-use verdict on RG40XXV and RG34XXSP: **no systemic
-breakage — OK for alpha**. The broad 720×480 surface sweep is now clean, including the
-keyboard used for RetroAchievements credentials. Screenshots pass on RG34XXSP.
-**UI scaling** across panels is good: 640×480, 720×480, and rotated 480×640 tested
-locally; 720×720 (RGcubexx) confirmed by a Discord community tester — no graphical
-issues worth tracking. **Panel-matched overlay assets** are a separate content gap:
-the release only ships empty `Overlays/<system>/` dirs plus two GBA PNGs at
-**1024×768** (TrimUI Brick), not 640×480 / 720×480 / 480×640 / 720×720. The overlay
-GLES path itself already runs on Mali (shaders/effects row); shipping H700-sized
-overlay packs is optional content, not a beta code gate. Related but
-distinct: the Input tester is now device-aware, the dead
-display controls are hidden/verified, and Fn-switch settings are gated off on h700.
-The broader capability sweep remains a useful regression check (09-roadmap #8).
+rendered at 480p for ~2 years. Bring-up on RG40XXV and RG34XXSP found no systemic
+scaling breakage; the 720×480 sweep included the RetroAchievements keyboard and
+screenshots. Local observations also cover 640×480 and rotated 480×640; a community
+tester reported normal general UI scaling on the 720×720 RGCubeXX. Refer to the test
+report for the maintained coverage record.
 
-## RG28XX rotation — validated: driver-level only (2026-07-12)
+**Panel-matched overlay assets** are a separate content question. The H700 tree ships
+empty `Overlays/<system>/` directories plus two GBA PNGs at
+**1024×768** (TrimUI Brick), not 640×480 / 720×480 / 480×640 / 720×720. The overlay
+GLES path itself runs on Mali. The Input tester is device-aware, ineffective display
+controls are hidden, and Fn-switch settings are disabled on H700.
+
+## RG28XX rotation decision (2026-07-12)
 
 Hardware testing answered both open questions, and the answer retired one of the
 two planned layers:
@@ -75,7 +78,7 @@ space. The pak now rotates previews 90° CW on the RG28XX
 carousel shows what the panel will actually display at boot; apply itself was
 already correct (user-verified: applied logo renders upright at power-on).
 
-## HDMI — hotplug output switching, user-validated ✅ (RG40XXV + TV, 2026-07-16)
+## HDMI output switching
 
 Plug-and-play design: when a cable is (dis)connected the running app quits via the
 existing `GFX_hdmiChanged()` plumbing (nextui inline, minarch `hdmimon()`, settings
@@ -83,9 +86,10 @@ main loop), the relauncher restarts it, and `PLAT_initPlatform()` converges the
 output to the cable state *before* SDL video comes up. Boot-with-cable works the
 same way for free.
 
-- `GetHDMI()` probes `/sys/class/extcon/hdmi/{state,cable.0/state}` — hotplug
-  detection (verified: `cable.0/state` is a bare 0/1; the top-level `state` file is
-  `HDMI=n` text which `getInt` parses as 0, so `cable.0` is the effective check).
+- `GetHDMI()` probes `/sys/class/extcon/hdmi/state` plus `cable.0/state` and
+  `cable.1/state` — hotplug detection (verified: `cable.0/state` is a bare 0/1; the
+  top-level `state` file is `HDMI=n` text which `getInt` parses as 0, so a cable-state
+  file is the effective check).
 - `SetHDMI()` (libmsettings) now performs the proven old-port sequence in C:
   blank fb0 → zero fb → `/sys/kernel/debug/dispdbg` `disp0/switch` with param
   `"4 10 0 0 0x4 0x101 0 0 0 8"` (HDMI type 4, mode 10 = **1080p60 signal**) →
@@ -126,23 +130,25 @@ same way for free.
      whichever commit lands last wins against the attach path's restore; commit
      again after unblank. The blob's pans then keep the crop in sync (they copy
      the committed config).
-- Validated end-to-end: plug/unplug in launcher and in-game (autosave →
-  auto-resume), repeated cycles, game scaling correct at 1280×720. An earlier
+- **Hardware evidence (RG40XXV + TV, 2026-07-16):** plug/unplug in launcher and
+  in-game (autosave →
+  auto-resume), repeated cycles, game scaling correct at 1280×720, and HDMI audio
+  routing all worked. An earlier
   "audio stutter on TV" symptom was collateral from the stale-layer DE errors,
-  not GPU load. Not yet covered: RG28XX/cube/SP models, boot-with-cable, odd
-  EDIDs (if a display rejects mode 10, mode 5 = 720p60 is the one-line
-  fallback). Old reference:
+  not GPU load. If a display rejects mode 10, mode 5 = 720p60 is the known one-line
+  fallback; broader EDID evidence is tracked in 09. Old reference:
   `git show 8cd78866:skeleton/SYSTEM/rg35xxplus/bin/hdmimon.sh`.
-- Unplug takes ~4-5s to restore: the deliberate `sleep(4)` debounce in the
-  shared hdmimon/nextui handlers plus the switch itself. Could be tuned later.
+- Observed unplug-to-panel restore is ~4–5s. The current shared MinArch/NextUI
+  handlers contribute a 1s cable-seating debounce; the remaining time is the output
+  switch and panel restore.
 
-## DisplayCal — ported 1:1, tested ✅
+## DisplayCal implementation and evidence
 
 Same `/dev/disp` gamma-LUT ioctls as tg5040 (`0x10b` set / `0x10c` enable / `0x10d`
 disable). On RG40XXV: RGB gain sliders visibly act, persist, and **survive sleep and
 game launch** (syncsettings.elf re-applies the LUT after resume — 06). `settings.cpp`
-gained the Anbernic vendor + RG XX models and enables
-colortemp/displaycal/mute/analog-stick/wifi/bt capability flags for h700.
+gained the Anbernic vendor + RG XX models. H700 enables color-temperature,
+DisplayCal, WiFi, and Bluetooth settings; the FN/mute-toggle menu remains disabled.
 
 **Reboot persistence — fixed 2026-07-09.** `InitSettings()` used to call
 `applyDisplayCalDefaultsForDevice()` unconditionally *after* loading the persisted
@@ -173,7 +179,7 @@ The libmsettings plumbing remains (harmless no-ops; the shared API keeps the
 symbols), and syncsettings still "restores" them on resume — a cosmetic cleanup at
 most.
 
-## Alpha/tinted-bitmap blits — resolved (it was libpng all along)
+## Incident: alpha/tinted-bitmap blits (libpng, not blending)
 
 During bring-up, graphical glitches were blamed on main's alpha-blending work; a
 compat experiment (`GFX_needsBitmapBlendCompat()` gated in shared `api.c`) was
@@ -185,18 +191,17 @@ pitfall #2 in 01). The alpha-blending code on main was never at fault.
 
 Consequence: the h700 branch was **rebased onto main with the alpha-blending work
 included** (done 2026-07-09). `workspace/all/` carried zero net change from the
-reverted experiment, so the rebase was clean on that front. Game switcher and box-art
-rendering are clean at 720×480; screenshots pass on RG34XXSP; multi-panel UI scaling
-passes (see geometry table); panel-matched overlay assets are not shipped (Brick-sized
-GBA only); remaining polish items remain to
-be checked. Upstream main has since advanced, so rebase once more before final merge.
+reverted experiment, so the rebase was clean on that front. Game-switcher and box-art
+checks at 720×480 and RG34XXSP screenshots supported the conclusion; retained
+coverage details belong in the testing report. Panel-matched overlay assets remain
+Brick-sized GBA only.
 
-## Bootlogo preset previews — resolved (2026-07-13)
+## Incident: Bootlogo preset previews (2026-07-13)
 
-The 640×480 catalog works on RG40XXV. The RG34XXSP "no visible presets" issue is
-fixed: driving the pak remotely over SSH on the SP with the current branch build
-showed all 23 `720x480/` presets loading and the carousel rendering correctly
-(verified via framebuffer capture); user-confirmed working. The failing binary was
+The RG34XXSP "no visible presets" issue was traced by driving the pak remotely over
+SSH on the SP with the current branch build: all 23 `720x480/` presets loaded and
+the carousel rendered correctly in a framebuffer capture, which the user also
+confirmed. The failing binary was
 the alpha1.1-era `bootlogo.elf` (built from a pre-commit working tree); the exact
 defect in that binary was never pinned because current source no longer reproduces
 it. To keep this class of failure diagnosable, `bootlogo.c` now logs the preset
@@ -204,10 +209,10 @@ search path, per-file `IMG_Load` failures, and the final count to the pak's
 `log.txt`, renders the searched path on screen when nothing loads, and guards
 scroll/apply against an empty preset list (apply previously dereferenced a NULL
 array). RG28XX previews are rotated to boot orientation (see rotation section
-above). The 720×720 path has community UI-scaling validation; full cube UI/core matrix
-still needs a local or broader external pass.
+above). Community feedback covers the 720×720 scaling path; maintained cube coverage
+belongs in the testing report.
 
-## Boot splash
+## Boot splash decision
 
 Deviation from plan: instead of per-panel raw-BMP `dd` assets, the shim ships
 `fbsplash` — a dependency-free fb0 text renderer (02). Post-install, SDL-based

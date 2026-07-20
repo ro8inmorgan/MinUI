@@ -38,8 +38,10 @@ static int wake_fd = -1;
 #define EV_KEY 0x01
 #define EV_ABS 0x03
 
-// From the old rg35xxplus platform: built-in controls expose evdev raw codes,
-// while SDL joystick enumeration is unreliable on stock H700 images.
+// Built-in controls use raw evdev codes. The in-tree SDL patch restores joystick
+// enumeration, but platform input deliberately skips this device because its SDL
+// button ordering differs from the external-pad JOY_* mapping and would duplicate
+// the evdev events.
 #define RAW_HATY 17
 #define RAW_HATX 16
 #define RAW_LSY  3

@@ -1,8 +1,10 @@
 # 10 — Core & Game Compatibility Matrix
 
-This is the system-by-system hardware validation ledger for the H700 port. The first
-pass is on RG34XXSP (720×480); add RG40XXV and other RG XX results where behavior
-differs.
+This is the system-by-system H700 compatibility ledger and the detailed evidence
+behind the games and performance rows in [08-testing-status.md](08-testing-status.md#games-and-performance).
+It records test coverage, reproducible issues, and device-specific differences;
+[09-roadmap.md](09-roadmap.md) decides lifecycle requirements. The first pass is on
+RG34XXSP (720×480); add RG40XXV and other RG XX results where behavior differs.
 
 The existing results predate the full protocol below. A green initial result means
 launch and gameplay were reported good; it does not yet imply every protocol step was
@@ -29,7 +31,7 @@ repeated for that system.
 | FC | FCEUmm | ✅ | Launch and gameplay perfect |
 | SFC | Snes9x | ✅ | Launch and gameplay perfect |
 | MD | PicoDrive | ✅ | Launch and gameplay good. Former Auto CPU slowdown (some shader/scale combos stuck near 480 MHz) is fixed — user-verified 2026-07-20 |
-| FBN | FBNeo | ⚠️ | With required BIOS: launch and play OK (2026-07-20). Without BIOS: still hard-locks MinArch (no menu/exit; device effectively stuck until power cycle). **beta1:** known issue (happy path). **RC gate:** fix error recovery |
+| FBN | FBNeo | ⚠️ | With required BIOS: launch and play OK (2026-07-20). Without BIOS: MinArch hard-locks (no menu/exit; power cycle required). The upstream FBNeo error path does not poll frontend input. Track upstream. |
 | PS | PCSX-ReARMed | ✅ | Launch and gameplay pass after a clean core rebuild. The earlier crashes across 2–3 titles were caused by a stale/corrupted core, not a model-specific runtime defect |
 | 32X | PicoDrive | ⬜ | — |
 | A2600 | Stella 2014 | ✅ | Launch and gameplay pass (2026-07-20) |
@@ -60,14 +62,3 @@ repeated for that system.
 | SUPA | Supafaust | ⬜ | Alternate SNES core |
 | VB | Mednafen VB | ⬜ | — |
 | VIC | VICE xvic | ⬜ | — |
-
-## Open investigations
-
-1. **FBNeo error recovery (RC must-fix; beta1 known issue):** with BIOS = pass.
-   Missing-BIOS still hard-locks MinArch completely. Determine why the core/error
-   path never returns control (menu/exit dead) and fix recovery without requiring a
-   power cycle. Ship beta1 with release-note callout; do not tag RC until fixed.
-2. **~~MD Auto CPU behavior~~ Fixed (2026-07-20):** former slowdown when Auto settled
-   near 480 MHz with some render settings is resolved; MD is green in the matrix.
-3. Expand the table across RG40XXV, RG28XX, RGcubexx, and other RG XX variants during
-   alpha testing, recording only device-specific differences once a core is known-good.

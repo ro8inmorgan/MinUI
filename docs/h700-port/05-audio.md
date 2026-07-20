@@ -1,15 +1,20 @@
 # 05 — Audio
 
-## Playback path (as shipped, tested ✅)
+This chapter records the H700 audio architecture, decisions, and diagnostic evidence.
+The maintained test report is [08 — Testing status](08-testing-status.md); release
+criteria and deferred work are in [09 — Roadmap](09-roadmap.md).
+
+## Playback architecture
 
 `SND_init` (shared `api.c`) → SDL audio → **ALSA backend → card 0 `audiocodec`**.
 `SDL_AUDIODRIVER=alsa` exported by launch.sh. GBA/SNES/PS1 run full speed with clean
-audio, no underruns, on RG40XXV; RG34XXSP behaves the same in user testing.
+audio and no underruns in H700 bring-up observations; see the testing report for the
+current device coverage.
 
 ```
 card 0: audiocodec   ← speaker / lineout / headphone (the one we use)
 card 1: ahubdam
-card 2: ahubhdmi     ← HDMI audio (unused until HDMI out lands)
+card 2: ahubhdmi     ← HDMI audio
 ```
 
 ## The dlopen'd-ALSA fix (the port's hardest bug — full story)
@@ -32,29 +37,29 @@ version. The bundled libasound copy was removed. Only `libtinyalsa` (used direct
 libmsettings) is bundled. Lesson generalized in 01: prefer dlopen over cross-linking
 for libraries that exist on the target.
 
-## Volume / mute (libmsettings — details in 03)
+## Volume and mute behavior (libmsettings — details in 03)
 
 - Master: `digital volume`, a 0–63 **attenuator with a reversed scale** — code writes
   `100 - val` percent. Confirmed correct by listening; the control's TLV metadata is
   garbage, so don't trust `amixer` ranges here. `lineout volume` secondary.
 - Mute: `SPK` switch off + saved/restored volume (H700 has no
-  `/sys/class/speaker/mute`). Mute toggle enabled for h700 in settings. Tested ✅.
-- Validation: no known issues on RG40XXV or RG34XXSP. The volume UI behaves correctly,
-  and audible levels are as expected across the full range from mute through 100%.
+  `/sys/class/speaker/mute`). The settings application enables the mute toggle.
+- Bring-up evidence: on RG40XXV and RG34XXSP, the volume UI and audible level range
+  behaved as intended from mute through 100%.
 - Suspend: the `suspend` script saves the full mixer state (`alsactl store`) in
-  `before()` and **restores it in `after()`** on resume (an early version had the
-  restore commented out; it's live now).
+  `before()` and **restores it in `after_sync()`** on resume (an early version had
+  the restore commented out; it's live now).
 
-## Headphone jack — hardware auto-route works; software detection unused
+## Headphone jack routing and detection
 
-**Hardware (tested):** plugging headphones auto-mutes the speaker and routes audio
-to the jack with no NextUI involvement. Functional audio is correct.
+**Hardware behavior:** plugging headphones auto-mutes the speaker and routes audio
+to the jack with no NextUI involvement.
 
 **Software:** Brick-style `SetJack` / separate speaker vs headphones volume / HP
 volume icon are **not** wired on h700 — `keymon` never monitors a jack event, so
 `GetJack()` stays 0 and the volume UI keeps the speaker path. That is cosmetic /
-dual-volume polish only; routing does not depend on it. Optional follow-up if a
-HP icon or independent HP volume is wanted later. (`jack_state` sysfs was
+dual-volume behavior only; routing does not depend on it. The HP-icon/independent-
+volume enhancement is classified in 09. (`jack_state` sysfs was
 historically always 0 and was never needed once hardware auto-mute was confirmed.)
 
 ## Bluetooth audio — stock-first A2DP enabled
@@ -66,8 +71,9 @@ registers two SBC source endpoints below `/org/bluez/hci0`.
 
 H700 now follows the tg5040 lifecycle with a stock-only implementation:
 - `bt_init.sh` starts BlueALSA only after `hci0` and stock BlueZ are ready, waits for
-  its D-Bus name, enables native A2DP volume, initializes the remote transport at a
-  nonzero volume, and logs useful startup failures
+  its D-Bus name, uses BlueALSA's default volume mode with `--initial-volume=100`,
+  and logs useful startup failures. It deliberately omits `--a2dp-volume`, which can
+  leave AirPods at absolute volume zero on this firmware
 - `/usr/bin/bluealsa`, the ALSA PCM/control plugins, SBC runtime, ALSA configuration,
   and BlueZ all come from the stock firmware; none are bundled or replaced
 - settings exposes the existing maximum-sampling-rate control (the H700-specific
@@ -79,23 +85,27 @@ H700 now follows the tg5040 lifecycle with a stock-only implementation:
 - disabling Bluetooth stops BlueALSA before BlueZ; no `bluetoothd`, `bluetoothctl`,
   or other BlueZ component is bundled or replaced
 
-**Earlier validation (RG40XXV):** AirPods 4 ANC pairing, A2DP connection, automatic
-internal-speaker muting/restoration, SBC transport, and user-audible game audio passed.
+### Evidence and observed behavior
+
+**RG40XXV / AirPods 4 ANC:** pairing, remembered pairing,
+manual connection, A2DP routing, SBC transport, and user-audible game audio pass.
+Putting the AirPods back in their case disconnects them and restores audio to the
+internal speaker as expected.
 The original silent stream was not a 44.1/48 kHz problem: BlueZ created the AirPods
 transport with absolute volume zero. Setting its `MediaTransport1.Volume` to 127 made
-the already-running stream audible. The shipped daemon flags now initialize that value
-natively. An A2DP PCM publication race was also observed during an artificial daemon
+the already-running stream audible. The shipped path instead starts BlueALSA with an
+initial mixer volume and has libmsettings update the connected A2DP mixer control.
+An A2DP PCM publication race was also observed during an artificial daemon
 restart while the device remained logically connected; it is not handled by an
 H700-only shared-code workaround unless a normal connection flow reproduces it.
 
-**Lifecycle remainder blocked (2026-07-20):** auto reconnect, menu/game and game/game
-switching, five suspend/resume cycles, case/disconnect speaker-restore revalidation,
-and Settings sample-rate change+persist were never completed. Revalidation is blocked
-because BT powers on but scans no devices and cannot pair on **both stock OS and
-BaseOS** — a device/firmware environment failure, not a NextUI-only regression.
-Resume the full matrix once discovery works again. Firmware without a runnable stock
-BlueALSA is logged as controller-only rather than augmented with another userspace
-stack; see 09-roadmap.
+### Connection policy and operating limits
+
+AirPods auto-connect is intentionally outside NextUI's control: they commonly connect
+to a nearby paired iPhone or Mac instead. NextUI retains the pairing and provides the
+reliable manual Connect path. If the stock firmware lacks runnable BlueALSA, the
+device remains controller-only rather than receiving a replacement Bluetooth audio
+stack from NextUI.
 
 ## Sample rates
 

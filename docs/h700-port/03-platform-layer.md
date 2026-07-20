@@ -1,5 +1,9 @@
 # 03 — Platform Layer (`workspace/h700/`)
 
+Reference map for the platform API, device detection, input architecture, settings
+backend, and H700-specific tools. Evidence is indexed in [08](08-testing-status.md)
+and release classification in [09](09-roadmap.md).
+
 Strategy, as planned and executed: **clone `workspace/tg5040/`**, keep the
 `generic_video.c`/`generic_wifi.c`/`generic_bt.c` includes and the current `PLAT_*` API
 surface, repoint hardware access to the H700 paths (00), borrowing only hardware
@@ -30,36 +34,37 @@ model string). No H700 Anbernic device has an Fn switch. Exact `RGXX_MODEL` stri
 still unconfirmed for the RG35xx family and RG40xxH (same caveat as msettings'
 displaycal presets).
 
-The Input pak intentionally visualizes digital button/click state only. It detects
-stick availability and draws L3/R3, but `minput.c` has no rendering path for analog
-axis movement; RG34XXSP showing working L3/R3 without moving-stick graphics is expected
-and is not an H700 regression.
+The Input pak uses the per-device capability flags to show only the sticks that exist,
+including their analog axis movement and L3/R3 click state. This is verified on the
+single-stick RG40XXV and dual-stick RG34XXSP: movement is visualized correctly for the
+left stick on RG40XXV and for both sticks on RG34XXSP.
 
 ## platform.h (as shipped)
 
 ```c
 extern int is_rg28xx, is_rg34xx, is_cube;
+extern int hdmi_active;
 extern int dev_has_lstick, dev_has_rstick;
 
+#define HDMI_WIDTH   1280
+#define HDMI_HEIGHT  720
 #define FIXED_SCALE   2
-#define FIXED_WIDTH   (is_cube?720:(is_rg34xx?720:640))
-#define FIXED_HEIGHT  (is_cube?720:480)
+#define FIXED_WIDTH   (hdmi_active?HDMI_WIDTH:(is_cube?720:(is_rg34xx?720:640)))
+#define FIXED_HEIGHT  (hdmi_active?HDMI_HEIGHT:(is_cube?720:480))
 #define FIXED_BPP     2
 #define SCREEN_FPS    60.0            // ⚠ assumed, never measured per panel
 #define SDCARD_PATH   "/mnt/SDCARD"   // symlink to the real TF2 mountpoint (02)
 #define MAX_LIGHTS    0               // no RGB LEDs on RG XX (work_led is on/off only)
-#define MAIN_ROW_COUNT (is_cube?8:6)  // 480px-tall screens fit 6 rows
+#define MAIN_ROW_COUNT (hdmi_active?10:(is_cube?8:6))
 ```
 
 ## Input — dual path, evdev primary (deviation from plan)
 
 The plan preferred the tg5040-style pure-SDL-joystick route. **Shipped: raw evdev is
 the primary path for built-in controls**, with SDL joystick as a secondary path for
-Bluetooth controllers. Reasons discovered during bring-up:
-- SDL joystick enumeration of the built-in pad is unreliable on the stock image
-  (udev interplay); SDL is built without udev and `SDL_JOYSTICK_DISABLE_UDEV=1` is
-  exported — that fixed startup hangs but made js enumeration of gpio-keys flaky.
-  Root cause found later (2026-07-09, Files-app freeze): the SDL fork's Batocera
+external controllers. Reasons discovered during bring-up:
+- SDL is built without udev and `SDL_JOYSTICK_DISABLE_UDEV=1` is exported. During
+  bring-up the built-in pad did not enumerate because the SDL fork's Batocera
   patches deleted the joystick heuristic in `SDL_EVDEV_GuessDeviceClass()`, so the
   no-udev fallback path never classified any device as a joystick. Fixed by
   `workspace/h700/patches/sdl2-h700.patch` (see 01); SDL joystick enumeration of
@@ -94,7 +99,7 @@ Verified mappings (also recorded in 00):
   shortcuts overlay into brightness mode. Fix: `button_from_code()` no longer maps
   `CODE_MENU_ALT` to `BTN_MENU` (keymon likewise ignores it); tap-vs-hold is derived
   from the clean 312 timing. The SDL path was never affected (`JOY_MENU_ALT = JOY_NA`).
-- Analog sticks: ABS_Z/RX/RY/RZ, raw 0..4096, scaled ×32767/4096. Presence varies
+- Analog sticks: ABS_Z/RX/RY/RZ; signed values are scaled ×32767/4096. Presence varies
   per model (see the stick matrix above); `dev_has_lstick`/`dev_has_rstick` gate
   CODE_L3/R3, JOY_L3/R3, and AXIS_LX/LY/RX/RY to NA where the stick is absent, so
   the Input pak and shared input code adapt without platform-independent changes.
@@ -120,23 +125,23 @@ open/closed per poll and could drop the wake press between polls.
 | Subsystem | Implementation |
 |---|---|
 | Video | `#include "generic_video.c"` — custom SDL2 mali driver does the rest (04) |
-| Battery | `axp2202-battery/capacity` + `axp2202-usb/online`, coarse bucketing in shared code — identical to tg5040 |
-| CPU speed | `governor.sh` via `system()`: auto=schedutil, performance=max 1512000, powersave=conservative capped mid-range. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
+| Battery | `axp2202-battery/capacity` + `axp2202-usb/online`, with coarse bucketing in shared code. Unlike tg5040, H700 charging detection uses `online` alone |
+| CPU speed | `governor.sh` via `system()`: auto=schedutil at the second-highest advertised frequency, performance at the greatest advertised frequency, powersave=conservative capped mid-range. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
 | CPU temp | thermal_zone0 |
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
 | GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
 | LEDs | `MAX_LIGHTS 0`, all `PLAT_setLed*` stubs — hardware has no RGB LEDs. `work_led` used only as sleep/backlight indicator |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
-| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP: POWER can wake light sleep with lid closed; deep sleep re-sleeps if lid still closed — accepted beta policy (06). |
-| Model | `PLAT_getModel` → "Anbernic " + `RGXX_MODEL` (copied into a static buffer, not a raw getenv pointer) |
-| Date/time | `timedatectl` / `hwclock` / `date` via snprintf-bounded commands; timezones via `timedatectl set-timezone`/`list-timezones`, NTP via `set-ntp` (systemd-timesyncd) — much cleaner than tg5040's uci |
+| Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP: POWER can wake light sleep with lid closed; deep sleep re-sleeps if the lid remains closed (06). |
+| Model | `PLAT_getModel` copies the raw `RGXX_MODEL` into a static buffer; when unavailable it returns `Anbernic RG XX` |
+| Date/time | `timedatectl` / `hwclock` / `date` via snprintf-bounded commands; timezone choices are parsed from `/usr/share/zoneinfo/zone.tab`, setting uses `timedatectl set-timezone`, and NTP uses `set-ntp` (systemd-timesyncd) |
 | Turbo | `PLAT_canTurbo()=false`, no-ops (tg5040's turbo rides trimui_inputd; no H700 equivalent wired) |
 | Deep sleep | `PLAT_supportsDeepSleep()=1`; `suspend` script wraps `echo mem` (06) |
 | Sample rate | tg5040 logic; consults `PLAT_bluetoothConnected()` only — calling `GetAudioSink()` here segfaulted minarch pre-`InitSettings()` (shm not yet mapped) |
 | WiFi/BT | generic_wifi.c / generic_bt.c + init scripts (07) |
 
-## libmsettings (`workspace/h700/libmsettings/msettings.c`, ~1300 lines)
+## libmsettings (`workspace/h700/libmsettings/msettings.c`, ~1600 lines)
 
 - **Brightness**: `/dev/disp` ioctl `DISP_LCD_SET_BRIGHTNESS (0x102)`, args
   `{0, raw, 0, 0}`; level curve `0→4, 1→6, 2→10, 3→16, 4→32, 5→48, 6→64, 7→96,
@@ -152,7 +157,7 @@ open/closed per poll and could drop the wake press between polls.
 - **Color temperature**: `/sys/class/disp/disp/attr/color_temperature` — works
   (tested ✅). The sibling `enhance_contrast` / `enhance_saturation` /
   `enhance_bright` attrs are also written, **but have no visible effect on RG XX
-  panels** — those settings are gated off for h700 (09-roadmap #8). All
+  panels** — those settings are gated off for h700 (04). All
   `scale*()` switches carry `default:` cases (a draft could hit uninitialized
   values on out-of-range input).
 - **DisplayCal**: same gamma-LUT ioctls as tg5040 (0x10b/0x10c/0x10d) — worked 1:1 as
@@ -162,7 +167,8 @@ open/closed per poll and could drop the wake press between polls.
   `SetHDMI()` switches disp0, framebuffer/layer geometry, and the ALSA route. Menu,
   game, audio, and in-game hotplug in both directions pass on RG40XXV (04).
 - **Jack detection**: not wired (path exists but historically dead — 00).
-- Debug printfs were stripped/commented for release; remaining prints are error paths.
+- Debug printfs were stripped/commented from the runtime path; remaining prints are
+  error paths.
 
 ## keymon (`workspace/h700/keymon/keymon.c`)
 
@@ -176,8 +182,35 @@ code 312 only — the synthetic 354 post-tap pulse is ignored (see MENU quirk ab
 tg5040's list verbatim — the full 28-core set builds and ships (same aarch64/a53
 target), with the picodrive LTO/patch-hygiene fixes noted in 01.
 
+## Shared-code integration surface
+
+Most H700 code is platform-local, but these shared areas knowingly carry H700
+integration. Review them when rebasing or adding another platform:
+
+- `workspace/all/common/generic_video.c` fails fast on SDL/window/GL initialization
+  errors instead of continuing into a black screen.
+- `workspace/all/common/api.c` / `api.h` expose `PWR_requestSleep()` for lid-driven
+  sleep and close audio with `SND_quit()` before suspend.
+- `workspace/all/audiomon/audiomon.cpp` checks BlueALSA availability; its Makefile
+  gives H700 the compile-time omission for the unsupported `delay 0` option.
+- `workspace/all/minarch/makefile` includes H700 in the tg5040-class RA/CHD/SRM/
+  sample-rate feature filters.
+- `workspace/all/settings/settings.cpp`, `btmenu.*`, and the settings Makefile carry
+  the Anbernic vendor/model capabilities and stock-Bluetooth-audio integration.
+- `workspace/all/syncsettings/syncsettings.c` restores the display settings and gamma
+  LUT after suspend.
+- `workspace/all/bootlogo/bootlogo.c` contains the diagnostic empty-state handling
+  and the optional `BOOTLOGO_PREVIEW_ROTATE_CW` hook used by RG28XX.
+- Root/workspace makefiles register the H700 platform, tg5040-image reuse, rfkill,
+  and the H700 Bootlogo build.
+
+Any change in this surface requires the H700 build plus the tg5040 regression build
+recorded as BUILD-01 and BUILD-02 in 08. A new shared button or `PLAT_*` hook must be
+defined on every platform; a full build is required because single-pak builds omit
+some translation units.
+
 ## What disappeared vs tg5040 (as planned)
-- `btmanager/` (BlueZ-upgrade pakz — H700 Ubuntu has BlueZ 5.64)
+- `btmanager/` (BlueZ-upgrade pakz — H700 uses firmware-provided BlueZ)
 - `poweroff_next/`, `reboot_next` (systemd poweroff/reboot work fine)
 - LED animation wiring (`led_anim`), ledcontrol.elf (gated to tg50x0 in `workspace/makefile`)
   — bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`

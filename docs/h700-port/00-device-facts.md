@@ -1,6 +1,8 @@
 # 00 — Device & OS Facts
 
-Ground truth for the H700 platform. Everything here was verified live on hardware
+Ground truth and probe notebook for the H700 platform. Current pass/fail results live
+in [08](08-testing-status.md); release decisions live in [09](09-roadmap.md).
+Everything here was verified live on hardware
 over SSH (probed 2026-07-08, corrections folded in from the implementation/review
 cycle through 2026-07-10) or recovered from git history. Re-run the probes after any
 Anbernic stock-firmware update — paths have historically been stable, but the
@@ -11,9 +13,9 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 | Device | Evidence | Role |
 |---|---|---|
 | TrimUI Brick (TG5040, A133P) | Probed live | Reference — NextUI runs perfectly |
-| Anbernic RG40XXV (H700) | Probed live | Port target #1 (was running stockmod) — **primary tested device** |
-| Anbernic RG34XXSP (H700) | User-tested | Port target #2 (clamshell, lid sensor) — strong 720×480/UI parity; core and lid edge cases tracked in 08 |
-| Anbernic RG28XX (H700) | User-tested | Port target #3 (rotated 480×640 panel) — rotation, game scaling, and bootlogo validated 2026-07-12 |
+| Anbernic RG40XXV (H700) | Probed live | 640×480, one stick, HDMI; primary probe device |
+| Anbernic RG34XXSP (H700) | User-tested | 720×480, dual sticks, clamshell lid sensor |
+| Anbernic RG28XX (H700) | User-tested | Rotated 480×640 panel |
 
 ## RG40XXV (H700) — probed live
 
@@ -63,8 +65,9 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   0.9 API and clamped the codec to 192 kHz while SDL believed 32.768 kHz → sliced/glitchy
   audio. Fix: build SDL2 with `--enable-alsa-shared` so it **dlopens** the device libasound
   (dlsym picks the default/new-API symbols). See 05.
-- Headphone jack: `snd_soc_sunxi_component_jack/parameters/jack_state` existed on the old
-  port and was "always 0"; **still unverified on 2026 firmware** — jack detection is not wired.
+- Headphone jack: the codec/hardware auto-mutes the speaker and routes audio without
+  NextUI. The old `snd_soc_sunxi_component_jack/parameters/jack_state` software path
+  was historically always 0 and remains unused; see 05.
 
 ### Input
 - `event0` — `axp2202-pek` (power button, PMIC). KEY_POWER = 116.
@@ -72,13 +75,15 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   - KEY bits: {1, 114, 115, 304–316, 354} — **no d-pad keycodes**; the d-pad is delivered
     as ABS_HAT0X/Y (the old port's UP 103 / DOWN 108 / LEFT 105 / RIGHT 106 codes do
     **not** appear on current firmware)
-  - ABS bits `0x3003c` = ABS_Z, ABS_RX, ABS_RY, ABS_RZ (analog sticks, raw 0..4096,
-    scale ×32767/4096) + ABS_HAT0X/Y (d-pad)
+  - ABS bits `0x3003c` = ABS_Z, ABS_RX, ABS_RY, ABS_RZ (analog sticks; H700 scales
+    the signed values by ×32767/4096) + ABS_HAT0X/Y (d-pad)
   - FF bits present (input-FF rumble is theoretically available; port uses `moto` sysfs instead)
 - `event2` — `dierct-keys-polled` (volume keys: PLUS 115, MINUS 114)
-- `/dev/input/js0` exists; **SDL joystick enumeration of the built-in pad is unreliable on
-  the stock image** (udev interplay) — the shipped port reads evdev directly for built-in
-  controls and keeps SDL joystick (with `SDL_JOYSTICK_DISABLE_UDEV=1`) for BT controllers.
+- `/dev/input/js0` exists. The in-tree SDL patch restores no-udev classification of
+  the built-in pad, but the H700 platform deliberately skips it as an SDL joystick:
+  raw evdev already supplies those events, and SDL's built-in ordering does not match
+  the external-pad `JOY_*` mapping. SDL joystick input remains enabled for external
+  controllers (`SDL_JOYSTICK_DISABLE_UDEV=1`).
 - Verified evdev button codes (event1): A 304, B 305, Y 306, X 307, L1 308, R1 309,
   SELECT 310, START 311, MENU 312, L3 313, L2 314, R2 315, R3 316,
   PLUS 115, MINUS 114.
@@ -90,8 +95,11 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   BTN_MENU** — doing so extends every tap past the 250 ms long-press threshold
   (tap misread as hold → brightness overlay instead of shortcuts). The extra
   KEY_ESC (code 1) capability bit has not been observed to fire.
-- SDL joystick indices for the built-in pad (secondary path): A=0 B=1 Y=2 X=3 L1=4 R1=5
-  SELECT=6 START=7 MENU=8, L3=9 L2=10 R2=11 R3=12, MINUS=15 PLUS=16; axes LX=0 LY=1 RX=2 RY=3.
+- After the no-udev classification patch, SDL orders the built-in pad by evdev key
+  code: ESC/VOL−/VOL+ occupy indices 0–2 and the gamepad cluster starts at A=3
+  through MENU=11. This ordering is diagnostic only; the runtime skips this SDL
+  device and reads it through evdev. The `JOY_*` constants in `platform.h` describe
+  the expected external-pad mapping, not the built-in pad.
 - `evtest` is available on the device for mapping discovery.
 
 ### Power / battery / sleep
@@ -99,9 +107,9 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 - `echo mem` suspend works; wake source is the **power button** (AXP2202 PEK).
   **RTC alarm wake does NOT fire** — no timed wake; don't build features on it.
   The shipped sleep/wake path is reliable in repeated RG40XXV/RG34XXSP testing,
-  including in-game resume and power-off auto-resume. RG34XXSP accepted policy: POWER
-  can wake light sleep while the lid is closed; deep sleep re-sleeps if the lid is
-  still closed (06). Charging intentionally prevents deep sleep in shared code.
+  including in-game resume and power-off auto-resume. On RG34XXSP, POWER can wake
+  light sleep while the lid is closed; deep sleep re-sleeps if the lid remains closed
+  (06). Charging intentionally prevents deep sleep in shared code.
 - PMIC: **AXP2202** — `/sys/class/power_supply/axp2202-battery/` and `axp2202-usb/`
 - Battery: `capacity`, `status`, `voltage_now`, `temp`, `time_to_empty_now`,
   `time_to_full_now`, `charge_counter`, `health`
@@ -113,7 +121,7 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — polarity verified
     (`1` = open); lid close sleeps and lid open wakes screen-off. Deep suspend still
     requires power. POWER can wake light sleep while closed; deep sleep re-sleeps if
-    lid still closed — accepted documented policy (06).
+    the lid remains closed (06).
   - `brightness`, `display_id` (panel variant id), `spk_state`, `mcu_esckey`, `nds_esckey`, `boot_mode`
 - `/sys/class/pwm/pwmchip0` exists (alternative rumble path; `moto` is simpler)
 
@@ -221,15 +229,7 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
   (SDL_Renderer compositing, 32-bit, pre-shader APIs) is obsolete. tg5040 was the code
   clone base.
 
-## Facts still unverified (need hardware/testing)
-1. ~~Why RG34XXSP power-key release wakes light sleep while `hallkey=0`~~ Accepted
-   as beta policy (2026-07-20): light sleep can wake on POWER with lid closed; deep
-   sleep re-sleeps if lid still closed. Optional later hardening (06).
-2. ~~RG28XX fb0 reporting `480x640` on current firmware, and the SDL rotation path
-   end-to-end.~~ Resolved 2026-07-12: SDL_ROTATION=1 rotates the whole GL frame at
-   the driver; app space is 640×480 landscape (`should_rotate` must stay 0 — 04).
-3. ~~Headphone jack detection on 2026 firmware~~ Resolved for beta: hardware
-   auto-mutes speaker and routes to HP without NextUI. Software `SetJack`/icon
-   path remains unwired (optional polish — 05).
-4. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
-5. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.
+## Known hardware unknowns
+
+1. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
+2. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.

@@ -1,9 +1,15 @@
 # 01 — Toolchain & Build System
 
+Build architecture, dependency decisions, and cross-toolchain lessons. Test results
+live in [08](08-testing-status.md); promotion requirements live in
+[09](09-roadmap.md).
+
 ## How the h700 build works
 
-`make PLATFORM=h700 all` builds like any other platform, with one twist: **there is no
-dedicated h700 toolchain image — the build runs inside the existing
+The CI-supported single-platform staging sequence is `make setup` followed by
+`make h700`. (`make all` builds every configured platform; adding `PLATFORM=h700`
+does not narrow it.) H700 has one build-system twist: **there is no dedicated h700
+toolchain image — the build runs inside the existing
 `ghcr.io/loveretro/tg5040-toolchain` image.** Same arch (aarch64/cortex-a53), same
 `-mcpu=cortex-a53` tuning, and the image's glibc (2.33) is older than the target's
 (Ubuntu 22.04, glibc 2.35) — forward-compatible by construction. This was empirically
@@ -11,7 +17,8 @@ validated before any code was written (a tg5040-built displaycal.elf ran unmodif
 RG40XXV stockmod and an RG34XXSP running Knulli) and has held up in production.
 
 Integration points:
-- Root `makefile`: `PLATFORMS = tg5050 tg5040 h700`; `make shell` passes
+- Root `makefile`: `PLATFORMS = tg5050 tg5040 h700`; the `make h700` dispatcher runs
+  the full `common` staging target for H700, while `make shell` passes
   `PLATFORM=$(PLATFORM)` through (and `makefile.toolchain` injects
   `-e PLATFORM -e UNION_PLATFORM` into the container).
 - `makefile.toolchain`: maps h700 → the tg5040 image.
@@ -105,26 +112,30 @@ future stock-OS port:
    must be added to those filter lists or minarch silently builds featureless (or not
    at all).
 
-## Dedicated `h700-toolchain` image: still deferred, deliberately
+## Decision: reuse the tg5040 image instead of a dedicated H700 image
 
 The reuse costs above are all *solved*, and the SDL2 build is pinned and cached. A thin
 image `FROM tg5040-toolchain` pre-baking SDL2 + a jammy-matched libasound would remove
 pitfall classes 1–3 structurally and speed CI — worth doing if the platform accumulates
 more external deps. Bluetooth audio uses the stock H700 BlueALSA daemon, ALSA plugins,
-SBC runtime, and BlueZ without copying them from the shared toolchain (see
-05/07/09-roadmap).
+SBC runtime, and BlueZ without copying them from the shared toolchain (see 05 and 07;
+09 classifies the release implications).
 
 ## Build outputs
 
-`make PLATFORM=h700 all` produces in `build/`:
-- `.system/h700/bin/*` — nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf,
+After `make setup && make h700`, the staging tree contains:
+- `build/SYSTEM/h700/bin/*` — nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf,
   gametimectl.elf, syncsettings.elf, nextval.elf, show2.elf, settings.elf, clock, …
   (tg5040 list minus ledcontrol, which is gated to tg50x0; bootlogo.elf builds for
   h700 too and ships in `EXTRAS/Tools/h700/Bootlogo.pak`) plus `rfkill`
   (h700 builds its own minimal `/dev/rfkill` ioctl tool — stock rfkill may be absent)
-- `.system/h700/lib/` — libmsettings.so, libbatmondb.so, libgametimedb.so, …
+- `build/SYSTEM/h700/lib/` — libmsettings.so, libbatmondb.so, libgametimedb.so, …
   plus the bundled SDL2/tinyalsa/libpng12 set above
-- `.system/h700/cores/*.so` — full tg5040-parity core list
-- `.system/h700/shaders/` — tg5040 `.glsl` set (ES 3.0, portable)
-- `.tmp_update/h700.sh` (installer), `h700/dmenu.bin` (boot shim — see 02),
+- `build/SYSTEM/h700/cores/*.so` — full tg5040-parity core list
+- `build/SYSTEM/h700/shaders/` — tg5040 `.glsl` set (ES 3.0, portable)
+- `build/BOOT/common/h700.sh` (installer), `build/BASE/h700/dmenu.bin` (boot shim — see 02),
   NextCommander built via `patches/NextCommander-h700.patch`
+
+The later `make special && make package` steps rename `build/SYSTEM` to
+`build/PAYLOAD/.system`, move the updater tree to `.tmp_update`, and create the
+release archives.

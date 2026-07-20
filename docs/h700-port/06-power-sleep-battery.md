@@ -1,6 +1,12 @@
 # 06 — Power, Sleep, Battery, Lid
 
-## ✅ Sleep/wake fixed (2026-07-09, verified on RG34XXSP and RG40XXV)
+This is the H700 power-management knowledge base: platform behavior, implementation
+decisions, incident analysis, and diagnostic leads. The current test evidence and
+device results are in [08-testing-status.md](08-testing-status.md#power-sleep-and-battery);
+stage requirements and accepted product behavior are in
+[09-roadmap.md](09-roadmap.md).
+
+## Sleep/wake incident and resolution (2026-07-09)
 
 The former "#1 open defect" turned out to be four separate bugs, all found and fixed:
 
@@ -30,22 +36,17 @@ The former "#1 open defect" turned out to be four separate bugs, all found and f
    (wifi/bt/hooks). Measured wake-to-responsive: ~0.5–1.2 s (audio reinit 150–200 ms,
    formerly 9–10 s).
 
-Verified by physical testing on RG34XXSP (stockmod OS) and re-tested on RG40XXV:
-repeated power-tap sleep/wake cycles, screen-off → suspend two-stage escalation with
-10 s/10 s timers, suspend → power-key wake, lid-close → sleep, and state restore
-(display settings, WiFi reconnect). In-game sleep/resume and in-game power-off →
-power-on → automatic resume of the running game are also verified. Long-press
-power-off is unaffected. Two RG34XXSP edge cases were found on 2026-07-10: a power-key
-release can wake light sleep even while the lid remains closed (accepted beta
-policy — deep sleep re-sleeps if lid still closed; see Lid below), and charging
-keeps the device in light sleep rather than deep suspend (also accepted policy).
+Physical evidence for the resolved paths—including repeated cycles, autosleep,
+in-game resume, lid handling, and state restoration—is recorded in POWER-01 through
+POWER-04 of the [test report](08-testing-status.md#power-sleep-and-battery). The
+implementation leaves long-press power-off unchanged.
 
 Stockmod/logind interference was ruled out: `HandlePowerKey=ignore` is in place (our
 launch.sh drop-in), stockmod's `pwr_new.sh` is not running under NextUI, and no evdev
 device exposes a lid switch (`sw=0` everywhere) — the hall sensor exists *only* as the
 AXP2202 `hallkey` sysfs node that our code polls, so nothing else can react to it.
 
-## Verified hardware facts (00 has the full list)
+## Hardware facts (00 has the full list)
 
 - `/sys/power/state` = `freeze mem`; `echo mem` suspend works
 - Wake source: **power button only** (AXP2202 PEK). RTC alarm wake does not fire.
@@ -73,9 +74,10 @@ Two layers, as on tg5040:
    - `after_async()` (backgrounded, `&`): restart wifi/bt services, then
      `post-resume.d` hooks — takes ~5 s and must not delay the script's exit or
      the caller's input handling freezes for that long.
-   - systemd is bypassed on purpose (direct sysfs write); launch.sh installs a logind
-     drop-in (`HandlePowerKey=ignore`, `HandlePowerKeyLongPress=ignore`) and restarts
-     logind so systemd never handles the power key (02)
+   - systemd is bypassed on purpose (direct sysfs write); when logind is present,
+     launch.sh best-effort installs a drop-in (`HandlePowerKey=ignore`,
+     `HandlePowerKeyLongPress=ignore`) and restarts logind so it does not handle the
+     power key (02)
 
 ### Wake & autosleep
 - `PLAT_shouldWake`: power-key (code 116) read from a persistent non-blocking fd on
@@ -83,7 +85,7 @@ Two layers, as on tg5040:
   above); lid gate below. Generic autosleep (`PWR_*` in api.c: idle timeout, disabled
   while charging/HDMI) works unchanged on top.
 
-## Lid (RG34XXSP) — working with one wake-gate issue
+## Lid (RG34XXSP)
 
 `LID_PATH = axp2202-battery/hallkey`; `PLAT_initLid` sets `has_lid` if the file exists
 (absent on RG40XXV). Polarity verified on hardware: 1 = open. Lid close →
@@ -94,34 +96,34 @@ sensor is not a kernel wake source — same as stock firmware, considered desira
 The intended software behavior is to ignore power while the lid is closed, and
 `PLAT_shouldWake()` has that gate. Hardware: POWER can still wake **light** sleep
 while the lid is closed. In **deep** sleep, if POWER briefly wakes the unit and the
-lid is still closed, the unit returns to sleep. **Accepted as documented beta
-policy** (2026-07-20) — not a release blocker. Optional later hardening if a
-stricter closed-lid gate for light sleep is desired.
+lid is still closed, the unit returns to sleep. Its lifecycle disposition is in the
+[roadmap](09-roadmap.md#accepted-behavior-and-non-gates).
 
 ## Battery
 
-- `PLAT_getBatteryStatus`: `axp2202-battery/capacity` + `axp2202-usb/online`, coarse
-  bucketing in shared code — same paths as tg5040, copied verbatim. Charging detection
-  and the UI indicator work on RG34XXSP; percentage accuracy vs stock passes on
-  RG34XXSP. After a ~9 h sleep/wake cycle the top-right battery icon and the Battery
-  pak were out of sync with each other (fresh boot keeps them aligned) — the reported
-  level itself is fine, but the two UI consumers of battery state need a hardening
-  look later (likely a stale cache / poll gap after long suspend).
+- `PLAT_getBatteryStatus`: `axp2202-battery/capacity` + `axp2202-usb/online`, with
+  coarse bucketing in shared code. H700 uses the USB `online` value directly; unlike
+  tg5040 it does not also require a positive `time_to_full_now`. The recorded
+  RG34XXSP evidence is in POWER-04 and POWER-05. One long-suspend observation found the
+  top-right battery icon and Battery pak temporarily out of sync, despite a sensible
+  reported level after a fresh boot. Investigate a stale cache or polling gap after
+  long suspend.
 - **Not supported:** “Keep awake over USB” (upstream #783). `PLAT_isUSBConnected()` is
   a stub returning 0; the Settings toggle remains tg5040-only. Charging already blocks
   deep sleep via `is_charging`; gadget/data keep-awake is not implemented.
 - While charging, lid or power sleep reaches screen-off/light sleep only. This matches
   shared `PWR_waitForWake()` behavior: the charging check deliberately skips
-  `PWR_deepSleep()` and checks again a minute later. **Accepted as documented beta
-  policy** (2026-07-20) — same shared product choice as other platforms; not a failed
-  suspend attempt and not an H700-specific override.
+  `PWR_deepSleep()` and checks again a minute later. It is a shared product behavior,
+  not a failed suspend attempt or an H700-specific override; see POWER-04 and the
+  [roadmap](09-roadmap.md#accepted-behavior-and-non-gates).
 - Richer metrics (`time_to_empty_now`, `voltage_now`, `temp`, `charge_counter`) are
   available for future batmon extensions; not wired.
-- Standby drain: first RG34XXSP data point — ~8.5 h deep sleep dropped capacity
-  40% → 33% (~7%). Higher than the aspirational ≤ stock + ~1% over 8 h target, but
-  capacity % is coarse (and the icon/Battery-pak desync after long sleep may muddy
-  the reading). Re-test with `axp2202-battery/voltage_now` before/after, and run the
-  same interval on stock OS for a true baseline, before calling this pass or fail.
+- Standby-drain investigation: the first RG34XXSP observation was a capacity change
+  from 40% to 33% over about 8.5 hours of deep sleep. Capacity is coarse, and the UI
+  desynchronization above may muddy the observation. Re-test with
+  `axp2202-battery/voltage_now` before/after and run the same interval on stock OS
+  for a baseline. POWER-06 records the evidence; the follow-up is tracked in the
+  [roadmap](09-roadmap.md#future-hardening).
 
 ## Power off / reboot
 
@@ -132,9 +134,11 @@ by u-boot/stock before our hijack, untouched.
 
 ## CPU governor
 
-`governor.sh`: auto=`schedutil`, performance=`performance` @1512000,
-powersave=`conservative` capped mid-range. Menu vs in-game profiles ride the shared
-settings; performance is forced during game launch. Manual in-game changes are clean.
+`governor.sh` reads the available frequency list: auto=`schedutil` at the
+second-highest advertised frequency, performance=`performance` at the greatest
+advertised frequency, and powersave=`conservative` capped mid-range. Menu vs in-game
+profiles ride the shared settings; performance is forced during game launch. Manual
+in-game changes are clean.
 ~~RG34XXSP MD Auto CPU slowdown~~ Fixed (user-verified 2026-07-20): earlier, some
 shader/scale combos left Auto near 480 MHz and felt slow; that no longer reproduces.
 Manual powersave/performance were already smooth. Single cluster → no core pinning.
