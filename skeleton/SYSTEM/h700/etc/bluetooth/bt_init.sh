@@ -10,6 +10,7 @@ fi
 DEVICE_NAME="Anbernic ${RGXX_MODEL:-RG XX} (NextUI)"
 VENDOR_BT_SCRIPT="/mnt/vendor/ctrl/setBluetooth.sh"
 BTCTL="/usr/bin/bluetoothctl"
+BTCTL_TIMEOUT=5
 BLUEALSA="/usr/bin/bluealsa"
 HCI_PATH="/sys/class/bluetooth/hci0"
 VENDOR_LOCK="/tmp/.init_bt"
@@ -70,6 +71,14 @@ block_bt() {
 		rfkill.elf block bluetooth >> "$LOG_FILE" 2>&1 || true
 	else
 		rfkill block bluetooth >> "$LOG_FILE" 2>&1 || true
+	fi
+}
+
+run_btctl_bounded() {
+	if command -v timeout >/dev/null 2>&1; then
+		timeout "$BTCTL_TIMEOUT" "$BTCTL" "$@"
+	else
+		"$BTCTL" "$@"
 	fi
 }
 
@@ -286,9 +295,18 @@ start_bt() {
 stop_bt() {
 	log "Stopping Bluetooth"
 
-	if [ -x "$BTCTL" ]; then
-		"$BTCTL" scan off >> "$LOG_FILE" 2>&1 || true
-		"$BTCTL" power off >> "$LOG_FILE" 2>&1 || true
+	# Settings may still have discovery clients running while the toggle is being
+	# changed. Clear them before teardown so they cannot hold open a stale D-Bus
+	# request after BlueZ exits.
+	killall bluetoothctl 2>/dev/null || true
+
+	# BaseOS starts BlueZ on demand. When Bluetooth is already off, invoking
+	# bluetoothctl without bluetoothd can block forever and retain NEXTUI_LOCK,
+	# preventing the next start operation. Only ask a live daemon to stop scanning
+	# and power down, and bound both best-effort requests in case it is unhealthy.
+	if [ -x "$BTCTL" ] && pidof bluetoothd >/dev/null 2>&1; then
+		run_btctl_bounded scan off >> "$LOG_FILE" 2>&1 || true
+		run_btctl_bounded power off >> "$LOG_FILE" 2>&1 || true
 	fi
 	killall bluetoothctl 2>/dev/null || true
 
