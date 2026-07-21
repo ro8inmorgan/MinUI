@@ -8,27 +8,30 @@ live in [08](08-testing-status.md); promotion requirements live in
 
 The CI-supported single-platform staging sequence is `make setup` followed by
 `make h700`. (`make all` builds every configured platform; adding `PLATFORM=h700`
-does not narrow it.) H700 has one build-system twist: **there is no dedicated h700
-toolchain image — the build runs inside the existing
-`ghcr.io/loveretro/tg5040-toolchain` image.** Same arch (aarch64/cortex-a53), same
-`-mcpu=cortex-a53` tuning, and the image's glibc (2.33) is older than the target's
-(Ubuntu 22.04, glibc 2.35) — forward-compatible by construction. This was empirically
-validated before any code was written (a tg5040-built displaycal.elf ran unmodified on
-RG40XXV stockmod and an RG34XXSP running Knulli) and has held up in production.
+does not narrow it.) H700 builds inside the dedicated
+**`ghcr.io/loveretro/h700-toolchain`** image (`LoveRetro/h700-toolchain`). Same arch
+(aarch64/cortex-a53), same `-mcpu=cortex-a53` tuning, and the image's glibc (2.33,
+via the TG5040 SDK sysroot) is older than the target's (Ubuntu 22.04, glibc 2.35) —
+forward-compatible by construction. This was empirically validated early in the port
+(a cross-built displaycal.elf ran unmodified on RG40XXV stockmod and an RG34XXSP
+running Knulli) and has held up in production. The image is a sibling of
+`tg5040-toolchain` (same GCC 8.3 + SDK recipe) with its own GHCR lifecycle so H700
+no longer shares the tg5040 container tag.
 
 Integration points:
 - Root `makefile`: `PLATFORMS = tg5050 tg5040 h700`; the `make h700` dispatcher runs
   the full `common` staging target for H700, while `make shell` passes
   `PLATFORM=$(PLATFORM)` through (and `makefile.toolchain` injects
   `-e PLATFORM -e UNION_PLATFORM` into the container).
-- `makefile.toolchain`: maps h700 → the tg5040 image.
+- `makefile.toolchain`: `PLATFORM=h700` → clone `toolchains/h700-toolchain/`, image
+  `ghcr.io/loveretro/h700-toolchain:latest` (same pattern as tg5040/tg5050; no remap).
 - `workspace/h700/platform/makefile.env`: tg5040-derived flags (`-mcpu=cortex-a53`,
   `SDL = SDL2`, `GL = GLES`), with the in-tree SDL2 prefix first in include/lib order.
 - `workspace/h700/makefile`: platform-local `early` target builds the external deps
   (SDL2, below) before the apps.
 - The full tg5040 core list (28 cores + patches) builds unchanged — same arch, same tuning.
 
-### In-tree SDL2 (the one real gap in the shared image)
+### In-tree SDL2 (not yet prebaked in the image)
 On tg5040 the stock OS supplies runtime SDL2; on H700 we ship our own. The platform
 `early` target clones **`JohnnyonFlame/SDL-malifbdev-rot`**, **pinned to commit
 `d4a7d7503524cc469fe775242f3f925d4dd56c88`**, builds it aarch64 and installs into a local
@@ -74,10 +77,11 @@ indistinguishable from other A53 platforms. On Anbernic the normal boot path doe
 through `updater` (our dmenu.bin calls `.tmp_update/h700.sh` directly), but correct
 detection prevents mis-flash if a multi-platform card moves between devices.
 
-## Toolchain-reuse pitfalls (lessons for future platform ports)
+## Sysroot-mismatch pitfalls (lessons for future platform ports)
 
-Cross-building in a *sibling platform's* image against a *different* target rootfs
-works, but every failure below came from exactly that gap. Check these first on any
+H700 originally built inside the tg5040 image and still uses that SDK as the
+h700-toolchain sysroot. Cross-building against a *sibling platform's* rootfs works,
+but every failure below came from exactly that gap. Check these first on any
 future stock-OS port:
 
 1. **libasound symbol versioning → glitchy audio.** The tg5040 SDK's libasound has no
@@ -112,14 +116,18 @@ future stock-OS port:
    must be added to those filter lists or minarch silently builds featureless (or not
    at all).
 
-## Decision: reuse the tg5040 image instead of a dedicated H700 image
+## Decision: dedicated h700-toolchain (same SDK recipe for now)
 
-The reuse costs above are all *solved*, and the SDL2 build is pinned and cached. A thin
-image `FROM tg5040-toolchain` pre-baking SDL2 + a jammy-matched libasound would remove
-pitfall classes 1–3 structurally and speed CI — worth doing if the platform accumulates
-more external deps. Bluetooth audio uses the stock H700 BlueALSA daemon, ALSA plugins,
-SBC runtime, and BlueZ without copying them from the shared toolchain (see 05 and 07;
-09 classifies the release implications).
+The port first reused `tg5040-toolchain` in-process; the **pitfalls above are solved
+in NextUI** (dlopen ALSA, direct GLES link, bundled libpng12, in-tree SDL2). We now
+use a **dedicated** `h700-toolchain` image/repo so H700 builds do not share the
+tg5040 container lifecycle, while keeping the proven GCC 8.3 + TG5040 SDK sysroot.
+
+Still worth doing later inside `h700-toolchain` (not blocking): prebake the pinned
+mali-fbdev SDL2 into `PREFIX_LOCAL`, and optionally a jammy-matched libasound, to
+remove pitfall classes 1–3 structurally and speed CI. Bluetooth audio uses the stock
+H700 BlueALSA daemon, ALSA plugins, SBC runtime, and BlueZ without shipping them from
+the toolchain (see 05 and 07; 09 classifies the release implications).
 
 ## Build outputs
 

@@ -204,9 +204,10 @@ Consequences:
 | TG5040 | 4.9.191 | aarch64 | 2.33 |
 | H700 stock | 4.9.170 | aarch64 | **2.35** |
 
-tg5040-toolchain-built binaries (glibc ≤ 2.33, aarch64, cortex-a53) load and run on the
-H700 stock OS unmodified — proven in production by this port, which builds entirely
-inside the tg5040 image. No ABI wall. (Caveat discovered the hard way: libc compatibility
+h700-toolchain-built binaries (GCC 8.3, glibc ≤ 2.33 from the TG5040 SDK sysroot,
+aarch64, cortex-a53) load and run on the H700 stock OS unmodified — proven in
+production by this port (first via the shared tg5040 image, now via dedicated
+`h700-toolchain`). No ABI wall. (Caveat discovered the hard way: libc compatibility
 is not the whole story — see the libasound symbol-versioning and libpng12 pitfalls in 01.)
 
 ## Old rg35xxplus port — git archaeology summary

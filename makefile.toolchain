@@ -10,9 +10,6 @@ HOST_WORKSPACE=$(shell pwd)/workspace
 GUEST_WORKSPACE=/root/workspace
 
 TOOLCHAIN_NAME=$(PLATFORM)
-ifeq ($(PLATFORM),h700)
-TOOLCHAIN_NAME=tg5040
-endif
 
 GIT_IF_NECESSARY=toolchains/$(TOOLCHAIN_NAME)-toolchain
 INIT_IF_NECESSARY=toolchains/$(TOOLCHAIN_NAME)-toolchain/.build
