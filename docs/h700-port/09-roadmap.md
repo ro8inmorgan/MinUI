@@ -138,7 +138,7 @@ evidence turns one into a supported-baseline defect.
 |---|---|
 | Broader HDMI EDID/display compatibility | Stretch: fixed-mode HDMI already passes; add fallback modes when real displays require them |
 | Panel-Fix tool | Stretch feature |
-| Prebake SDL2 / jammy libasound into h700-toolchain | Follow-up: dedicated image ships (`h700-toolchain`); content specialization still optional |
+| Jammy-matched libasound / richer H700 sysroot | Optional: SDL2 already prebaked; BlueZ not in image |
 | Pak Store | Separate product scope; NET-04 is not exercised for this port |
 | OTA updates | Separate product scope; NET-05 is not exercised for this port |
 

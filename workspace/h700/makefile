@@ -15,25 +15,21 @@ REQUIRES_JSTEST=other/jstest
 REQUIRES_UNZIP60=other/unzip60
 REQUIRES_FILEMGR=other/NextCommander
 REQUIRES_SDL2=other/sdl2
-SDL2_COMMIT=d4a7d7503524cc469fe775242f3f925d4dd56c88
 FILEMGR_PATCH=patches/NextCommander-h700.patch
 FILEMGR_STAMP=.patched-h700-v3
-SDL2_PATCH=patches/sdl2-h700.patch
-SDL2_PATCH_STAMP=.patched-h700-v1
-SDL2_STAMP=.configured-nextui-h700-v3
 
 all: readmes
 
-early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR) $(REQUIRES_SDL2)
+# SDL2 (mali-fbdev, alsa-shared, joystick patch) is prebaked into h700-toolchain
+# at PREFIX_LOCAL. Stage it + SDK companion libs for packaging. Rebuild only via
+# the toolchain image (support/build-sdl2.sh); keep patches/sdl2-h700.patch in sync.
+early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR)
 	mkdir -p other
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart unzip
-	cd $(REQUIRES_SDL2) && ([ -f $(SDL2_PATCH_STAMP) ] || (git checkout -- src/core/linux/SDL_evdev_capabilities.c && git apply ../../$(SDL2_PATCH) && rm -f $(SDL2_STAMP) && touch $(SDL2_PATCH_STAMP)))
-	cd $(REQUIRES_SDL2) && ([ -f $(SDL2_STAMP) ] || ([ ! -f Makefile ] || make clean))
-	cd $(REQUIRES_SDL2) && ( [ -f configure ] || ./autogen.sh ) && ./configure --host=$(CROSS_TRIPLE) --prefix=$(PREFIX_LOCAL) --enable-video-mali --enable-alsa --enable-alsa-shared --enable-video-opengles --disable-video-opengl --disable-video-x11 --disable-video-wayland --disable-video-kmsdrm --disable-pulseaudio --disable-jack --disable-esd --disable-arts --disable-nas --disable-sndio --disable-dbus --disable-ibus --disable-fcitx --disable-hidapi --disable-libudev --disable-power --enable-filesystem --disable-sensor --disable-locale --enable-loadso --enable-shared --disable-static --disable-libsamplerate-shared && touch $(SDL2_STAMP)
-	grep -q '^#define SDL_VIDEO_DRIVER_MALI 1' $(REQUIRES_SDL2)/include/SDL_config.h
-	cd $(REQUIRES_SDL2) && make -j && make install
+	@test -e "$(PREFIX_LOCAL)/lib/libSDL2.so" -o -e "$(PREFIX_LOCAL)/lib/libSDL2-2.0.so.0" || \
+		(echo "error: prebaked SDL2 missing from PREFIX_LOCAL=$(PREFIX_LOCAL); use ghcr.io/loveretro/h700-toolchain" >&2; exit 1)
 	mkdir -p $(REQUIRES_SDL2)/output
 	cp -a $(PREFIX_LOCAL)/lib/libSDL2*.so* $(REQUIRES_SDL2)/output/
 	cp -a $(PREFIX)/lib/libSDL2_image*.so* $(REQUIRES_SDL2)/output/ 2>/dev/null || true
@@ -50,7 +46,7 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 clean:
 	cd $(REQUIRES_FILEMGR) && make clean PLATFORM=h700
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart clean
-	if [ -f $(REQUIRES_SDL2)/Makefile ]; then cd $(REQUIRES_SDL2) && make clean; fi
+	rm -rf $(REQUIRES_SDL2)/output
 	rm -rf boot/output
 
 ###########################################################
@@ -66,9 +62,5 @@ $(REQUIRES_JSTEST):
 
 $(REQUIRES_UNZIP60):
 	git clone --depth 1 https://github.com/shauninman/unzip60.git $(REQUIRES_UNZIP60)
-
-$(REQUIRES_SDL2):
-	git clone https://github.com/JohnnyonFlame/SDL-malifbdev-rot.git $(REQUIRES_SDL2)
-	cd $(REQUIRES_SDL2) && git checkout $(SDL2_COMMIT)
 
 include ../all/readmes/makefile

@@ -27,18 +27,22 @@ Integration points:
   `ghcr.io/loveretro/h700-toolchain:latest` (same pattern as tg5040/tg5050; no remap).
 - `workspace/h700/platform/makefile.env`: tg5040-derived flags (`-mcpu=cortex-a53`,
   `SDL = SDL2`, `GL = GLES`), with the in-tree SDL2 prefix first in include/lib order.
-- `workspace/h700/makefile`: platform-local `early` target builds the external deps
-  (SDL2, below) before the apps.
+- `workspace/h700/makefile`: platform-local `early` stages prebaked SDL2 from the
+  image and builds other deps (NextCommander, boot shim) before the apps.
 - The full tg5040 core list (28 cores + patches) builds unchanged — same arch, same tuning.
 
-### In-tree SDL2 (not yet prebaked in the image)
-On tg5040 the stock OS supplies runtime SDL2; on H700 we ship our own. The platform
-`early` target clones **`JohnnyonFlame/SDL-malifbdev-rot`**, **pinned to commit
-`d4a7d7503524cc469fe775242f3f925d4dd56c88`**, builds it aarch64 and installs into a local
-prefix that `makefile.env` puts first. Configure highlights (see `workspace/h700/makefile`):
+### Prebaked SDL2 (h700-toolchain `PREFIX_LOCAL`)
+On tg5040 the stock OS supplies runtime SDL2; on H700 we ship our own. The
+**h700-toolchain** image builds **`JohnnyonFlame/SDL-malifbdev-rot`** (commit
+`d4a7d7503524cc469fe775242f3f925d4dd56c88` + `support/sdl2-h700.patch`) into
+`PREFIX_LOCAL=/opt/nextui`. NextUI's `early` target only stages those libs (plus
+SDK `SDL2_image`/`ttf`, tinyalsa, libpng12) into `other/sdl2/output` for packaging.
+`makefile.env` still prefers `PREFIX_LOCAL` for includes/libs/pkg-config.
+
+Configure highlights (see `h700-toolchain/support/build-sdl2.sh`):
 
 - `--enable-video-mali --enable-video-opengles`, x11/wayland/kmsdrm disabled.
-  The makefile **asserts `#define SDL_VIDEO_DRIVER_MALI 1` in the generated
+  The build **asserts `#define SDL_VIDEO_DRIVER_MALI 1` in the generated
   `SDL_config.h`** right after configure — a silent fallback to the dummy driver
   produces a black screen much later, so fail fast here.
 - `--enable-alsa --enable-alsa-shared` — ALSA loaded via **dlopen at runtime**, not
@@ -47,14 +51,10 @@ prefix that `makefile.env` puts first. Configure highlights (see `workspace/h700
   and for alsa-shared/image-shared dlopen to work at all. (An early draft disabled
   both; don't.)
 - No udev (`SDL_JOYSTICK_DISABLE_UDEV=1` is also exported at runtime — see 03).
-- **`patches/sdl2-h700.patch` is applied after clone** (stamped, like the
-  NextCommander patch). The fork's "Batocera patches" commit removed the heuristic
-  joystick classification from `SDL_EVDEV_GuessDeviceClass()` (Batocera classifies
-  via udev), which — combined with our no-udev build — made `SDL_NumJoysticks()`
-  permanently return 0 for the built-in pad. NextUI never noticed (it reads evdev
-  raw — 03), but pure-SDL apps like NextCommander got no input at all. The patch
-  restores classification via a `BTN_GAMEPAD`/`BTN_JOYSTICK` check (the upstream
-  check wouldn't match anyway: the pad exposes no ABS_X/ABS_Y).
+- **`sdl2-h700.patch`** restores joystick classification via `BTN_GAMEPAD` /
+  `BTN_JOYSTICK` (the fork's Batocera patches removed heuristics in favor of udev).
+  Vendored in the toolchain; keep `workspace/h700/patches/sdl2-h700.patch` in sync
+  when changing it.
 
 ### Runtime library bundling (`platform/makefile.copy`)
 Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted for:
@@ -119,15 +119,14 @@ future stock-OS port:
 ## Decision: dedicated h700-toolchain (same SDK recipe for now)
 
 The port first reused `tg5040-toolchain` in-process; the **pitfalls above are solved
-in NextUI** (dlopen ALSA, direct GLES link, bundled libpng12, in-tree SDL2). We now
-use a **dedicated** `h700-toolchain` image/repo so H700 builds do not share the
-tg5040 container lifecycle, while keeping the proven GCC 8.3 + TG5040 SDK sysroot.
+in NextUI** (dlopen ALSA, direct GLES link, bundled libpng12). We now use a
+**dedicated** `h700-toolchain` image/repo so H700 builds do not share the tg5040
+container lifecycle, while keeping the proven GCC 8.3 + TG5040 SDK sysroot.
 
-Still worth doing later inside `h700-toolchain` (not blocking): prebake the pinned
-mali-fbdev SDL2 into `PREFIX_LOCAL`, and optionally a jammy-matched libasound, to
-remove pitfall classes 1–3 structurally and speed CI. Bluetooth audio uses the stock
-H700 BlueALSA daemon, ALSA plugins, SBC runtime, and BlueZ without shipping them from
-the toolchain (see 05 and 07; 09 classifies the release implications).
+The image prebakes mali-fbdev SDL2 into `PREFIX_LOCAL` and does **not** rebuild
+BlueZ (stock H700 BlueALSA/BlueZ at runtime — see 05 and 07). Optional later:
+jammy-matched libasound in the sysroot to harden pitfall #1 further if direct
+links reappear.
 
 ## Build outputs
 

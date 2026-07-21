@@ -34,7 +34,7 @@ release planning, and per-core coverage.
 One `h700` platform serves rg40xx/rg34xx/rg28xx/cube (`DEVICE` env, detected at boot
 from the stock dmenu.bin binary). It builds inside the **h700-toolchain image** (same
 aarch64/A53 target and TG5040-derived SDK sysroot as the historical tg5040 reuse,
-forward-compatible glibc) with one in-tree extra: a pinned custom SDL2
+forward-compatible glibc) with mali-fbdev SDL2 prebaked in the toolchain image
 (`JohnnyonFlame/SDL-malifbdev-rot`) targeting the Mali blob's fbdev EGL winsys.
 NextUI's shared `generic_video.c`/`generic_wifi.c`/`generic_bt.c` run unchanged. Boot
 is hijacked by dropping one `dmenu.bin` file on the stock card's FAT partition; NextUI
@@ -48,7 +48,7 @@ bundled around.
 |---|---|---|
 | Platform | one `h700`, `DEVICE` env per device | ✅ as planned |
 | Arch / toolchain | 64-bit; dedicated `h700-toolchain` (TG5040 SDK recipe) | ✅ dedicated image; sysroot-mismatch pitfalls catalogued in 01 |
-| SDL2 | in-tree malifbdev-rot build | ✅ as planned, pinned + config-asserted |
+| SDL2 | malifbdev-rot in h700-toolchain | ✅ prebaked in image; early only stages libs |
 | Video | generic_video GLES pipeline on Mali blob | ✅ core pipeline works; multi-panel UI scaling + box art pass; panel-matched overlay assets not shipped |
 | **Input** | SDL joystick route | **Deviation:** raw evdev remains primary for the built-in pad; the SDL classification fix makes enumeration work, but the built-in SDL ordering differs from external-pad `JOY_*` mappings and would duplicate/mis-map events. SDL is retained for external pads (03) |
 | **Audio linkage** | SDK libasound, bundled | **Deviation:** dlopen'd device libasound (`--enable-alsa-shared`) after a symbol-versioning bug caused glitchy audio (05) |
