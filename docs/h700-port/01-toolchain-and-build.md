@@ -51,10 +51,9 @@ Configure highlights (see `h700-toolchain/support/build-sdl2.sh`):
   and for alsa-shared/image-shared dlopen to work at all. (An early draft disabled
   both; don't.)
 - No udev (`SDL_JOYSTICK_DISABLE_UDEV=1` is also exported at runtime — see 03).
-- **`sdl2-h700.patch`** restores joystick classification via `BTN_GAMEPAD` /
-  `BTN_JOYSTICK` (the fork's Batocera patches removed heuristics in favor of udev).
-  Vendored in the toolchain; keep `workspace/h700/patches/sdl2-h700.patch` in sync
-  when changing it.
+- **`support/sdl2-h700.patch`** (in h700-toolchain) restores joystick classification
+  via `BTN_GAMEPAD` / `BTN_JOYSTICK` (the fork's Batocera patches removed heuristics
+  in favor of udev).
 
 ### Runtime library bundling (`platform/makefile.copy`)
 Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted for:

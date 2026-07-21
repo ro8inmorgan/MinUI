@@ -67,7 +67,7 @@ external controllers. Reasons discovered during bring-up:
   bring-up the built-in pad did not enumerate because the SDL fork's Batocera
   patches deleted the joystick heuristic in `SDL_EVDEV_GuessDeviceClass()`, so the
   no-udev fallback path never classified any device as a joystick. Fixed by
-  `workspace/h700/patches/sdl2-h700.patch` (see 01); SDL joystick enumeration of
+  h700-toolchain's `support/sdl2-h700.patch` (see 01); SDL joystick enumeration of
   the built-in pad now works. Note the fork assigns SDL button indices in
   ascending evdev-keycode order, so the pad's ESC/VOL−/VOL+ (1/114/115) occupy
   indices 0–2 and the gamepad cluster starts at index 3 (A=3 … MENU=11).

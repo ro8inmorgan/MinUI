@@ -21,8 +21,8 @@ FILEMGR_STAMP=.patched-h700-v3
 all: readmes
 
 # SDL2 (mali-fbdev, alsa-shared, joystick patch) is prebaked into h700-toolchain
-# at PREFIX_LOCAL. Stage it + SDK companion libs for packaging. Rebuild only via
-# the toolchain image (support/build-sdl2.sh); keep patches/sdl2-h700.patch in sync.
+# at PREFIX_LOCAL. Stage it + SDK companion libs into other/sdl2/output for packaging.
+# Rebuild only via the toolchain image (support/build-sdl2.sh + support/sdl2-h700.patch).
 early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR)
 	mkdir -p other
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
