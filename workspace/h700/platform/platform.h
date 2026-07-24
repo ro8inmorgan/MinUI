@@ -163,8 +163,9 @@ extern int dev_has_rstick;
 
 ///////////////////////////////
 
-// 10 rows at 720p/scale-2 matches tg5050 (same resolution and scale)
-#define MAIN_ROW_COUNT (hdmi_active?10:(is_cube?8:6))
+// Rows that fit above the button hints: (FIXED_HEIGHT/FIXED_SCALE - 2*PADDING - PILL_SIZE) / PILL_SIZE
+// 720-tall at scale 2 (HDMI and the cube's square panel) gives 10, like tg5050; 480 gives 6.
+#define MAIN_ROW_COUNT ((hdmi_active||is_cube)?10:6)
 #define QUICK_SWITCHER_COUNT 3
 #define PADDING 5
 

@@ -135,7 +135,7 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 | DEV-01 | RG40XXV 640×480/single-stick baseline | ✅ | RG40XXV | UI, input, game runtime, HDMI, and Bluetooth paths pass |
 | DEV-02 | RG34XXSP 720×480/lid/dual-stick delta | ✅ | RG34XXSP | UI scaling, lid, controls, apps, and games pass |
 | DEV-03 | RG28XX 480×640 rotation delta | ✅ | RG28XX | UI, game Aspect/Fullscreen scaling, bootlogo apply, and rotated preview pass |
-| DEV-04 | RGcubexx 720×720 delta | ⚠️ | Community report | General UI scaling passes; no full local functional/core walk exists |
+| DEV-04 | RGcubexx 720×720 delta | ⚠️ | Community report | General UI scaling passes; the main list under-filled the panel (8 rows instead of the 10 that fit) until [#18](https://github.com/pvaibhav/NextUI/issues/18) — fix is untested on cube hardware; no full local functional/core walk exists |
 | DEV-05 | Bootlogo 640×480 apply/backup | ✅ | RG40XXV | Carousel, apply, backup, and original entry pass; restore uses the same apply path |
 | DEV-06 | Bootlogo 720×480 preview/apply/backup/restore | ✅ | RG34XXSP | All 23 presets render; first backup and restore pass |
 | DEV-07 | Bootlogo 480×640 apply and preview orientation | ✅ | RG28XX | Applied logo and rotated previews are upright |
