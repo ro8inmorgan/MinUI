@@ -31,6 +31,29 @@ Integration points:
   image and builds other deps (NextCommander, boot shim) before the apps.
 - The full tg5040 core list (28 cores + patches) builds unchanged — same arch, same tuning.
 
+### Never pass the platform as a `make` argument to the guest build
+
+See the note above the `build` target in `makefile.toolchain`. A command-line variable is
+recorded in `MAKEOVERRIDES` and overrides same-named assignments in *every* recursive
+make, including the `PLATFORM = libretro` that picodrive and pcsx_rearmed set in their
+picoarch-derived build system. Their libretro frontend objects then never reach `OBJS`,
+and because the link uses `-flto`, a version script that keeps only `retro_*` global,
+and `--gc-sections`, nothing is reachable: the linker emits a ~10KB stub that segfaults
+as soon as minarch resolves `retro_init`. Upstream is unaffected — it invokes a bare
+`make` in the container and lets `UNION_PLATFORM` flow through the environment, where a
+makefile assignment still wins. The h700 branch introduced the command-line form in
+`d4fc5b51`, which broke picodrive (worked around per-core in `04a1d62d`) and shipped a
+stub PS1 core for h700, tg5040, and tg5050 in the 20260720 and 20260724 builds
+([#19](https://github.com/pvaibhav/NextUI/issues/19)). The guest invocations now match
+upstream and the per-core workarounds are gone.
+
+A stub core is silent — it links, installs, and only fails when minarch resolves
+`retro_init` — so if a core is ever suspected, check it directly rather than by size:
+
+```
+nm -D workspace/<platform>/cores/output/<core>_libretro.so | grep retro_api_version
+```
+
 ### Prebaked SDL2 (h700-toolchain `PREFIX_LOCAL`)
 On tg5040 the stock OS supplies runtime SDL2; on H700 we ship our own. The
 **h700-toolchain** image builds **`JohnnyonFlame/SDL-malifbdev-rot`** (commit
