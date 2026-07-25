@@ -127,10 +127,63 @@ lid is still closed, the unit returns to sleep. Its lifecycle disposition is in 
 
 ## Power off / reboot
 
-Launch-loop sentinels: `/tmp/poweroff` → `poweroff`, `/tmp/reboot` → `reboot`.
-Systemd handles clean unmounts — works; the old port's sysrq fallback
-(`echo s/u/o > /proc/sysrq-trigger`) was never needed. Charging-while-off is handled
-by u-boot/stock before our hijack, untouched.
+Launch-loop sentinels: `/tmp/poweroff` → `poweroff_next`, `/tmp/reboot` → `reboot_next`,
+each falling back to the plain busybox/systemd command if the tool exits non-zero.
+Charging-while-off is handled by u-boot/stock before our hijack, untouched.
+
+### The AXP2202 needs an explicit software power-off
+
+The port originally shipped bare `poweroff` on the theory that "systemd poweroff works
+fine". It does not. `reboot(LINUX_REBOOT_CMD_POWER_OFF)` lands in the kernel's generic
+`axp20x_power_off`, which writes `AXP20X_OFF_CTRL` at **0x32** — not the power-off
+register on this part. AXP2202 (same die as AXP717) moved the on/off control group the
+AXP2101 keeps at 0x10 out to **0x27**, so the kernel's write is a no-op: the CPU halts,
+the rails stay up, and because `PLAT_powerOff` has already killed the backlight and
+blanked the framebuffer, the user sees "the screen went black but it never turned off".
+
+`workspace/h700/poweroff_next/` fixes it, adapted from tg5040's tool (itself vendored
+from Helaas's `nextui-brick-poweroff-hook`). Sequence, against the AXP2202 at 0x34:
+
+| Write | Why |
+|---|---|
+| `0x40`–`0x44` ← `0x00` | Mask every IRQ source |
+| `0x48`–`0x4C` ← `0xFF` | Clear pending IRQ status (write-1-to-clear) |
+| `0x22` ← `0x0A` | `PWROFF_EN`: bit0=0 button event powers off (not restart), bit1 long-press, bit3 LDO-OC, bit2 die-overtemp off |
+| `0x27` ← `0x01` | `SOFT_PWROFF` bit0 — the actual trigger |
+
+The IRQ masking is likely the primary fix: a pending unmasked IRQ holds the AXP's IRQ
+pin low, and >16 ms of that powers the PMU straight back on. The power-key edge IRQs
+(`PONP`/`PONN` in `IRQ_EN1`) are armed by stock firmware, so the very press that asked
+for power-off is the most likely thing to undo it. The `0x27` write is a plain store,
+not read-modify-write, which also clears bit3 (PWROK pulled low restarts the system) —
+set on stock H700 firmware, observed as `0x27 = 0x08`.
+
+**This is not a battery disconnect.** That is `0x12` bit 3 (`BATFET_CTRL`), which the
+sequence never touches — the "soft-disconnect the battery" description that circulates
+for the Brick fix traces to an earlier brute-force experiment with different registers
+and misattributed names. `0x12` is eFuse-defaulted and governs the battery-only
+powered-off case; leave it alone.
+
+### H700-specific divergences from the tg5040 tool
+
+- **Bus is auto-detected**, not hardcoded. tg5040 uses `/dev/i2c-6`; H700 has the PMIC
+  on `/dev/i2c-5` (`soc/twi5/i2c-5/5-0034`). The tool scans
+  `/sys/bus/i2c/devices/*/name` for an `axp*` at 0x34 and falls back to `/dev/i2c-5`.
+- **The card path is resolved with `realpath`.** `SDCARD_PATH` is `/mnt/SDCARD`, which
+  launch.sh makes a symlink (or bind mount) onto `/mnt/sdcard`. `/proc/mounts` and
+  `/proc/*/fd` both name the resolved path, so the tg5040 string comparisons against
+  `/mnt/SDCARD` would never match here.
+- **No global process kill.** tg5040 SIGTERM/SIGKILLs every pid before powering off.
+  On the base OS `/etc/inittab` has `::respawn:/sbin/nextui-session`, so killing
+  launch.sh starts a *new* frontend racing the shutdown — the exact failure being
+  fixed. The PMIC cut is instantaneous and total, so nothing needs reaping first;
+  `CFG_getPowerOffProtection()` gates a sync + swapoff + detach-unmount and no more.
+- **`reboot_next` does no PMIC writes at all** — a restart is the SoC's job. It exists
+  for the deterministic sync and signal blocking. (tg5040's launch.sh calls
+  `reboot_next` but never builds or ships it, so on the Brick that line is a
+  command-not-found followed by `exit 0`.)
+- `--dry-run` reports the detected bus, resolved card path and planned writes, and
+  touches nothing. Safe on a live device.
 
 ## CPU governor
 

@@ -37,6 +37,7 @@ ifeq ($(PLATFORM), tg5040)
 endif
 ifeq ($(PLATFORM), h700)
 	cd ./$(PLATFORM)/rfkill && make all
+	cd ./$(PLATFORM)/poweroff_next/ && make
 endif
 	cd ./$(PLATFORM)/libmsettings && make
 	cd ./$(PLATFORM) && make early # eg. other libs
@@ -98,6 +99,7 @@ ifeq ($(PLATFORM), tg5040)
 endif
 ifeq ($(PLATFORM), h700)
 	cd ./$(PLATFORM)/rfkill && make clean
+	cd ./$(PLATFORM)/poweroff_next/ && make clean
 endif
 endif
 	cd ./$(PLATFORM)/libmsettings && make clean

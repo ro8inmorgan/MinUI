@@ -81,11 +81,11 @@ ensure_system_dbus() {
 }
 
 if [ -f "/tmp/poweroff" ]; then
-	poweroff
+	poweroff_next || poweroff
 	exit 0
 fi
 if [ -f "/tmp/reboot" ]; then
-	reboot
+	reboot_next || reboot
 	exit 0
 fi
 
@@ -213,13 +213,13 @@ while [ -f "$EXEC_PATH" ]; do
 	fi
 
 	if [ -f "/tmp/poweroff" ]; then
-		poweroff
+		poweroff_next || poweroff
 		exit 0
 	fi
 	if [ -f "/tmp/reboot" ]; then
-		reboot
+		reboot_next || reboot
 		exit 0
 	fi
 done
 
-poweroff
+poweroff_next || poweroff

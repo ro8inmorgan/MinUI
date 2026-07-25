@@ -211,7 +211,10 @@ some translation units.
 
 ## What disappeared vs tg5040 (as planned)
 - `btmanager/` (BlueZ-upgrade pakz — H700 uses firmware-provided BlueZ)
-- `poweroff_next/`, `reboot_next` (systemd poweroff/reboot work fine)
+- ~~`poweroff_next/`, `reboot_next` (systemd poweroff/reboot work fine)~~ **Reversed.**
+  That reasoning was wrong twice over: the tg5040 limbo is a PMIC latch that no
+  init system can fix, and the base OS runs BusyBox init with no systemd at all.
+  Both tools are now ported — see [06](06-power-sleep-battery.md#power-off--reboot).
 - LED animation wiring (`led_anim`), ledcontrol.elf (gated to tg50x0 in `workspace/makefile`)
   — bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`
   builds for h700 with resolution-keyed preset folders (`640x480`, `720x480`,
