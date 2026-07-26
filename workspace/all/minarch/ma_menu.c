@@ -113,13 +113,14 @@ void MSG_quit(void) {
 
 ///////////////////////////////////////
 
-#define MENU_ITEM_COUNT 5
+#define MENU_ITEM_COUNT 6
 #define MENU_SLOT_COUNT 8
 
 enum {
 	ITEM_CONT,
 	ITEM_SAVE,
 	ITEM_LOAD,
+	ITEM_UNDO,
 	ITEM_OPTS,
 	ITEM_QUIT,
 };
@@ -161,6 +162,7 @@ static struct {
 		[ITEM_CONT] = "Continue",
 		[ITEM_SAVE] = "Save",
 		[ITEM_LOAD] = "Load",
+		[ITEM_UNDO] = "Undo",
 		[ITEM_OPTS] = "Options",
 		[ITEM_QUIT] = "Quit",
 	}
@@ -1688,6 +1690,7 @@ void Menu_loadState(void) {
 	Menu_updateState();
 
 	if (menu.save_exists) {
+		int disc_changed = 0;
 		if (menu.total_discs) {
 			char slot_disc_name[256];
 			getFile(menu.txt_path, slot_disc_name, 256);
@@ -1699,12 +1702,22 @@ void Menu_loadState(void) {
 			char* disc_path = menu.disc_paths[menu.disc];
 			if (!exactMatch(slot_disc_path, disc_path)) {
 				Game_changeDisc(slot_disc_path);
+				disc_changed = 1;
 			}
 		}
 
 		state_slot = menu.slot;
 		putInt(menu.slot_path, menu.slot);
-		int success = State_read();
+		int success;
+		if (disc_changed) {
+			// the state we'd be undoing back to belongs to the disc that was just
+			// ejected, so there's nothing safe to offer an undo for
+			State_invalidateUndo();
+			success = State_read();
+		}
+		else {
+			success = State_readWithUndo();
+		}
 		Rewind_on_state_change();
 		
 		// Show notification if enabled
@@ -1714,6 +1727,15 @@ void Menu_loadState(void) {
 			snprintf(msg, sizeof(msg), success ? "State Loaded - Slot %d" : "Load Failed - Slot %d", menu.slot + 1);
 			Notification_push(NOTIFICATION_LOAD_STATE, msg, NULL);
 		}
+	}
+}
+void Menu_undoLoadState(void) {
+	int success = State_undoLoad();
+
+	// Show notification if enabled (hardcore mode pushes its own message)
+	if (CFG_getNotifyLoad() && !RA_isHardcoreModeActive()) {
+		Notification_push(NOTIFICATION_LOAD_STATE,
+			success ? "Load State Undone" : "Nothing To Undo", NULL);
 	}
 }
 
@@ -1864,6 +1886,15 @@ void Menu_loop(void) {
 					show_menu = 0;
 				}
 				break;
+				case ITEM_UNDO: {
+					// inert while there's nothing to undo, matching the greyed out label
+					if (State_hasUndo()) {
+						Menu_undoLoadState();
+						status = STATUS_LOAD;
+						show_menu = 0;
+					}
+				}
+				break;
 				case ITEM_OPTS: {
 					if (simple_mode) {
 						core.reset();
@@ -1936,11 +1967,12 @@ void Menu_loop(void) {
 			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OKAY", NULL }, 1, screen, 1);
 			
 			// list
+			int can_undo = State_hasUndo();
 			oy = (((DEVICE_HEIGHT / FIXED_SCALE) - PADDING * 2) - (MENU_ITEM_COUNT * PILL_SIZE)) / 2;
 			for (int i=0; i<MENU_ITEM_COUNT; i++) {
 				char* item = menu.items[i];
 				SDL_Color text_color = COLOR_WHITE;
-				
+
 				if (i==selected) {
 					text_color = uintToColour(THEME_COLOR5_255);
 
@@ -1971,8 +2003,11 @@ void Menu_loop(void) {
 						SCALE1(PILL_SIZE)
 					});
 				}
-			
-				
+
+				// grey out undo while no snapshot is available, but keep it selectable
+				// so the cursor still lands somewhere sensible
+				if (i==ITEM_UNDO && !can_undo) text_color = COLOR_GRAY;
+
 				// text
 				text = TTF_RenderUTF8_Blended(font.large, item, text_color);
 				SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){
