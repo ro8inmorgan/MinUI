@@ -416,6 +416,14 @@ ConnectionStrength PLAT_connectionStrength(void) {
 		return SIGNAL_STRENGTH_LOW;
 }
 
+int PLAT_getNumLeds(void) {
+	// MAX_LIGHTS is 4 but PLAT_initDefaultLeds() below only fills 3. The
+	// spare slot is a zeroed global, and a zeroed slot passes the
+	// filename != "f2" test in PLAT_setLedBrightness and writes brightness 0
+	// to the global max_scale, killing every LED.
+	return 3;
+}
+
 void PLAT_initDefaultLeds() {
 	lightsDefault[0] = (LightSettings) {
 		"Joystick L",

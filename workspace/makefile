@@ -55,7 +55,7 @@ endif
 	cd ./all/syncsettings/ && make
 	cd ./all/nextval/ && make
 	cd ./all/settings/ && make
-ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
+ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
 	cd ./all/ledcontrol/ && make
 endif
 ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
@@ -84,7 +84,7 @@ clean:
 ifneq ($(PLATFORM), desktop)
 	cd ./$(PLATFORM)/keymon && make clean
 	cd ./all/syncsettings/ && make clean
-ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
+ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
 	cd ./all/ledcontrol/ && make clean
 endif
 ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))

@@ -17,6 +17,8 @@ extern int is_cube;
 extern int hdmi_active;
 extern int dev_has_lstick;
 extern int dev_has_rstick;
+extern int dev_has_rgb;
+extern int dev_num_leds;
 
 ///////////////////////////////
 
@@ -175,7 +177,10 @@ extern int dev_has_rstick;
 #define MUTE_VOLUME_RAW 0
 
 #define SCREEN_FPS 60.0
-#define MAX_LIGHTS 0
+// ceiling, not the count: only the RG40XX H/V and RG CubeXX have RGB LEDs, and
+// the V populates one bank where the others populate two. PLAT_getNumLeds()
+// reports what the running device actually has.
+#define MAX_LIGHTS 2
 
 // stock Anbernic boot logo: bootlogo.bmp on the vfat boot-resource partition
 #define BOOTLOGO_PARTITION "/dev/mmcblk0p2"

@@ -407,6 +407,17 @@ ConnectionStrength PLAT_connectionStrength(void) {
 		return SIGNAL_STRENGTH_LOW;
 }
 
+int PLAT_getNumLeds(void) {
+	// PLAT_initPlatform() sets is_brick/is_brickpro and may not have run yet
+	// (LedControl asks for the count before GFX_init); it is idempotent.
+	PLAT_initPlatform();
+	// must match how many slots PLAT_initDefaultLeds() below actually fills:
+	// the spare MAX_LIGHTS slots are zeroed, and a zeroed slot passes the
+	// filename != "f2" test in PLAT_setLedBrightness and writes brightness 0
+	// to the global max_scale, killing every LED.
+	return is_brickpro ? 5 : is_brick ? 4 : 3;
+}
+
 void PLAT_initDefaultLeds() {
 	PLAT_initPlatform();
 	if(is_brickpro) {

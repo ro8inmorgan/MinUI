@@ -32,7 +32,16 @@ int is_cube = 0;
 int hdmi_active = 0;
 int dev_has_lstick = 0;
 int dev_has_rstick = 0;
+int dev_has_rgb = 0;
+int dev_num_leds = 0;
 static int wake_fd = -1;
+
+// RGB LEDs hang off an MCU on UART5, gated by the axp2202 mcu_pwr rail.
+// See led.c, which is included at the bottom of this file.
+#define H700_LED_TTY "/dev/ttyS5"
+#define H700_MCU_PWR "/sys/class/power_supply/axp2202-battery/mcu_pwr"
+static void LED_invalidateCache(void);
+static void LED_shutdown(void);
 
 #define H700_INPUT_COUNT 12
 #define EV_KEY 0x01
@@ -189,7 +198,20 @@ static void detect_device(void) {
 
 	is_rg28xx = exactMatch("rg28xx", device) || exactMatch("RG28xx", model);
 	is_rg34xx = exactMatch("rg34xx", device) || exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model);
-	is_cube = exactMatch("cube", device) || exactMatch("RGcubexx", model);
+	is_cube = exactMatch("cube", device) || (model && prefixMatch("RGcube", model));
+
+	// RGB LEDs exist only on the RG40XX H, RG40XX V and RG CubeXX (same three
+	// models muOS flags with led/rgb=1); every other RG XX has just the binary
+	// work_led. The V has a single stick and one populated bank, the H and the
+	// Cube have two -- which is why the exact model matters here and the coarse
+	// DEVICE=rg40xx isn't enough.
+	int is_rg40xxv = exactMatch("RG40xxV", model);
+	int model_has_rgb = is_rg40xxv || is_cube || exactMatch("rg40xx", device) ||
+		(model && (prefixMatch("RG40xx", model) || prefixMatch("RG40XX", model)));
+	// launch.sh falls back to DEVICE=rg40xx for anything it doesn't recognise,
+	// so require the MCU transport to actually be there before we write to it
+	dev_has_rgb = model_has_rgb && exists(H700_LED_TTY) && exists(H700_MCU_PWR);
+	dev_num_leds = !dev_has_rgb ? 0 : (is_rg40xxv ? 1 : 2);
 
 	// Analog sticks per model; every stick on these devices clicks (L3 = left,
 	// R3 = right). Exact RGXX_MODEL strings confirmed so far: RG28xx, RG34xx,
@@ -621,6 +643,9 @@ void PLAT_enableBacklight(int enable) {
 		putInt("/sys/class/power_supply/axp2202-battery/work_led", 0);
 		putInt("/sys/class/graphics/fb0/blank", 0);
 		SetBrightness(GetBrightness());
+		// the suspend script drops mcu_pwr while we sleep, so the MCU comes
+		// back blank -- forget the cached frame so the next commit repaints it
+		LED_invalidateCache();
 	}
 	else {
 		SetRawBrightness(0);
@@ -638,6 +663,7 @@ void PLAT_powerOff(int reboot) {
 
 	SetRawVolume(MUTE_VOLUME_RAW);
 	PLAT_enableBacklight(0);
+	LED_shutdown();
 	SND_quit();
 	VIB_quit();
 	PWR_quit();
@@ -855,30 +881,7 @@ ConnectionStrength PLAT_connectionStrength(void) {
 		return SIGNAL_STRENGTH_LOW;
 }
 
-void PLAT_initDefaultLeds() {
-}
-void PLAT_initLeds(LightSettings *lights) 
-{
-}
-
-void PLAT_setLedInbrightness(LightSettings *led)
-{
-}
-void PLAT_setLedBrightness(LightSettings *led)
-{
-}
-void PLAT_setLedEffect(LightSettings *led)
-{
-}
-void PLAT_setLedEffectCycles(LightSettings *led)
-{
-}
-void PLAT_setLedEffectSpeed(LightSettings *led)
-{
-}
-void PLAT_setLedColor(LightSettings *led)
-{
-}
+// LED support lives in led.c, included at the bottom of this file.
 
 //////////////////////////////////////////////
 
@@ -1033,3 +1036,8 @@ void PLAT_setNetworkTimeSync(bool on) {
 
 // We use the generic bluetooth implementation here
 #include "generic_bt.c"
+
+/////////////////////////
+
+// RGB LEDs (RG40XX H/V and RG CubeXX only)
+#include "led.c"

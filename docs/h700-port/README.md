@@ -56,7 +56,8 @@ bundled around.
 | Sleep | `echo mem` + tg5040-style wrapper | ✅ shared power architecture retained; target-specific service and ALSA sequencing documented in 06 |
 | Lid | hallkey → PLAT lid API | ✅ sysfs-polled lid integrated with the shared sleep request API (06) |
 | WiFi | NextUI-owned wpa_supplicant | ✅ as planned; creds on SD, dhclient + wpa_action renew (07) |
-| Rumble / LEDs | moto sysfs; MAX_LIGHTS 0 | ✅ as planned; rumble tested-good |
+| Rumble | moto sysfs | ✅ as planned; tested-good |
+| LEDs | MAX_LIGHTS 0 — "no RGB on RG XX" | **Reversed.** RG40XX H/V and RG CubeXX do have RGB, driven by an MCU over UART5 rather than `/sys/class/leds`, which is why the first probe missed them (03) |
 | Brightness / displaycal | same disp ioctls as tg5040 | ✅ 1:1 as predicted, tested-good incl. sleep survival |
 | Install | TF1 gets one file; NextUI on TF2; no TF1-only mode | ✅ as planned; TF1 writes mountpoint+cmp guarded |
 | **Splash** | per-panel raw-BMP `dd` assets | **Deviation:** `fbsplash` text renderer — no per-resolution assets needed (02) |

@@ -658,19 +658,29 @@ void GFX_setAmbientColor(const void *data, unsigned width, unsigned height, size
 
 	uint32_t dominant_color = GFX_extract_average_color(data, width, height, pitch);
 
-	if (mode == 1 || mode == 2 || mode == 5)
+	// the zone indices below are the Brick layout (0/1 = FN keys or sticks,
+	// 2 = top bar, 3 = L/R). Devices with fewer lights simply don't have the
+	// higher ones, so every index has to be checked -- these are writes into
+	// a MAX_LIGHTS array and slot 3 is out of bounds on a 2-light device.
+	int count = LEDS_getCount();
+
+	if ((mode == 1 || mode == 2 || mode == 5) && count > 2)
 	{
 		(lightsAmbient)[2].color1 = dominant_color;
 		(lightsAmbient)[2].effect = 4;
 	}
 	if (mode == 1 || mode == 3)
 	{
-		(lightsAmbient)[0].color1 = dominant_color;
-		(lightsAmbient)[0].effect = 4;
-		(lightsAmbient)[1].color1 = dominant_color;
-		(lightsAmbient)[1].effect = 4;
+		if (count > 0) {
+			(lightsAmbient)[0].color1 = dominant_color;
+			(lightsAmbient)[0].effect = 4;
+		}
+		if (count > 1) {
+			(lightsAmbient)[1].color1 = dominant_color;
+			(lightsAmbient)[1].effect = 4;
+		}
 	}
-	if (mode == 1 || mode == 4 || mode == 5)
+	if ((mode == 1 || mode == 4 || mode == 5) && count > 3)
 	{
 		(lightsAmbient)[3].color1 = dominant_color;
 		(lightsAmbient)[3].effect = 4;
@@ -4452,6 +4462,26 @@ FALLBACK_IMPLEMENTATION void PLAT_setLedInbrightness(LightSettings *led) {}
 FALLBACK_IMPLEMENTATION void PLAT_setLedEffectCycles(LightSettings *led) {}
 FALLBACK_IMPLEMENTATION void PLAT_setLedEffectSpeed(LightSettings *led) {}
 
+FALLBACK_IMPLEMENTATION int PLAT_getNumLeds(void) { return MAX_LIGHTS; }
+FALLBACK_IMPLEMENTATION const char *PLAT_getLedSettingsFile(void) { return "ledsettings.txt"; }
+FALLBACK_IMPLEMENTATION const char *PLAT_getLedLabel(int index) { return NULL; }
+FALLBACK_IMPLEMENTATION int PLAT_getLedEffectCount(void) { return 6; } // LedControl's historical range
+FALLBACK_IMPLEMENTATION int PLAT_getLedEffectId(int index) { return index + 1; }
+FALLBACK_IMPLEMENTATION const char *PLAT_getLedEffectName(int effect_id) { return NULL; }
+
+int LEDS_getCount(void)
+{
+	static int count = -1;
+	if (count < 0) {
+		count = PLAT_getNumLeds();
+		// the arrays are MAX_LIGHTS long, so this is the hard backstop
+		// against a platform over-reporting and walking off the end
+		if (count < 0) count = 0;
+		if (count > MAX_LIGHTS) count = MAX_LIGHTS;
+	}
+	return count;
+}
+
 void LEDS_setProfile(int profile)
 {
 	if(lights_initialized == 0)
@@ -4548,10 +4578,7 @@ void LEDS_updateLeds(bool indicator_only)
 		return;
 	}
 		
-	char *device = getenv("DEVICE");
-	int lightsize = exactMatch("brick", device) ? 4 
-		: exactMatch("brickpro", device) ? 5 
-		: 3; // smartpro, smartpro s
+	int lightsize = LEDS_getCount();
 
 	if(!lights)
 	{

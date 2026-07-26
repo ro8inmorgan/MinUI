@@ -115,15 +115,46 @@ Anbernic stock-firmware update — paths have historically been stable, but the
   `time_to_full_now`, `charge_counter`, `health`
 - Anbernic kernel extras under `axp2202-battery/`:
   - `moto` — rumble motor (write 1/0) — **confirmed working**
-  - `work_led` — power LED (0=on, 1=off) — used by the port around backlight off/on
+  - `work_led` — small power-indicator LED, next to the charge LED. Present on every
+    H700 model, unrelated to the RGB stick LEDs. **Polarity is `0=off, 1=on`** — an
+    earlier note here had it backwards. Verified the same way on RG40XXV and RG28XX:
+    the LED is lit through stock boot and goes out as soon as NextUI's `launch.sh`
+    writes `0`. Plugging in USB lights it independently of any of this.
+    The port writes `0` on wake and `1` on sleep (`PLAT_enableBacklight`), so in
+    practice the LED marks *sleep*, not power. That is inherited from the old
+    rg35xxplus port, is the same across models, and is deliberate — don't "correct"
+    the polarity of those writes on the strength of the old comment.
   - `workled_sleep` — LED behavior during sleep
   - `lowpwr_led`, `led_test`
+  - `mcu_pwr` — power rail for the RGB LED MCU (write 1 to enable). See "RGB LEDs" below.
   - `hallkey` — lid/hall sensor (RG34XXSP only; absent on RG40XXV) — polarity verified
     (`1` = open); lid close sleeps and lid open wakes screen-off. Deep suspend still
     requires power. POWER can wake light sleep while closed; deep sleep re-sleeps if
     the lid remains closed (06).
   - `brightness`, `display_id` (panel variant id), `spk_state`, `mcu_esckey`, `nds_esckey`, `boot_mode`
 - `/sys/class/pwm/pwmchip0` exists (alternative rumble path; `moto` is simpler)
+
+### RGB LEDs
+
+Only three models have them: **RG40XX H, RG40XX V, RG CubeXX** (the same three muOS
+flags with `device/<dev>/config/led/rgb = 1`; every other RG XX is `0`).
+
+An early probe concluded RG XX had no RGB LEDs. That was wrong. They are not exposed
+as LED-class devices — on an RG40XXV `/sys/class/leds` is empty, there is no
+`led_anim` driver (TrimUI only), and the device tree has no LED node. They hang off a
+**separate MCU reached over UART5**:
+
+- `/dev/ttyS5`, 115200 8N1 raw (`uart@05001400`; char 248,5 — verified present)
+- `/sys/class/power_supply/axp2202-battery/mcu_pwr` must be `1` to power the MCU
+- Frame: `<mode> <brightness> <payload...> <checksum>`, checksum = `sum(preceding) & 0xFF`,
+  written as raw bytes. Brightness is one byte for the whole strip (0-255).
+  - mode 1 solid — payload 8x(R,G,B) for one bank then 8x(R,G,B) for the other
+    (16 positions in two banks of 8); the only mode with per-bank colour
+  - mode 2/3/4 breath fast/med/slow — payload 16x(R,G,B), one colour for all
+  - mode 5/6 rainbow mono/multi — payload `<1> <1> <speed 0-255>`
+- The MCU animates on its own, so there is no userspace animation in the port —
+  effect ids are translated onto these modes in `workspace/h700/platform/led.c`.
+- Protocol source: muOS `MustardOS/internal`, `script/device/rgb.sh` (SERIAL backend).
 
 ### Network / Bluetooth
 - WiFi: RTL8821CS (SDIO), module `8821cs`; interfaces `wlan0` (+`wlan1` virtual);

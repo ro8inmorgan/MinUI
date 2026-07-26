@@ -103,7 +103,7 @@ endif
 	cp ./workspace/all/clock/build/$(PLATFORM)/clock.elf ./build/EXTRAS/Tools/$(PLATFORM)/Clock.pak/
 	cp ./workspace/all/minput/build/$(PLATFORM)/minput.elf ./build/EXTRAS/Tools/$(PLATFORM)/Input.pak/
 	cp ./workspace/all/settings/build/$(PLATFORM)/settings.elf ./build/EXTRAS/Tools/$(PLATFORM)/Settings.pak/
-ifneq (,$(filter $(PLATFORM),tg5040 tg5050))
+ifneq (,$(filter $(PLATFORM),tg5040 tg5050 h700))
 	cp ./workspace/all/ledcontrol/build/$(PLATFORM)/ledcontrol.elf ./build/EXTRAS/Tools/$(PLATFORM)/LedControl.pak/
 ifeq ($(PLATFORM), tg5040)
 	# Limbo fix

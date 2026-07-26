@@ -153,6 +153,14 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 |---|---|---|---|---|
 | CAP-01 | FN1/FN2/HOME assignable pak actions | ➖ | RG XX hardware/platform API | RG XX devices have no dedicated buttons; Settings hides the assignment UI |
 | CAP-02 | Keep awake over USB data connection | ➖ | H700 platform API | `PLAT_isUSBConnected()` is a stub; charging-state power behavior is covered by POWER-04 |
+| LED-01 | RGB LEDs driven over the UART5 MCU | ✅ | RG40XXV | Verified end to end: raw frames light the L stick ring, and NextUI drives it with the seeded `0x440044` default after update. Second bank drives nothing on the V, confirming `dev_num_leds = 1`. `/dev/ttyS5` is free (console and getty are on `ttyS0`) |
+| LED-02 | Colour, brightness, all four effects | ✅ | RG40XXV | User-verified in LedControl |
+| LED-03 | Ambient Mode narrowed to Off/On | ✅ | RG40XXV | User-verified |
+| LED-01b | Two-bank models, bank order | ⏳ | RG40XX H / RG CubeXX | Untested — nobody in the fleet has one. Gated to 2 zones, `H700_LED_RIGHT_FIRST 1` per muOS. The V cannot settle bank order: with one populated bank both halves get the same colour, so its "first bank lights the left stick" observation does not generalise |
+| LED-06 | tg5040 regression after `PLAT_getNumLeds` | ✅ | TrimUI Brick | Per-LED mapping still correct — each LED responded to its own mode change. This is the path where a wrong count would write brightness 0 to the global `max_scale` and kill every LED |
+| LED-05 | Speed control | ✅ | RG40XXV | Rainbow/Rainbow Multi take a continuous 0-255 speed byte and vary smoothly across the whole 0-4900 range. Breathe has only the three firmware rates (modes 2/3/4), so its Speed row quantises into thirds — a known cosmetic wart, not a defect |
+| LED-02 | LedControl on a model without RGB | ⏳ | RG34XXSP / RG28XX | Pak now ships to every h700 device; must show the "no RGB lights" screen, exit on B, and never open `/dev/ttyS5` |
+| LED-03 | Ambient Mode narrowed to Off/On | ⏳ | RG40XXV | Option is hidden entirely at 0 lights and reduced to two entries at ≤2 |
 
 ## Test execution protocol
 

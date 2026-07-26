@@ -54,7 +54,7 @@ extern int dev_has_lstick, dev_has_rstick;
 #define FIXED_BPP     2
 #define SCREEN_FPS    60.0            // ⚠ assumed, never measured per panel
 #define SDCARD_PATH   "/mnt/SDCARD"   // symlink to the real TF2 mountpoint (02)
-#define MAX_LIGHTS    0               // no RGB LEDs on RG XX (work_led is on/off only)
+#define MAX_LIGHTS    2               // ceiling; PLAT_getNumLeds() reports 0/1/2 per model
 #define MAIN_ROW_COUNT (hdmi_active?10:(is_cube?8:6))
 ```
 
@@ -131,7 +131,7 @@ open/closed per poll and could drop the wake press between polls.
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
 | GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
-| LEDs | `MAX_LIGHTS 0`, all `PLAT_setLed*` stubs — hardware has no RGB LEDs. `work_led` used only as sleep/backlight indicator |
+| LEDs | RGB on RG40XX H / RG40XX V / RG CubeXX only, via an MCU on `/dev/ttyS5` (115200 8N1) gated by `axp2202-battery/mcu_pwr` — see `platform/led.c`. `MAX_LIGHTS 2` is a ceiling; `PLAT_getNumLeds()` returns 0 (no RGB), 1 (RG40XXV, one populated bank) or 2. Effects are rendered by the MCU firmware, not in userspace. `work_led` remains the sleep/backlight indicator on every model |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
 | Lid | `hallkey` path wired into `PLAT_initLid`/`PLAT_lidChanged` (`has_lid` = file exists); lid close → sleep and lid open wakes screen-off. RG34XXSP: POWER can wake light sleep with lid closed; deep sleep re-sleeps if the lid remains closed (06). |
 | Model | `PLAT_getModel` copies the raw `RGXX_MODEL` into a static buffer; when unavailable it returns `Anbernic RG XX` |
@@ -215,8 +215,13 @@ some translation units.
   That reasoning was wrong twice over: the tg5040 limbo is a PMIC latch that no
   init system can fix, and the base OS runs BusyBox init with no systemd at all.
   Both tools are now ported — see [06](06-power-sleep-battery.md#power-off--reboot).
-- LED animation wiring (`led_anim`), ledcontrol.elf (gated to tg50x0 in `workspace/makefile`)
-  — bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`
+- ~~LED animation wiring (`led_anim`), ledcontrol.elf (gated to tg50x0 in `workspace/makefile`)~~
+  **Partly reversed.** `led_anim` really is TrimUI-only, but the premise that RG XX has
+  no RGB LEDs was wrong — RG40XX H/V and RG CubeXX drive theirs from an MCU over UART5
+  (00). `ledcontrol.elf` now builds and ships for h700 as well, and LedControl is
+  platform-aware: it asks the platform for the light count, names and effect list, and
+  shows a "no RGB lights" screen on the models without them.
+  Bootlogo was initially gated off too, but has since been ported: `Bootlogo.pak`
   builds for h700 with resolution-keyed preset folders (`640x480`, `720x480`,
   `480x640`, `720x720`) selected via `$DEVICE`, writes `bootlogo.bmp` to `mmcblk0p2`
   (`BOOTLOGO_PARTITION` in `platform.h`), backs up the stock logo as

@@ -19,6 +19,9 @@ asound_state_dir=/tmp/asound-suspend
 before() {
 	>&2 echo "Preparing for suspend..."
 	echo 1 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
+	# RGB models: cut the LED MCU rail, otherwise the last frame stays lit for
+	# the whole sleep. NextUI repaints it on wake (PLAT_enableBacklight).
+	echo 0 > /sys/class/power_supply/axp2202-battery/mcu_pwr 2>/dev/null || true
 
 	# Run pre-sleep hooks synchronously before services are stopped.
 	# Subshell ensures a crashing hook cannot block suspend.
@@ -48,6 +51,7 @@ before() {
 after_sync() {
 	>&2 echo "Resumed from suspend."
 	echo 0 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
+	echo 1 > /sys/class/power_supply/axp2202-battery/mcu_pwr 2>/dev/null || true
 
 	if [ -f "$asound_state_dir/asound.state.pre" ]; then
 		>&2 echo "Restoring mixer state..."
