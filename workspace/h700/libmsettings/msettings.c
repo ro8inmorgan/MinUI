@@ -916,6 +916,12 @@ static void setFramebufferSize(int w, int h) {
 		vinfo.yres = h;
 		vinfo.xres_virtual = w;
 		vinfo.yres_virtual = h * 2; // double buffered
+		// The pan offset survives the resize: coming off the 640x480 panel it is
+		// still 480, which is not a page boundary of the new geometry. Left
+		// there it wedges the winsys — measured on RG40XXV, fb0 then never pans
+		// again and every frame lands in page 0. Reset it so the buffer starts
+		// on page 0 and the blob's flips work from a sane origin.
+		vinfo.xoffset = vinfo.yoffset = 0;
 		vinfo.bits_per_pixel = 32;
 		// FORCE so set_par runs (and rebuilds the DE layer for the new output)
 		// even when the geometry is unchanged
@@ -934,6 +940,11 @@ static void setFramebufferSize(int w, int h) {
 // switch we read-modify-write the fb0 layer ourselves with the geometry that
 // matches the new framebuffer and output; the blob's per-flip pans then keep
 // the crop in sync against our committed config.
+// The crop we commit must name page 0, matching the pan offset setFramebufferSize
+// just reset. Naming page 1 was only ever right if a flip landed before the first
+// scanout; when none does — which is what happens if the winsys is wedged, and
+// what happened on BaseOS — the display shows a page nothing has written, i.e.
+// black on both the TV and the panel.
 // The switch path restores the previous mode's layer config on device attach,
 // asynchronously and sometimes AFTER we've already written ours — whichever
 // commit lands last wins. So: commit, read back, and retry until it sticks.
@@ -958,7 +969,7 @@ static void commitLayerGeometry(int fbW, int fbH, int outW, int outH) {
 			config.info.fb.size[i].height = fbH * 2; // whole double buffer
 		}
 		config.info.fb.crop.x = 0;
-		config.info.fb.crop.y = ((long long)fbH) << 32; // page 1; pans re-sync it every flip
+		config.info.fb.crop.y = 0; // page 0 — see above
 		config.info.fb.crop.width = ((long long)fbW) << 32;
 		config.info.fb.crop.height = ((long long)fbH) << 32;
 		config.info.screen_win.x = 0;
@@ -976,7 +987,8 @@ static void commitLayerGeometry(int fbW, int fbH, int outW, int outH) {
 		if (ioctl(fd, DISP_LAYER_GET_CONFIG, param) < 0)
 			break;
 		applied = config.info.fb.size[0].width == (unsigned)fbW
-			&& config.info.screen_win.width == (unsigned)outW;
+			&& config.info.screen_win.width == (unsigned)outW
+			&& config.info.fb.crop.y == 0; // a late restore can revive the old page offset
 	}
 	if (!applied)
 		fprintf(stderr, "SetHDMI: layer geometry %dx%d->%dx%d did not stick\n", fbW, fbH, outW, outH);
