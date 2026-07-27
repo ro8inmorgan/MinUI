@@ -98,6 +98,17 @@ Cheats use RetroArch .cht file format. Many cheat files are here <https://github
 Cheat file name needs to match ROM name, and go underneath the "Cheats" directory. For example, `/Cheats/GB/Super Mario Land (World).zip.cht`. When a cheat file is detected, it will show up in the "cheats" menu item ingame. Not all cheats work with all cores, may want to clean up files to just the cheats you want.
 
 ----------------------------------------
+Shader sets
+
+The Shader Sets tool applies one frontend and shader configuration across all Minarch emulators. Set configs live in `/Shaders/sets`. Each `.cfg` file directly inside that folder appears as a selectable set. Select Disabled to use the normal emulator settings without a global set.
+
+A set can be adjusted for a specific emulator tag by adding a config with the same filename inside a tag subfolder. For example, `/Shaders/sets/Retro.cfg` is the fallback for every emulator and `/Shaders/sets/GBA/Retro.cfg` overrides its values for GBA games.
+
+Set configs support `minarch_` frontend, shader, and shader-parameter options only. Console settings are applied before the selected set, while per-game settings are applied afterward and take priority. Existing shader presets in `/Shaders` remain available separately in the in-game Shaders menu.
+
+The in-game Shortcuts menu includes Next Shader Set. Bind it to cycle through Disabled and the available sets, apply the new set immediately, and show the selected name in a notification.
+
+----------------------------------------
 
 Disc-based games
 

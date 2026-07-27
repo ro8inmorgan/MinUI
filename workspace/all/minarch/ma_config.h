@@ -13,6 +13,7 @@ void Config_readOptions(void);
 void Config_readControls(void);
 void Config_write(int override);
 void Config_restore(void);
+bool Config_reloadFrontendShaders(void);
 void Config_syncShaders(char* key, int value);
 void applyShaderSettings(void);
 void initShaders(void);

@@ -182,6 +182,8 @@ struct Config {
 	char* system_cfg;
 	char* default_cfg;
 	char* user_cfg;
+	char* shader_set_cfg;
+	char* shader_set_override_cfg;
 	char* shaders_preset;
 	char* device_tag;
 	OptionList frontend;
@@ -245,6 +247,7 @@ enum {
 	SHORTCUT_HOLD_REWIND,
 	SHORTCUT_GAMESWITCHER,
 	SHORTCUT_SCREENSHOT,
+	SHORTCUT_NEXT_SHADER_SET,
 	// Trimui only
 	SHORTCUT_TOGGLE_TURBO_A,
 	SHORTCUT_TOGGLE_TURBO_B,

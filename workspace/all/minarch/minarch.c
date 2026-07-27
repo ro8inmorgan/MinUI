@@ -245,8 +245,6 @@ int main(int argc , char* argv[]) {
 	int rewind_initialized = Rewind_init(core.serialize_size ? core.serialize_size() : 0);
 	rewind_init_ready = 1;  // Mark setup as attempted, even if rewind init failed, so option changes can retry it later.
 	if (rewind_initialized && core.serialize_size) Rewind_on_state_change();
-	// release config when all is loaded
-	Config_free();
 
 	LOG_info("total startup time %ims\n\n",SDL_GetTicks());
 	
