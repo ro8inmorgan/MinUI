@@ -22,7 +22,6 @@ ifeq ($(PLATFORM), desktop)
 	#cd ./all/libbatmondb/ && make
 	#cd ./all/battery/ && make
 	cd ./all/clock/ && make
-	cd ./all/shadersets/ && make
 	#cd ./all/batmon/ && make
 	#cd ./all/libgametimedb/ && make
 	#cd ./all/gametimectl/ && make
@@ -54,7 +53,6 @@ endif
 	cd ./all/settings/ && make
 	cd ./all/ledcontrol/ && make
 	cd ./all/bootlogo/ && make
-	cd ./all/shadersets/ && make
 	cd ./all/audiomon && make all
 	cd ./all/show2/ && make
 endif
@@ -93,7 +91,6 @@ endif
 	cd ./all/minarch/ && make clean
 	cd ./all/battery/ && make clean
 	cd ./all/clock/ && make clean
-	cd ./all/shadersets/ && make clean
 	cd ./all/libbatmondb/ && make clean
 	cd ./all/libgametimedb/ && make clean
 	cd ./all/gametimectl/ && make clean

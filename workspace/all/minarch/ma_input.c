@@ -26,8 +26,12 @@ static void nextShaderSet(void) {
 	}
 
 	if (list.count == 1) {
-		if (ShaderSets_setActive(""))
+		int had_active_set = config.shader_set_cfg || config.shader_set_override_cfg;
+		if (ShaderSets_setActive("")) {
+			if (had_active_set)
+				Config_reloadFrontendShaders();
 			Notification_push(NOTIFICATION_SETTING, "Shader set: Disabled", NULL);
+		}
 		else
 			Notification_push(NOTIFICATION_SETTING, "Unable to change shader set", NULL);
 		ShaderSets_freeList(&list);
