@@ -78,7 +78,7 @@ int loadImages()
     // presets are shared between devices with the same panel resolution
     char* folder = "640x480"; // rg35xx, rg40xx
     if (exactMatch("rg28xx", device)) folder = "480x640";
-    else if (exactMatch("rg34xx", device)) folder = "720x480";
+    else if (exactMatch("rg34xx", device) || exactMatch("rgsp", device)) folder = "720x480";
     else if (exactMatch("cube", device)) folder = "720x720";
     snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/%s/", TOOLS_PATH, folder);
 #else

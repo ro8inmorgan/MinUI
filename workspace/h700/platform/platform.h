@@ -13,6 +13,7 @@
 
 extern int is_rg28xx;
 extern int is_rg34xx;
+extern int is_rgsp;
 extern int is_cube;
 extern int hdmi_active;
 extern int dev_has_lstick;
@@ -156,7 +157,9 @@ extern int dev_num_leds;
 #define HDMI_SIZE		(HDMI_PITCH * HDMI_HEIGHT)
 
 #define FIXED_SCALE 	2
-#define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:(is_cube?720:(is_rg34xx?720:640)))
+// 720 wide on the RG34xx family and the RG SP, which shares the RG34XXSP panel;
+// 720x720 on the cube's square panel; 640x480 everywhere else.
+#define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:(is_cube?720:((is_rg34xx||is_rgsp)?720:640)))
 #define FIXED_HEIGHT	(hdmi_active?HDMI_HEIGHT:(is_cube?720:480))
 #define FIXED_BPP		2
 #define FIXED_DEPTH		(FIXED_BPP * 8)

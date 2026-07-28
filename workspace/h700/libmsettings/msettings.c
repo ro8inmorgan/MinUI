@@ -321,13 +321,16 @@ static int prefixMatch(char* pre, char* str) {
 }
 
 // Pick the displaycal preset for this device. Exact RGXX_MODEL strings confirmed
-// so far: RG28xx, RG34xx, RG34xxSP, RG40xxV, RGcubexx. The RG35xx family and
-// RG40xxH are matched by prefix/suffix until their exact strings are confirmed.
+// so far: RG28xx, RG34xx, RG34xxSP, RG40xxH, RG40xxV, RGSP, RGcubexx. The RG35xx
+// family is matched by prefix/suffix until its exact strings are confirmed.
 static enum DisplayCalPreset displayCalPresetForDevice(void) {
 	char* device = getenv("DEVICE");
 	char* model = getenv("RGXX_MODEL");
 
 	if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) return DISPLAYCAL_PRESET_RG28XX;
+	// Before the RG34xx prefix test: the RG SP shares that panel but is its own
+	// preset, and its bare "RGSP" would not match the prefix anyway.
+	if (exactMatch("RGSP", model) || exactMatch("rgsp", device)) return DISPLAYCAL_PRESET_RGSP;
 	if (exactMatch("RG34xxSP", model)) return DISPLAYCAL_PRESET_RG34XXSP;
 	if (prefixMatch("RG34xx", model) || exactMatch("rg34xx", device)) return DISPLAYCAL_PRESET_RG34XX;
 	if (exactMatch("RG40xxV", model)) return DISPLAYCAL_PRESET_RG40XXV;
@@ -857,7 +860,8 @@ static void panelSize(int* w, int* h) {
 	char* model = getenv("RGXX_MODEL");
 	*w = 640; *h = 480;
 	if (exactMatch("RGcubexx", model) || exactMatch("cube", device)) { *w = 720; *h = 720; }
-	else if (exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model) || exactMatch("rg34xx", device)) { *w = 720; *h = 480; }
+	else if (exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model) || exactMatch("rg34xx", device)
+		|| exactMatch("RGSP", model) || exactMatch("rgsp", device)) { *w = 720; *h = 480; } // RG SP shares the RG34XXSP panel
 	else if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) { *w = 480; *h = 640; } // panel is mounted portrait
 }
 

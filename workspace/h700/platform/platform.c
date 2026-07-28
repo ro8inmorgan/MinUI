@@ -28,6 +28,7 @@
 
 int is_rg28xx = 0;
 int is_rg34xx = 0;
+int is_rgsp = 0;
 int is_cube = 0;
 int hdmi_active = 0;
 int dev_has_lstick = 0;
@@ -198,6 +199,14 @@ static void detect_device(void) {
 
 	is_rg28xx = exactMatch("rg28xx", device) || exactMatch("RG28xx", model);
 	is_rg34xx = exactMatch("rg34xx", device) || exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model);
+	// The RG SP is the RG34XXSP without the sticks: same panel (lcd_driver_name
+	// rg34xxsp_v1, identical DTB timings), bigger battery. Its stock RGXX_MODEL
+	// is a bare "RGSP", which no family glob matches -- hence its own flag
+	// rather than folding it into is_rg34xx, so stick and LED policy stay exact.
+	// Matched on the model as well as DEVICE, like the others: the installer shim
+	// (install/boot.sh) exports RGXX_MODEL but never DEVICE, so anything reached
+	// from that path sees only the model string.
+	is_rgsp = exactMatch("rgsp", device) || exactMatch("RGSP", model);
 	is_cube = exactMatch("cube", device) || (model && prefixMatch("RGcube", model));
 
 	// RGB LEDs exist only on the RG40XX H, RG40XX V and RG CubeXX (same three
@@ -215,11 +224,14 @@ static void detect_device(void) {
 
 	// Analog sticks per model; every stick on these devices clicks (L3 = left,
 	// R3 = right). Exact RGXX_MODEL strings confirmed so far: RG28xx, RG34xx,
-	// RG34xxSP, RG40xxV, RGcubexx. The RG35xx family and RG40xxH are matched by
-	// prefix/suffix until their exact strings are confirmed (same as msettings).
+	// RG34xxSP, RG40xxH, RG40xxV, RGSP, RGcubexx. The RG35xx family is matched
+	// by prefix/suffix until its exact strings are confirmed (same as msettings).
 	dev_has_lstick = 1; // unknown models keep the previous dual-stick layout
 	dev_has_rstick = 1;
-	if (is_rg28xx) {
+	if (is_rg28xx || is_rgsp) {
+		// The RG SP drops the RG34XXSP's sticks entirely: its device tree has no
+		// keyL3/keyR3 and none of the analog multiplexer pins (amux-en-gpios,
+		// A0/A1_gpio, adc-en-gpios), and the GPADC itself is status="disabled".
 		dev_has_lstick = dev_has_rstick = 0;
 	}
 	else if (is_rg34xx) {

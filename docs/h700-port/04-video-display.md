@@ -32,6 +32,7 @@ The stack:
 |---|---|---|---|
 | RG40XXV | 640×480 4:3 | 640×480 | Native landscape reference panel |
 | RG34XXSP | 720×480 3:2 | 720×480 | Broad UI and scaling evidence gathered during bring-up |
+| RG SP | 720×480 3:2 | 720×480 | Same panel as RG34XXSP (`rg34xxsp_v1`, identical DTB timings); firmware-derived, never run on hardware |
 | RG28XX | 480×640 portrait | 640×480 logical | Driver-level rotation; see the rotation decision below |
 | RGcubexx | 720×720 | 720×720 | `is_cube` geometry path; community scaling feedback available |
 
@@ -160,11 +161,13 @@ survive reboot. (tg5040 has the same latent bug, masked by its calibrated preset
 flagged as a separate task.)
 
 **Per-model default presets — plumbed, not yet measured.** `displaycal.h` has a
-preset per H700 model (RG28XX, RG34XX, RG34XXSP, RG35XX = Plus/H/2024 shared,
+preset per H700 model (RG28XX, RG34XX, RG34XXSP, RGSP, RG35XX = Plus/H/2024 shared,
 RG35XXSP, RG35XXPRO, RG40XXH, RG40XXV, RGCubeXX), all currently disabled/neutral
-(100/100/100). Selection keys on `RGXX_MODEL` (exact-model string from stock
-`dmenu.bin`; confirmed so far: `RG28xx`, `RG34xx`, `RG34xxSP`, `RG40xxV`,
-`RGcubexx` — RG35xx-family and RG40xxH strings matched by prefix until confirmed)
+(100/100/100). The RG SP keeps its own preset rather than sharing the RG34XXSP's,
+so calibrating one panel cannot silently retune the other. Selection keys on
+`RGXX_MODEL` (exact-model string from stock `dmenu.bin`; confirmed so far:
+`RG28xx`, `RG34xx`, `RG34xxSP`, `RGSP`, `RG40xxH`, `RG40xxV`,
+`RGcubexx` — RG35xx-family strings matched by prefix until confirmed)
 with `DEVICE` fallback, in both h700 libmsettings and the settings app's
 reset-to-defaults. launch.sh now maps `RG35xx*` → `DEVICE=rg35xx` instead of lumping
 the 35xx family into rg40xx. Calibrating a panel later = editing numbers in

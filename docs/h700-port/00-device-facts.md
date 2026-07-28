@@ -16,6 +16,27 @@ Anbernic stock-firmware update — paths have historically been stable, but the
 | Anbernic RG40XXV (H700) | Probed live | 640×480, one stick, HDMI; primary probe device |
 | Anbernic RG34XXSP (H700) | User-tested | 720×480, dual sticks, clamshell lid sensor |
 | Anbernic RG28XX (H700) | User-tested | Rotated 480×640 panel |
+| Anbernic RG SP (H700) | Firmware-analysed | 720×480, **no** sticks; RG34XXSP hardware minus the sticks |
+
+### RG SP vs RG34XXSP
+
+Established by comparing the stock `2026-07-27 ANBERNIC RG SP TF1.img` against both
+the RG34XXSP stock and StockMod images. The two devices are near-identical: same
+DRAM type (boot0 differs by 11 bytes of parameter block), same kernel size to the
+byte, and `mali_kbase`/`8821cs`/`rtl_btlpm` with byte-identical `.text`.
+
+The entire device-tree difference is 34 lines:
+
+| Change | Meaning |
+|---|---|
+| `lcd_*` **unchanged** — `lcd_driver_name = "rg34xxsp_v1"`, 720×480, identical timings | same panel; DTB fingerprint `26-820-536`, the `34xx` entry in the panel-fix table below |
+| `pmu_battery_cap` `0xce4` → `0xdac` | 3300 → 3500 mAh |
+| `keyL3`/`keyR3` removed; `amux-en-gpios`, `A0_gpio`, `A1_gpio`, `adc-en-gpios` removed | no analog sticks |
+| GPADC `status` `okay` → `disabled`, five unused `key0..4_vol/val` added | stick ADC turned off |
+
+⚠ **The stock `bootlogo.bmp` is 640×480 on a 720×480 panel — on the RG34XXSP too.**
+It is a stock packaging quirk, not evidence about the panel; StockMod replaces it
+with a correct 720×480 image. Do not treat the vendor bootlogo as a geometry source.
 
 ## RG40XXV (H700) — probed live
 
@@ -221,6 +242,13 @@ Consequences:
    breaks: fb0 mode `480x640` → 28xx, `xres/yres` in /sys/class/disp,
    `axp2202-battery/display_id`, DTB lcd timings.
 
+   Strings read straight out of the vendor `dmenu.bin` in each firmware's `appfs`
+   (p6, the partition mounted at `/mnt/vendor`): **`RGSP`**, `RG34xx`, `RG40xxH`.
+   ⚠ The RG SP's is a bare **`RGSP`** — no `xx` — so it matches none of the
+   `RG34xx*`/`RG40xx*` family globs in launch.sh and needs its own case. Before that
+   case existed it hit the `*) DEVICE="rg40xx"` fallback and NextUI drew the UI at
+   640×480 on a 720×480 panel, which is the "4:3 instead of 3:2" symptom users saw.
+
 ## TG5040 (reference) — probed live
 - Kernel `4.9.191 aarch64` (TinaLinux/OpenWRT-flavored), **glibc 2.33**
 - `/sys/power/state`: `freeze mem`; same disp2 attrs incl. `color_temperature`;
@@ -264,4 +292,8 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
 ## Known hardware unknowns
 
 1. Real panel refresh rate — `SCREEN_FPS 60.0` is assumed, never measured.
-2. Exact stock `RGXX_MODEL` strings for the RG35XX family and RG40XXH.
+2. Exact stock `RGXX_MODEL` strings for the RG35XX family. (RG40XXH is now
+   confirmed as `RG40xxH`, read from its StockMod `dmenu.bin`.)
+3. RG SP support is derived entirely from firmware analysis — never run on the
+   hardware. Panel geometry, stickless input and the displaycal preset all need
+   confirming on a real unit.

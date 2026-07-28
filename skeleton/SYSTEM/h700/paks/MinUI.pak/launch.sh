@@ -96,6 +96,12 @@ echo "launch: starting $(date)" > "$LAUNCH_LOG"
 export RGXX_MODEL="$(strings /mnt/vendor/bin/dmenu.bin 2>/dev/null | grep -m1 '^RG')"
 case "$RGXX_MODEL" in
 	RG28xx) export DEVICE="rg28xx" ;;
+	# The RG SP reports a bare "RGSP" -- no "xx" -- so it matched none of the
+	# family globs and fell through to the rg40xx fallback, which drew the UI
+	# 640x480 on its 720x480 panel. It shares the RG34XXSP panel exactly (same
+	# lcd_driver_name rg34xxsp_v1, DTB fingerprint 26-820-536) but has no analog
+	# sticks, so it gets its own DEVICE rather than an rg34xx alias.
+	RGSP) export DEVICE="rgsp" ;;
 	RG34xx*|RG34XX*) export DEVICE="rg34xx" ;;
 	RG35xx*|RG35XX*) export DEVICE="rg35xx" ;;
 	RG40xx*|RG40XX*) export DEVICE="rg40xx" ;;

@@ -10,7 +10,7 @@ surface, repoint hardware access to the H700 paths (00), borrowing only hardware
 constants from the old rg35xxplus port (`git show 8cd78866:...`).
 
 One platform serves all devices: `DEVICE`/`RGXX_MODEL` env (set by launch.sh, see 02)
-→ `detect_device()` sets `is_rg28xx / is_rg34xx / is_cube` globals that drive
+→ `detect_device()` sets `is_rg28xx / is_rg34xx / is_rgsp / is_cube` globals that drive
 resolution and the bootlogo preview rotation (panel rotation itself is handled
 entirely by the SDL driver via `SDL_ROTATION=1`; nothing app-side rotates — 04),
 plus `dev_has_lstick / dev_has_rstick` capability flags
@@ -23,6 +23,7 @@ R3 ⇔ right):
 | Device | Sticks | Detection key |
 |---|---|---|
 | RG28XX, RG34XX, RG35XX Plus/2024/SP | none | `RG28xx` / `RG34xx` exact; `RG35xx` prefix default |
+| RG SP | none | `RGSP` exact |
 | RG35XX H, RG35XX Pro | dual | `RG35xx` prefix + `H`/`Pro` suffix |
 | RG34XXSP | dual | `RG34xxSP` exact |
 | RG40XX H, RG CubeXX, unknown | dual | `RG40xxH`, `RGcube*`; dual is the fallback |
@@ -31,8 +32,13 @@ R3 ⇔ right):
 Unknown `RG35xx` variants default to stickless (most of that family is); anything
 else unknown defaults to dual (today's behavior, covers `DEVICE=rg40xx` without a
 model string). No H700 Anbernic device has an Fn switch. Exact `RGXX_MODEL` strings
-still unconfirmed for the RG35xx family and RG40xxH (same caveat as msettings'
-displaycal presets).
+still unconfirmed for the RG35xx family (same caveat as msettings' displaycal
+presets).
+
+The RG SP is stickless on device-tree evidence rather than spec sheets: its DTB has
+no `keyL3`/`keyR3` nodes, none of the analog multiplexer pins the RG34XXSP carries
+(`amux-en-gpios`, `A0_gpio`, `A1_gpio`, `adc-en-gpios`), and the GPADC itself is
+`status = "disabled"`.
 
 The Input pak uses the per-device capability flags to show only the sticks that exist,
 including their analog axis movement and L3/R3 click state. This is verified on the
@@ -42,14 +48,14 @@ left stick on RG40XXV and for both sticks on RG34XXSP.
 ## platform.h (as shipped)
 
 ```c
-extern int is_rg28xx, is_rg34xx, is_cube;
+extern int is_rg28xx, is_rg34xx, is_rgsp, is_cube;
 extern int hdmi_active;
 extern int dev_has_lstick, dev_has_rstick;
 
 #define HDMI_WIDTH   1280
 #define HDMI_HEIGHT  720
 #define FIXED_SCALE   2
-#define FIXED_WIDTH   (hdmi_active?HDMI_WIDTH:(is_cube?720:(is_rg34xx?720:640)))
+#define FIXED_WIDTH   (hdmi_active?HDMI_WIDTH:(is_cube?720:((is_rg34xx||is_rgsp)?720:640)))
 #define FIXED_HEIGHT  (hdmi_active?HDMI_HEIGHT:(is_cube?720:480))
 #define FIXED_BPP     2
 #define SCREEN_FPS    60.0            // ⚠ assumed, never measured per panel

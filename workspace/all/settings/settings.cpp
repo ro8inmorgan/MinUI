@@ -257,6 +257,7 @@ namespace {
             RG40XXH,
             RG34XX,
             RG34XXSP,
+            RGSP, // RG34XXSP panel, no sticks
             RG35XX, // Plus/H/2024
             RG35XXSP,
             RG35XXPRO,
@@ -307,6 +308,10 @@ namespace {
                     m_vendor = Anbernic;
                     m_model = RG34XX;
                     m_platform = h700;
+                } else if(exactMatch("rgsp", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RGSP;
+                    m_platform = h700;
                 } else if(exactMatch("rg28xx", device)) {
                     m_vendor = Anbernic;
                     m_model = RG28XX;
@@ -325,6 +330,7 @@ namespace {
                 if (model == "RG40xxV") m_model = RG40XXV;
                 else if (model == "RG40xxH") m_model = RG40XXH;
                 else if (model == "RG34xxSP") m_model = RG34XXSP;
+                else if (model == "RGSP") m_model = RGSP;
                 else if (model.rfind("RG35xx", 0) == 0) {
                     std::string suffix = model.substr(6);
                     if (suffix.rfind("SP", 0) == 0) m_model = RG35XXSP;
@@ -591,6 +597,7 @@ int main(int argc, char *argv[])
                 deviceInfo.getModel() == DeviceInfo::RG28XX ? DISPLAYCAL_PRESET_RG28XX :
                 deviceInfo.getModel() == DeviceInfo::RG34XX ? DISPLAYCAL_PRESET_RG34XX :
                 deviceInfo.getModel() == DeviceInfo::RG34XXSP ? DISPLAYCAL_PRESET_RG34XXSP :
+                deviceInfo.getModel() == DeviceInfo::RGSP ? DISPLAYCAL_PRESET_RGSP :
                 deviceInfo.getModel() == DeviceInfo::RG35XX ? DISPLAYCAL_PRESET_RG35XX :
                 deviceInfo.getModel() == DeviceInfo::RG35XXSP ? DISPLAYCAL_PRESET_RG35XXSP :
                 deviceInfo.getModel() == DeviceInfo::RG35XXPRO ? DISPLAYCAL_PRESET_RG35XXPRO :
