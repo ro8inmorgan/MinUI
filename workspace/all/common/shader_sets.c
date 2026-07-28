@@ -227,6 +227,46 @@ int ShaderSets_activeIndex(const ShaderSetList *list)
 	return 0;
 }
 
+bool ShaderSets_getActive(char *name, size_t name_size)
+{
+	ShaderSetList list;
+	FILE *file;
+
+	if (!name || name_size == 0)
+		return false;
+
+	name[0] = '\0';
+	file = fopen(SHADER_SET_STATE_PATH, "r");
+	if (!file)
+		return errno == ENOENT;
+	if (fgets(name, name_size, file))
+		name[strcspn(name, "\r\n")] = '\0';
+	if (ferror(file) || fclose(file) != 0) {
+		name[0] = '\0';
+		return false;
+	}
+	if (!name[0])
+		return true;
+	if (!isSafeComponent(name)) {
+		name[0] = '\0';
+		return false;
+	}
+
+	if (!ShaderSets_list(&list))
+		return false;
+
+	for (int i = 1; i < list.count; i++) {
+		if (!strcmp(list.names[i], name)) {
+			ShaderSets_freeList(&list);
+			return true;
+		}
+	}
+
+	ShaderSets_freeList(&list);
+	name[0] = '\0';
+	return false;
+}
+
 bool ShaderSets_setActive(const char *name)
 {
 	char path[MAX_PATH];

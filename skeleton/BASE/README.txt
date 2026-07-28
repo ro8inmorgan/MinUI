@@ -108,7 +108,9 @@ Set configs support `minarch_` frontend, shader, and shader-parameter options on
 
 The in-game Shortcuts menu includes Next Shader Set. Bind it to cycle through Disabled and the available sets, apply the new set immediately, and show the selected name in a notification.
 
-Saving console or per-game settings while a shader set is active saves the currently effective shader values into that emulator config. Select Disabled before saving if you do not want the set values included.
+When a shader set is active, Save for console keeps normal emulator, control, and shortcut settings in the console config and writes frontend or shader changes to `/Shaders/sets/<TAG>/<Set>.cfg`. Only values differing from the effective root-set baseline are written, making the generated override suitable for review and sharing.
+
+Save for game continues to save the currently effective shader values into the game config. Game settings take priority over shader sets, so that game may retain those values when switching sets.
 
 ----------------------------------------
 

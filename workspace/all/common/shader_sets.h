@@ -22,6 +22,7 @@ void ShaderSets_freeList(ShaderSetList *list);
 
 const char *ShaderSets_displayName(const char *name);
 int ShaderSets_activeIndex(const ShaderSetList *list);
+bool ShaderSets_getActive(char *name, size_t name_size);
 bool ShaderSets_setActive(const char *name);
 bool ShaderSets_advance(const ShaderSetList *list, char *name, size_t name_size);
 

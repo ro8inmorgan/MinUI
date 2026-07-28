@@ -432,13 +432,19 @@ static int OptionSaveChanges_onConfirm(MenuList* list, int i) {
 	char* message;
 	switch (i) {
 		case 0: {
-			Config_write(CONFIG_WRITE_ALL);
-			message = "Saved for console.";
+			int result = Config_write(CONFIG_WRITE_ALL);
+			if (result == CONFIG_WRITE_SHADER_SET)
+				message = "Saved console and shader set.";
+			else if (result == CONFIG_WRITE_STANDARD)
+				message = "Saved for console.";
+			else
+				message = "Unable to save for console.";
 			break;
 		}
 		case 1: {
-			Config_write(CONFIG_WRITE_GAME);
-			message = "Saved for game.";
+			message = Config_write(CONFIG_WRITE_GAME)
+				? "Saved for game."
+				: "Unable to save for game.";
 			break;
 		}
 		default: {
