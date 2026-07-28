@@ -113,14 +113,13 @@ void MSG_quit(void) {
 
 ///////////////////////////////////////
 
-#define MENU_ITEM_COUNT 6
+#define MENU_ITEM_COUNT 5
 #define MENU_SLOT_COUNT 8
 
 enum {
 	ITEM_CONT,
 	ITEM_SAVE,
 	ITEM_LOAD,
-	ITEM_UNDO,
 	ITEM_OPTS,
 	ITEM_QUIT,
 };
@@ -162,7 +161,6 @@ static struct {
 		[ITEM_CONT] = "Continue",
 		[ITEM_SAVE] = "Save",
 		[ITEM_LOAD] = "Load",
-		[ITEM_UNDO] = "Undo",
 		[ITEM_OPTS] = "Options",
 		[ITEM_QUIT] = "Quit",
 	}
@@ -1860,6 +1858,13 @@ void Menu_loop(void) {
 			status = STATUS_CONT;
 			show_menu = 0;
 		}
+		else if (PAD_justPressed(BTN_X)) {
+			if (selected==ITEM_LOAD && State_hasUndo()) {
+				Menu_undoLoadState();
+				status = STATUS_LOAD;
+				show_menu = 0;
+			}
+		}
 		else if (PAD_justPressed(BTN_A)) {
 			switch(selected) {
 				case ITEM_CONT:
@@ -1884,15 +1889,6 @@ void Menu_loop(void) {
 					Menu_loadState();
 					status = STATUS_LOAD;
 					show_menu = 0;
-				}
-				break;
-				case ITEM_UNDO: {
-					// inert while there's nothing to undo, matching the greyed out label
-					if (State_hasUndo()) {
-						Menu_undoLoadState();
-						status = STATUS_LOAD;
-						show_menu = 0;
-					}
 				}
 				break;
 				case ITEM_OPTS: {
@@ -1964,10 +1960,14 @@ void Menu_loop(void) {
 			
 			if (show_setting && !GetHDMI()) GFX_blitHardwareHints(screen, show_setting);
 			else GFX_blitButtonGroup((char*[]){ BTN_SLEEP==BTN_POWER?"POWER":"MENU","SLEEP", NULL }, 0, screen, 0);
-			GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OKAY", NULL }, 1, screen, 1);
+			if (selected==ITEM_LOAD && State_hasUndo()) {
+				GFX_blitButtonGroup((char*[]){ "X","UNDO LOAD", "B","BACK", "A","LOAD", NULL }, 1, screen, 1);
+			}
+			else {
+				GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OKAY", NULL }, 1, screen, 1);
+			}
 			
 			// list
-			int can_undo = State_hasUndo();
 			oy = (((DEVICE_HEIGHT / FIXED_SCALE) - PADDING * 2) - (MENU_ITEM_COUNT * PILL_SIZE)) / 2;
 			for (int i=0; i<MENU_ITEM_COUNT; i++) {
 				char* item = menu.items[i];
@@ -2003,10 +2003,6 @@ void Menu_loop(void) {
 						SCALE1(PILL_SIZE)
 					});
 				}
-
-				// grey out undo while no snapshot is available, but keep it selectable
-				// so the cursor still lands somewhere sensible
-				if (i==ITEM_UNDO && !can_undo) text_color = COLOR_GRAY;
 
 				// text
 				text = TTF_RenderUTF8_Blended(font.large, item, text_color);
