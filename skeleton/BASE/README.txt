@@ -104,13 +104,13 @@ The first option in the in-game Shaders menu applies one frontend and shader con
 
 A set can be adjusted for a specific emulator tag by adding a config with the same filename inside a tag subfolder. For example, `/Shaders/sets/Retro.cfg` is the fallback for every emulator and `/Shaders/sets/GBA/Retro.cfg` overrides its values for GBA games.
 
-Set configs support `minarch_` frontend, shader, and shader-parameter options only. Console settings are applied before the selected set, while per-game settings are applied afterward and take priority. Existing shader presets in `/Shaders` remain available separately in the in-game Shaders menu.
+Set configs support `minarch_` frontend, shader, and shader-parameter options only. The selected set is applied after console or per-game settings and takes priority for those visual options. Existing shader presets in `/Shaders` remain available separately in the in-game Shaders menu.
 
 The in-game Shortcuts menu includes Next Shader Set. Bind it to cycle through Disabled and the available sets, apply the new set immediately, and show the selected name in a notification.
 
-When a shader set is active, Save for console keeps normal emulator, control, and shortcut settings in the console config and writes frontend or shader changes to `/Shaders/sets/<TAG>/<Set>.cfg`. Only values differing from the effective root-set baseline are written, making the generated override suitable for review and sharing.
+When a shader set is active, Save for console keeps normal emulator, control, and shortcut settings in the console config and writes a complete frontend and shader snapshot to `/Shaders/sets/<TAG>/<Set>.cfg`. This tag override replaces the root set values for that emulator until it is regenerated or removed.
 
-Save for game continues to save the currently effective shader values into the game config. Game settings take priority over shader sets, so that game may retain those values when switching sets.
+Save for game continues to save the currently effective shader values into the game config. The active set stays visually in control; selecting Disabled reveals the saved game values again.
 
 ----------------------------------------
 

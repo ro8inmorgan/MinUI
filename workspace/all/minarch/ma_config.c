@@ -652,25 +652,25 @@ void Config_free(void) {
 void Config_readOptions(void) {
 	Config_readOptionsString(config.system_cfg);
 	Config_readOptionsString(config.default_cfg);
-	if (config.loaded == CONFIG_CONSOLE)
-		Config_readOptionsString(config.user_cfg);
+	Config_readOptionsString(config.user_cfg);
+	// Active sets intentionally override both console and game visual settings.
 	Config_readFrontendShaderOptionsString(config.shader_set_cfg, 1);
 	Config_readFrontendShaderOptionsString(config.shader_set_override_cfg, 1);
-	if (config.loaded == CONFIG_GAME)
-		Config_readOptionsString(config.user_cfg);
 }
 void Config_readControls(void) {
 	Config_readControlsString(config.default_cfg);
 	Config_readControlsString(config.user_cfg);
 }
 
-static int Config_writeFrontendShaders(FILE *file) {
+static int Config_writeFrontendShaders(FILE *file, int preserve_locks) {
 	for (int i=0; config.frontend.options[i].key; i++) {
 		Option* option = &config.frontend.options[i];
 		int count = 0;
 		while ( option->values &&  option->values[count]) count++;
 		if (option->value >= 0 && option->value < count) {
-			if (fprintf(file, "%s = %s\n", option->key, option->values[option->value]) < 0)
+			if (fprintf(file, "%s%s = %s\n",
+				preserve_locks && option->lock ? "-" : "",
+				option->key, option->values[option->value]) < 0)
 				return 0;
 		}
 	}
@@ -679,7 +679,9 @@ static int Config_writeFrontendShaders(FILE *file) {
 		int count = 0;
 		while ( option->values &&  option->values[count]) count++;
 		if (option->value >= 0 && option->value < count) {
-			if (fprintf(file, "%s = %s\n", option->key, option->values[option->value]) < 0)
+			if (fprintf(file, "%s%s = %s\n",
+				preserve_locks && option->lock ? "-" : "",
+				option->key, option->values[option->value]) < 0)
 				return 0;
 		}
 	}
@@ -689,7 +691,9 @@ static int Config_writeFrontendShaders(FILE *file) {
 			int count = 0;
 			while ( option->values &&  option->values[count]) count++;
 			if (option->value >= 0 && option->value < count) {
-				if (fprintf(file, "%s = %s\n", option->key, option->values[option->value]) < 0)
+				if (fprintf(file, "%s%s = %s\n",
+					preserve_locks && option->lock ? "-" : "",
+					option->key, option->values[option->value]) < 0)
 					return 0;
 			}
 		}
@@ -754,7 +758,7 @@ static int Config_writeStandard(const char *path) {
 	if (!file)
 		return 0;
 
-	if (!Config_writeFrontendShaders(file) || !Config_writeNonvisual(file)) {
+	if (!Config_writeFrontendShaders(file, 0) || !Config_writeNonvisual(file)) {
 		fclose(file);
 		return 0;
 	}
@@ -830,278 +834,29 @@ static int Config_writePreservedVisual(FILE *file, const char *cfg) {
 	return 1;
 }
 
-static int Config_resolveOptionIndex(Option *option, const char *console_cfg,
-	const char *root_cfg, int *lock) {
-	const char *layers[] = {
-		config.system_cfg,
-		config.default_cfg,
-		console_cfg,
-		root_cfg,
-	};
-	int value_index = option->default_value;
-	char value[256];
-
-	if (lock) *lock = 0;
-	for (size_t i = 0; i < sizeof(layers) / sizeof(layers[0]); i++) {
-		if (layers[i] && Config_getValue((char *)layers[i], option->key, value, lock))
-			value_index = Option_getValueIndex(option, value);
-	}
-	return value_index;
-}
-
-static int Config_resolvePragmaIndex(int pass, Option *option, int default_index,
-	const char *console_cfg, const char *root_cfg, int *lock) {
-	const char *layers[] = {
-		config.system_cfg,
-		config.default_cfg,
-		console_cfg,
-		root_cfg,
-	};
-	int value = default_index;
-	int shader_count = config.shaders.options[SH_NROFSHADERS].default_value;
-	char serialized[256];
-
-	if (lock) *lock = 0;
-	for (size_t i = 0; i < sizeof(layers) / sizeof(layers[0]); i++) {
-		if (!layers[i])
-			continue;
-		if (Config_getValue((char *)layers[i],
-			config.shaders.options[SH_NROFSHADERS].key, serialized, NULL))
-			shader_count = Option_getValueIndex(
-				&config.shaders.options[SH_NROFSHADERS], serialized);
-		if (pass < shader_count &&
-			Config_getValue((char *)layers[i], option->key, serialized, lock))
-			value = Option_getValueIndex(option, serialized);
-	}
-	return value;
-}
-
-static int Config_getPragmaDefaultIndex(int pass, Option *option) {
-	ShaderParam *params = PLAT_getShaderPragmas(pass);
-	if (!params || !option->values)
-		return 0;
-
-	for (int i = 0; i < 32; i++) {
-		if (!strcmp(params[i].name, option->key)) {
-			for (int j = 0; option->values[j]; j++) {
-				float candidate = strtof(option->values[j], NULL);
-				if (fabsf(params[i].def - candidate) < 0.001f)
-					return j;
-			}
-			break;
-		}
-	}
-	return 0;
-}
-
-static int Config_writeOverrideDelta(FILE *file, const char *console_cfg, const char *root_cfg) {
-	int written = 0;
-
-	for (int i = 0; config.frontend.options[i].key; i++) {
-		Option *option = &config.frontend.options[i];
-		if (!option->values || option->value < 0 || !option->values[option->value])
-			continue;
-		int baseline_lock = 0;
-		int baseline = Config_resolveOptionIndex(option, console_cfg, root_cfg, &baseline_lock);
-		if (option->value != baseline || option->lock != baseline_lock) {
-			if (fprintf(file, "%s%s = %s\n", option->lock ? "-" : "",
-				option->key, option->values[option->value]) < 0)
-				return -1;
-			written++;
-		}
-	}
-
-	for (int i = 0; config.shaders.options[i].key; i++) {
-		Option *option = &config.shaders.options[i];
-		if (!option->values || option->value < 0 || !option->values[option->value])
-			continue;
-		int baseline_lock = 0;
-		int baseline = Config_resolveOptionIndex(option, console_cfg, root_cfg, &baseline_lock);
-		if (option->value != baseline || option->lock != baseline_lock) {
-			if (fprintf(file, "%s%s = %s\n", option->lock ? "-" : "",
-				option->key, option->values[option->value]) < 0)
-				return -1;
-			written++;
-		}
-	}
-
-	for (int pass = 0; pass < config.shaders.options[SH_NROFSHADERS].value; pass++) {
-		for (int i = 0; i < config.shaderpragmas[pass].count; i++) {
-			Option *option = &config.shaderpragmas[pass].options[i];
-			if (!option->values || option->value < 0 || !option->values[option->value])
-				continue;
-			int baseline_lock = 0;
-			int baseline = Config_resolvePragmaIndex(pass, option,
-				Config_getPragmaDefaultIndex(pass, option), console_cfg, root_cfg,
-				&baseline_lock);
-			if (option->value != baseline || option->lock != baseline_lock) {
-				if (fprintf(file, "%s%s = %s\n", option->lock ? "-" : "",
-					option->key, option->values[option->value]) < 0)
-					return -1;
-				written++;
-			}
-		}
-	}
-	return written;
-}
-
 static int Config_makeTempPath(const char *path, char *temp_path, size_t temp_size) {
 	return snprintf(temp_path, temp_size, "%s.tmp.%ld", path, (long)getpid()) < (int)temp_size;
-}
-
-static int Config_makeBackupPath(const char *path, char *backup_path, size_t backup_size) {
-	return snprintf(backup_path, backup_size, "%s.bak.%ld", path, (long)getpid()) < (int)backup_size;
-}
-
-static int Config_copyFile(const char *source, const char *destination) {
-	FILE *input = fopen(source, "rb");
-	if (!input)
-		return 0;
-	FILE *output = fopen(destination, "wb");
-	if (!output) {
-		fclose(input);
-		return 0;
-	}
-
-	char buffer[4096];
-	size_t count;
-	int result = 1;
-	while ((count = fread(buffer, 1, sizeof(buffer), input)) > 0) {
-		if (fwrite(buffer, 1, count, output) != count) {
-			result = 0;
-			break;
-		}
-	}
-	if (ferror(input))
-		result = 0;
-	fclose(input);
-	if (!result) {
-		fclose(output);
-		unlink(destination);
-		return 0;
-	}
-	if (!Config_finishFile(output)) {
-		unlink(destination);
-		return 0;
-	}
-	return 1;
-}
-
-static void Config_restoreBackup(const char *backup_path, const char *path, int had_original) {
-	if (had_original) {
-		if (rename(backup_path, path) != 0)
-			LOG_error("failed to restore config: %s\n", path);
-	}
-	else {
-		unlink(path);
-	}
-}
-
-static int Config_commitConsoleAndOverride(const char *console_temp, const char *console_path,
-	const char *override_temp, const char *override_path, int has_override,
-	const char *game_path, int remove_game) {
-	char console_backup[MAX_PATH];
-	char override_backup[MAX_PATH];
-	char game_backup[MAX_PATH];
-	int console_backed_up = 0;
-	int override_backed_up = 0;
-	int game_backed_up = 0;
-	int console_installed = 0;
-	int override_modified = 0;
-
-	if (!Config_makeBackupPath(console_path, console_backup, sizeof(console_backup)) ||
-		!Config_makeBackupPath(override_path, override_backup, sizeof(override_backup)) ||
-		(remove_game && !Config_makeBackupPath(game_path, game_backup, sizeof(game_backup))))
-		return 0;
-
-	unlink(console_backup);
-	unlink(override_backup);
-	if (remove_game)
-		unlink(game_backup);
-
-	if (exists((char *)console_path)) {
-		if (!Config_copyFile(console_path, console_backup))
-			goto rollback;
-		console_backed_up = 1;
-	}
-	if (exists((char *)override_path)) {
-		if (!Config_copyFile(override_path, override_backup))
-			goto rollback;
-		override_backed_up = 1;
-	}
-	if (remove_game && exists((char *)game_path)) {
-		if (!Config_copyFile(game_path, game_backup))
-			goto rollback;
-		game_backed_up = 1;
-	}
-
-	if (rename(console_temp, console_path) != 0)
-		goto rollback;
-	console_installed = 1;
-
-	if (has_override) {
-		if (rename(override_temp, override_path) != 0)
-			goto rollback;
-		override_modified = 1;
-	}
-	else if (unlink(override_path) != 0 && errno != ENOENT) {
-		goto rollback;
-	}
-	else {
-		override_modified = 1;
-	}
-
-	if (remove_game && unlink(game_path) != 0 && errno != ENOENT)
-		goto rollback;
-
-	unlink(console_backup);
-	unlink(override_backup);
-	if (remove_game)
-		unlink(game_backup);
-	return 1;
-
-rollback:
-	if (console_installed)
-		Config_restoreBackup(console_backup, console_path, console_backed_up);
-	else
-		unlink(console_backup);
-	if (override_modified)
-		Config_restoreBackup(override_backup, override_path, override_backed_up);
-	else
-		unlink(override_backup);
-	if (game_backed_up && !exists((char *)game_path))
-		Config_restoreBackup(game_backup, game_path, 1);
-	else
-		unlink(game_backup);
-	return 0;
 }
 
 static int Config_writeActiveSetConsole(const char *set_name, const char *game_path,
 	const char *console_path) {
 	char override_dir[MAX_PATH];
 	char override_path[MAX_PATH];
-	char root_path[MAX_PATH];
 	char console_temp[MAX_PATH] = {0};
 	char override_temp[MAX_PATH] = {0};
 	char *console_cfg = allocFile((char *)console_path);
-	char *root_cfg = NULL;
 	char *new_user_cfg = NULL;
 	char *new_override_cfg = NULL;
 	FILE *console_file = NULL;
 	FILE *override_file = NULL;
-	int override_lines;
 	int result = 0;
 
-	if (!ShaderSets_rootPath(set_name, root_path, sizeof(root_path)) ||
-		!ShaderSets_overridePath(set_name, core.tag, override_path, sizeof(override_path)) ||
+	if (!ShaderSets_overridePath(set_name, core.tag, override_path, sizeof(override_path)) ||
 		snprintf(override_dir, sizeof(override_dir), "%s/%s", SHADER_SETS_PATH, core.tag) >= (int)sizeof(override_dir) ||
 		!Config_makeTempPath(console_path, console_temp, sizeof(console_temp)) ||
 		!Config_makeTempPath(override_path, override_temp, sizeof(override_temp)))
 		goto cleanup;
 
-	root_cfg = allocFile(root_path);
-	if (!root_cfg)
-		goto cleanup;
 	if (exists((char *)console_path) && !console_cfg)
 		goto cleanup;
 
@@ -1123,8 +878,7 @@ static int Config_writeActiveSetConsole(const char *set_name, const char *game_p
 	override_file = fopen(override_temp, "wb");
 	if (!override_file)
 		goto cleanup;
-	override_lines = Config_writeOverrideDelta(override_file, console_cfg, root_cfg);
-	if (override_lines < 0)
+	if (!Config_writeFrontendShaders(override_file, 1))
 		goto cleanup;
 	if (!Config_finishFile(override_file)) {
 		override_file = NULL;
@@ -1135,15 +889,16 @@ static int Config_writeActiveSetConsole(const char *set_name, const char *game_p
 	new_user_cfg = allocFile(console_temp);
 	if (!new_user_cfg)
 		goto cleanup;
-	if (override_lines > 0) {
-		new_override_cfg = allocFile(override_temp);
-		if (!new_override_cfg)
-			goto cleanup;
-	}
+	new_override_cfg = allocFile(override_temp);
+	if (!new_override_cfg)
+		goto cleanup;
 
-	if (!Config_commitConsoleAndOverride(console_temp, console_path,
-		override_temp, override_path, override_lines > 0,
-		game_path, config.loaded == CONFIG_GAME))
+	if (rename(console_temp, console_path) != 0)
+		goto cleanup;
+	if (rename(override_temp, override_path) != 0)
+		goto cleanup;
+	if (config.loaded == CONFIG_GAME &&
+		unlink(game_path) != 0 && errno != ENOENT)
 		goto cleanup;
 
 	config.loaded = CONFIG_CONSOLE;
@@ -1162,7 +917,6 @@ cleanup:
 	if (console_temp[0]) unlink(console_temp);
 	if (override_temp[0]) unlink(override_temp);
 	free(console_cfg);
-	free(root_cfg);
 	free(new_user_cfg);
 	free(new_override_cfg);
 	return result;
@@ -1472,23 +1226,17 @@ static void resetFrontendShaders(void) {
 static void readEffectiveFrontendOptions(int sync) {
 	Config_readFrontendOptionsString(config.system_cfg, sync);
 	Config_readFrontendOptionsString(config.default_cfg, sync);
-	if (config.loaded == CONFIG_CONSOLE)
-		Config_readFrontendOptionsString(config.user_cfg, sync);
+	Config_readFrontendOptionsString(config.user_cfg, sync);
 	Config_readFrontendOptionsString(config.shader_set_cfg, sync);
 	Config_readFrontendOptionsString(config.shader_set_override_cfg, sync);
-	if (config.loaded == CONFIG_GAME)
-		Config_readFrontendOptionsString(config.user_cfg, sync);
 }
 
 static void readEffectiveShaderOptions(void) {
 	Config_readShaderOptionsString(config.system_cfg);
 	Config_readShaderOptionsString(config.default_cfg);
-	if (config.loaded == CONFIG_CONSOLE)
-		Config_readShaderOptionsString(config.user_cfg);
+	Config_readShaderOptionsString(config.user_cfg);
 	Config_readShaderOptionsString(config.shader_set_cfg);
 	Config_readShaderOptionsString(config.shader_set_override_cfg);
-	if (config.loaded == CONFIG_GAME)
-		Config_readShaderOptionsString(config.user_cfg);
 }
 
 static void readEffectiveFrontendShaders(int sync) {
