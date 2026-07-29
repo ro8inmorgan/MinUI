@@ -84,6 +84,7 @@ after_async() {
 before
 
 hallkey=/sys/class/power_supply/axp2202-battery/hallkey
+os_sleep=/sys/class/power_supply/axp2202-battery/os_sleep
 
 >&2 echo "Suspending..."
 while :; do
@@ -92,6 +93,15 @@ while :; do
 		>&2 echo "Deep sleep attempt $i of $sleep_max_tries"
 
 		sleep_time=$(date +%s)
+
+		# Enable Super Standby before sleeping.
+		# 16 is the value used by stock and stockmod OS, so we preserve
+		# it, but any non-zero value has the same effect.
+		# Non-SP kernels do not expose this attribute and already use the
+		# full USB-controller suspend path.
+		[ -w "$os_sleep" ] && printf '16' > "$os_sleep"
+
+		# Now issue suspend-to-ram command.
 		echo mem >/sys/power/state
 		sleep_retval=$?
 

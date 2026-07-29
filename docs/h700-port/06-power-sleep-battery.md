@@ -63,6 +63,12 @@ Two layers, as on tg5040:
    `skeleton/SYSTEM/h700/bin/suspend`:
    - `before()`: `alsactl store` mixer state, stop bluetoothd/wpa_supplicant,
      `pre-sleep.d` hooks
+   - when the SP-only `axp2202-battery/os_sleep` attribute exists, write stock's
+     persisted Super Standby value (`16`) before every attempt. Any non-zero value is
+     equivalent in the vendor driver, but matching stock keeps the integration
+     recognizable. This selects full USB-controller suspend and removes hall-open from
+     the kernel wake set; non-SP kernels have no attribute and already use full USB
+     suspend.
    - `echo mem > /sys/power/state` in a retry loop (5 tries, with the tg5040-style
      false-negative workaround: if we were asleep >5 s, a failed-looking write is
      counted as success)
@@ -120,7 +126,8 @@ lid is still closed, the unit returns to sleep. Its lifecycle disposition is in 
   available for future batmon extensions; not wired.
 - Standby-drain investigation: the first RG34XXSP observation was a capacity change
   from 40% to 33% over about 8.5 hours of deep sleep. Capacity is coarse, and the UI
-  desynchronization above may muddy the observation. Re-test with
+  desynchronization above may muddy the observation; it also predates the Super
+  Standby `os_sleep=16` integration. Re-test with
   `axp2202-battery/voltage_now` before/after and run the same interval on stock OS
   for a baseline. POWER-06 records the evidence; the follow-up is tracked in the
   [roadmap](09-roadmap.md#future-hardening).
