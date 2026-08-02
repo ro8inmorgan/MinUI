@@ -127,6 +127,7 @@ extern int rewind_cfg_audio;
 extern int rewind_cfg_compress;
 extern int rewind_cfg_lz4_acceleration;
 extern int rewind_init_ready;
+extern int has_pending_opt_change;
 
 #include "ma_rewind.h"
 

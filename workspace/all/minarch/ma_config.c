@@ -4,6 +4,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -453,8 +454,54 @@ static void Config_readShaderOptionsString(char* cfg) {
 	}
 }
 
-static void Config_readFrontendShaderOptionsString(char* cfg, int sync) {
+static int Config_getGamepadType(char *cfg, int *type) {
+	char value[256];
+	char *end;
+	long parsed;
+	int count = 0;
+
+	if (!cfg || !Config_getValue(cfg, "minarch_gamepad_type", value, NULL))
+		return 0;
+
+	errno = 0;
+	parsed = strtol(value, &end, 0);
+	if (end == value)
+		return -1;
+	while (isspace((unsigned char)*end)) end++;
+	while (gamepad_values[count]) count++;
+	if (errno == ERANGE || *end || parsed < 0 || parsed >= count)
+		return -1;
+
+	*type = parsed;
+	return 1;
+}
+
+static void Config_readCoreOptionsString(char* cfg) {
+	if (!cfg) return;
+
+	if (has_custom_controllers) {
+		int type;
+		int result = Config_getGamepadType(cfg, &type);
+		if (result > 0) {
+			gamepad_type = type;
+			int device = strtol(gamepad_values[gamepad_type], NULL, 0);
+			core.set_controller_port_device(0, device);
+		}
+		else if (result < 0)
+			LOG_warn("invalid minarch_gamepad_type\n");
+	}
+	char value[256];
+	for (int i=0; config.core.options[i].key; i++) {
+		Option* option = &config.core.options[i];
+		// LOG_info("%s\n",option->key);
+		if (!Config_getValue(cfg, option->key, value, &option->lock)) continue;
+		OptionList_setOptionValue(&config.core, option->key, value);
+	}
+}
+
+static void Config_readSetOptionsString(char* cfg, int sync) {
 	Config_readFrontendOptionsString(cfg, sync);
+	Config_readCoreOptionsString(cfg);
 	Config_readShaderOptionsString(cfg);
 }
 
@@ -462,21 +509,7 @@ static void Config_readOptionsString(char* cfg) {
 	if (!cfg) return;
 
 	LOG_info("Config_readOptions\n");
-	char value[256];
-	Config_readFrontendOptionsString(cfg, 1);
-
-	if (has_custom_controllers && Config_getValue(cfg,"minarch_gamepad_type",value,NULL)) {
-		gamepad_type = strtol(value, NULL, 0);
-		int device = strtol(gamepad_values[gamepad_type], NULL, 0);
-		core.set_controller_port_device(0, device);
-	}
-	for (int i=0; config.core.options[i].key; i++) {
-		Option* option = &config.core.options[i];
-		// LOG_info("%s\n",option->key);
-		if (!Config_getValue(cfg, option->key, value, &option->lock)) continue;
-		OptionList_setOptionValue(&config.core, option->key, value);
-	}
-	Config_readShaderOptionsString(cfg);
+	Config_readSetOptionsString(cfg, 1);
 }
 static void Config_readControlsString(char* cfg) {
 	if (!cfg) return;
@@ -654,8 +687,8 @@ void Config_readOptions(void) {
 	Config_readOptionsString(config.default_cfg);
 	Config_readOptionsString(config.user_cfg);
 	// Active sets intentionally override both console and game visual settings.
-	Config_readFrontendShaderOptionsString(config.shader_set_cfg, 1);
-	Config_readFrontendShaderOptionsString(config.shader_set_override_cfg, 1);
+	Config_readSetOptionsString(config.shader_set_cfg, 1);
+	Config_readSetOptionsString(config.shader_set_override_cfg, 1);
 }
 void Config_readControls(void) {
 	Config_readControlsString(config.default_cfg);
@@ -697,6 +730,16 @@ static int Config_writeFrontendShaders(FILE *file, int preserve_locks) {
 					return 0;
 			}
 		}
+	}
+	return 1;
+}
+
+static int Config_writeSetCoreOptions(FILE *file) {
+	for (int i=0; config.core.options[i].key; i++) {
+		Option* option = &config.core.options[i];
+		if (fprintf(file, "%s%s = %s\n", option->lock ? "-" : "",
+			option->key, option->values[option->value]) < 0)
+			return 0;
 	}
 	return 1;
 }
@@ -878,7 +921,8 @@ static int Config_writeActiveSetConsole(const char *set_name, const char *game_p
 	override_file = fopen(override_temp, "wb");
 	if (!override_file)
 		goto cleanup;
-	if (!Config_writeFrontendShaders(override_file, 1))
+	if (!Config_writeFrontendShaders(override_file, 1) ||
+		!Config_writeSetCoreOptions(override_file))
 		goto cleanup;
 	if (!Config_finishFile(override_file)) {
 		override_file = NULL;
@@ -1254,6 +1298,63 @@ static int shaderSetTouchesFrontendOption(int index) {
 			Config_getValue(config.shader_set_override_cfg, key, value, NULL));
 }
 
+static int shaderSetTouchesKey(const char *key) {
+	char value[256];
+	return (config.shader_set_cfg &&
+			Config_getValue(config.shader_set_cfg, key, value, NULL)) ||
+		(config.shader_set_override_cfg &&
+			Config_getValue(config.shader_set_override_cfg, key, value, NULL));
+}
+
+static int shaderSetTouchesGamepad(void) {
+	int type;
+	return Config_getGamepadType(config.shader_set_cfg, &type) > 0 ||
+		Config_getGamepadType(config.shader_set_override_cfg, &type) > 0;
+}
+
+static void reloadCoreOptions(const int *old_values, const int *old_locks,
+	const int *old_set_options, int old_gamepad, int old_set_gamepad) {
+	int new_set_gamepad = shaderSetTouchesGamepad();
+	int palette_changed = 0;
+
+	for (int i = 0; i < config.core.count; i++) {
+		config.core.options[i].value = config.core.options[i].default_value;
+		config.core.options[i].lock = 0;
+	}
+	if (has_custom_controllers) {
+		gamepad_type = 0;
+		core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+	}
+
+	Config_readCoreOptionsString(config.system_cfg);
+	Config_readCoreOptionsString(config.default_cfg);
+	Config_readCoreOptionsString(config.user_cfg);
+	Config_readCoreOptionsString(config.shader_set_cfg);
+	Config_readCoreOptionsString(config.shader_set_override_cfg);
+
+	// Keep unsaved core changes that neither the old nor new set manages.
+	for (int i = 0; i < config.core.count; i++) {
+		int new_set_option = shaderSetTouchesKey(config.core.options[i].key);
+		if ((old_set_options[i] || new_set_option) &&
+			containsString(config.core.options[i].key, "palette"))
+			palette_changed = 1;
+		if (!old_set_options[i] &&
+			!new_set_option) {
+			config.core.options[i].value = old_values[i];
+			config.core.options[i].lock = old_locks[i];
+		}
+	}
+	if (has_custom_controllers && !old_set_gamepad && !new_set_gamepad) {
+		gamepad_type = old_gamepad;
+		int device = strtol(gamepad_values[gamepad_type], NULL, 0);
+		core.set_controller_port_device(0, device);
+	}
+	config.core.changed = 1;
+	has_pending_opt_change = 1;
+	if (palette_changed && exactMatch((char*)core.tag, "GB"))
+		Special_updatedDMGPalette(2);
+}
+
 static void resetShaderPragmas(int pass) {
 	ShaderParam *params = PLAT_getShaderPragmas(pass);
 	if (!params)
@@ -1288,6 +1389,13 @@ bool Config_reloadFrontendShaders(void) {
 	int old_locks[FE_OPT_COUNT];
 	int old_set_options[FE_OPT_COUNT];
 	int old_shader_values[SH_NONE];
+	int core_count = config.core.count;
+	int old_core_values[core_count ? core_count : 1];
+	int old_core_locks[core_count ? core_count : 1];
+	int old_core_set_options[core_count ? core_count : 1];
+	int old_gamepad = gamepad_type;
+	int old_set_gamepad = shaderSetTouchesGamepad();
+	int reload_core = old_set_gamepad;
 	int apply_overclock = 0;
 	int apply_sync_ref = 0;
 
@@ -1298,8 +1406,24 @@ bool Config_reloadFrontendShaders(void) {
 	}
 	for (int i = 0; i < SH_NONE; i++)
 		old_shader_values[i] = config.shaders.options[i].value;
+	for (int i = 0; i < core_count; i++) {
+		old_core_values[i] = config.core.options[i].value;
+		old_core_locks[i] = config.core.options[i].lock;
+		old_core_set_options[i] = shaderSetTouchesKey(config.core.options[i].key);
+		if (old_core_set_options[i]) reload_core = 1;
+	}
 
 	Config_loadShaderSet();
+	if (shaderSetTouchesGamepad())
+		reload_core = 1;
+	for (int i = 0; i < config.core.count && !reload_core; i++) {
+		if (shaderSetTouchesKey(config.core.options[i].key))
+			reload_core = 1;
+	}
+	if (reload_core)
+		reloadCoreOptions(old_core_values, old_core_locks, old_core_set_options,
+			old_gamepad, old_set_gamepad);
+
 	resetFrontendShaders();
 	readEffectiveFrontendShaders(0);
 
