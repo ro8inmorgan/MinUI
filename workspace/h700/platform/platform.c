@@ -583,14 +583,30 @@ void PLAT_getGPUTemp() {
 }
 
 void PLAT_getGPUSpeed() {
-	int speed = getInt("/sys/devices/platform/soc@03000000/1800000.gpu/devfreq/1800000.gpu/cur_freq");
-	if (speed <= 0)
-		speed = getInt("/sys/devices/platform/soc/1800000.gpu/devfreq/1800000.gpu/cur_freq");
-	if (speed <= 0)
-		speed = getInt("/sys/kernel/debug/clk/gpu0/clk_rate");
-	if (speed <= 0)
-		speed = getInt("/sys/kernel/debug/clk/pll_gpu/clk_rate");
-	perf.gpu_speed = speed > 0 ? speed / 1000000 : 660; // MHz
+	static char* path = NULL;
+	static int resolved = 0;
+
+	if (!resolved) {
+		static char* candidates[] = {
+			"/sys/class/devfreq/gpu/cur_freq",
+			"/sys/devices/platform/gpu/devfreq/gpu/cur_freq",
+			"/sys/devices/platform/soc@03000000/1800000.gpu/devfreq/1800000.gpu/cur_freq",
+			"/sys/devices/platform/soc/1800000.gpu/devfreq/1800000.gpu/cur_freq",
+			"/sys/kernel/debug/clk/gpu0/clk_rate",
+			"/sys/kernel/debug/clk/pll_gpu/clk_rate",
+			NULL,
+		};
+		for (int i = 0; candidates[i]; i++) {
+			if (access(candidates[i], R_OK) == 0) {
+				path = candidates[i];
+				break;
+			}
+		}
+		resolved = 1;
+	}
+
+	int speed = path ? getInt(path) : 0;
+	perf.gpu_speed = speed > 0 ? speed / 1000000 : 648; // MHz
 }
 
 static struct WIFI_connection connection = {
