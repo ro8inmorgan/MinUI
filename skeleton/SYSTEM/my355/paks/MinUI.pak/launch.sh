@@ -12,6 +12,7 @@ export USERDATA_PATH="$SDCARD_PATH/.userdata/$PLATFORM"
 export SHARED_USERDATA_PATH="$SDCARD_PATH/.userdata/shared"
 export LOGS_PATH="$USERDATA_PATH/logs"
 export HOOKS_PATH="$USERDATA_PATH/.hooks"
+export DATETIME_PATH="$SHARED_USERDATA_PATH/datetime.txt"
 export HOME="$USERDATA_PATH"
 
 #######################################
@@ -28,6 +29,9 @@ mkdir -p "$SHARED_USERDATA_PATH/.minui"
 export DEVICE="my355"
 
 export IS_NEXT="yes"
+
+# clear shadercache unconditionally, until it properly invalidates itself
+rm -rf $SDCARD_PATH/.shadercache
 
 #######################################
 

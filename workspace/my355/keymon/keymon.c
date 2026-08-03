@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <linux/input.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <msettings.h>
 
@@ -30,6 +31,9 @@
 #define RELEASED	0
 #define PRESSED		1
 #define REPEAT		2
+
+static volatile int quit = 0;
+static void on_term(int sig) { quit = 1; }
 
 int getInt(char* path) {
 	int i = 0;
@@ -76,14 +80,14 @@ static int HDMI_enabled(void) {
 
 static void* watchPorts(void *arg) {
 	int has_jack,had_jack;
-	had_jack = had_jack = JACK_enabled();
+	has_jack = had_jack = JACK_enabled();
 	SetJack(has_jack);
 
 	int has_hdmi,had_hdmi;
 	has_hdmi = had_hdmi = HDMI_enabled();
 	SetHDMI(has_hdmi);
-	
-	while(1) {
+
+	while(!quit) {
 		sleep(1);
 
 		has_jack = JACK_enabled();
@@ -103,9 +107,13 @@ static void* watchPorts(void *arg) {
 }
 
 int main (int argc, char *argv[]) {
+	struct sigaction sa = {0};
+	sa.sa_handler = on_term;
+	sigaction(SIGTERM, &sa, NULL);
+
 	InitSettings();
 	pthread_create(&ports_pt, NULL, &watchPorts, NULL);
-	
+
 	input_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 	
 	uint32_t input;
@@ -129,7 +137,7 @@ int main (int argc, char *argv[]) {
 	then = tod.tv_sec * 1000 + tod.tv_usec / 1000; // essential SDL_GetTicks()
 	ignore = 0;
 	
-	while (1) {
+	while (!quit) {
 		gettimeofday(&tod, NULL);
 		now = tod.tv_sec * 1000 + tod.tv_usec / 1000;
 		// TODO: check if if necessary
@@ -200,7 +208,12 @@ int main (int argc, char *argv[]) {
 		
 		then = now;
 		ignore = 0;
-		
+
 		usleep(16666); // 60fps
 	}
+
+	close(input_fd);
+
+	pthread_cancel(ports_pt);
+	pthread_join(ports_pt, NULL);
 }
