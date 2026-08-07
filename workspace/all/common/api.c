@@ -1,6 +1,7 @@
 #include "defines.h"
 #include "api.h"
 
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -3139,11 +3140,22 @@ void SND_init(double sample_rate, double frame_rate)
 	if (snd.device_id <= 0)
 	{
 		LOG_info("SDL_OpenAudioDevice error: %s\n", SDL_GetError());
-		if (SDL_OpenAudio(&spec_in, &spec_out) < 0) {
-			LOG_info("SDL_OpenAudio error: %s\n", SDL_GetError());
-			SDL_QuitSubSystem(SDL_INIT_AUDIO);
-			return;
+
+		// The default device can name a card that is gone (a .asoundrc left
+		// behind by a sink that went away), which would otherwise cost us audio
+		// for the rest of the session.
+		if (SDL_GetNumAudioDevices(0) > 0)
+		{
+			const char *fallback = SDL_GetAudioDeviceName(0, 0);
+			LOG_info("Falling back to audio device: %s\n", fallback);
+			snd.device_id = SDL_OpenAudioDevice(fallback, 0, &spec_in, &spec_out, SDL_AUDIO_ALLOW_ANY_CHANGE);
 		}
+	}
+	if (snd.device_id <= 0 && SDL_OpenAudio(&spec_in, &spec_out) < 0)
+	{
+		LOG_info("SDL_OpenAudio error: %s\n", SDL_GetError());
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+		return;
 	}
 #else
 	if (SDL_OpenAudio(&spec_in, &spec_out) < 0) {
@@ -3201,9 +3213,24 @@ void SND_quit(void)
 	}
 }
 
+// alsa-lib caches ~/.asoundrc for the life of the process, so a reopen would
+// still resolve "default" to the sink that just went away. This is the only way
+// to force a re-read. No-op where libasound isn't loaded.
+static void SND_dropALSAConfigCache(void)
+{
+	void *lib = dlopen("libasound.so.2", RTLD_LAZY);
+	if (!lib) return;
+
+	int (*update_free_global)(void) = (int (*)(void))dlsym(lib, "snd_config_update_free_global");
+	if (update_free_global) update_free_global();
+
+	dlclose(lib);
+}
+
 void SND_resetAudio(double sample_rate, double frame_rate)
 {
 	SND_quit();
+	SND_dropALSAConfigCache(); // needs every pcm/ctl handle closed
 	SND_init(sample_rate, frame_rate);
 }
 

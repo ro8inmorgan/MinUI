@@ -300,6 +300,10 @@ int main(int argc, char* argv[]) {
     }
     log("Connected to system D-Bus");
 
+    // libdbus exits the process on disconnect by default, which would strand a
+    // stale .asoundrc and break audio for every other process until reboot
+    dbus_connection_set_exit_on_disconnect(conn, FALSE);
+
     dbus_bus_add_match(conn,
         "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged'",
         nullptr);
