@@ -129,42 +129,33 @@ static int HDMI_enabled(void) {
 	return exactMatch(value, "connected\n");
 }
 
-static int get_usbc_card_num() {
-	FILE *fp = popen("cat /proc/asound/cards", "r");
+// Number of the first card in /proc/asound/cards matching needle, or -1.
+static int get_card_num(const char* needle) {
+	FILE *fp = fopen("/proc/asound/cards", "r");
 	if (!fp) return -1;
 
 	char line[256];
+	int card_num = -1;
 	while (fgets(line, sizeof(line), fp)) {
-		if (strstr(line, "rockchiprk817") == NULL) { // skip the built-in codec
-			int card_num;
-			if (sscanf(line, " %d ", &card_num) == 1) {
-				pclose(fp);
-				return card_num;
-			}
+		if (strstr(line, needle) == NULL) continue;
+		int num;
+		if (sscanf(line, " %d ", &num) == 1) {
+			card_num = num;
+			break;
 		}
 	}
 
-	pclose(fp);
-	return -1;
+	fclose(fp);
+	return card_num;
+}
+
+static int get_usbc_card_num() {
+	// can't just skip the codec, there's always a "rockchiphdmi" card too
+	return get_card_num("USB-Audio");
 }
 
 static int get_rockchip_card_num() {
-	FILE *fp = popen("cat /proc/asound/cards", "r");
-	if (!fp) return -1;
-
-	char line[256];
-	while (fgets(line, sizeof(line), fp)) {
-		if (strstr(line, "rockchiprk817") != NULL) { // look for the built-in codec
-			int card_num;
-			if (sscanf(line, " %d ", &card_num) == 1) {
-				pclose(fp);
-				return card_num;
-			}
-		}
-	}
-
-	pclose(fp);
-	return -1;
+	return get_card_num("rockchiprk817"); // the built-in codec
 }
 
 void InitSettings(void) {
@@ -215,6 +206,9 @@ void InitSettings(void) {
 			// load defaults
 			memcpy(settings, &DefaultSettings, shm_size);
 		}
+
+		// persisted with the rest of the struct but audiomon owns it at runtime
+		settings->audiosink = AUDIO_SINK_DEFAULT;
 	}
 
 	// Always re-set Jack and HDMI according to hardware state
@@ -684,22 +678,27 @@ void SetRawVolume(int val) { // 0-100
 			return;
 		}
 
+		// USB DACs don't agree on control names, so drive every playback one
 		const unsigned int num_controls = mixer_get_num_ctls(mixer);
 		for (unsigned int i = 0; i < num_controls; i++) {
 			struct mixer_ctl *ctl = mixer_get_ctl(mixer, i);
 			const char *name = mixer_ctl_get_name(ctl);
-			if (!name) continue;
+			if (!name || strstr(name, "Capture")) continue;
 
-			if ((strstr(name, "PCM") || strstr(name, "Playback")) && (strstr(name, "Volume") || strstr(name, "volume"))) {
-				if (mixer_ctl_get_type(ctl) == MIXER_CTL_TYPE_INT) {
-					int min = mixer_ctl_get_range_min(ctl);
-					int max = mixer_ctl_get_range_max(ctl);
-					int volume = min + (val * (max - min)) / 100;
-					unsigned int ctl_values = mixer_ctl_get_num_values(ctl);
-					for (unsigned int j = 0; j < ctl_values; j++)
-						mixer_ctl_set_value(ctl, j, volume);
-				}
-				break;
+			enum mixer_ctl_type type = mixer_ctl_get_type(ctl);
+			unsigned int num_values = mixer_ctl_get_num_values(ctl);
+
+			if (strstr(name, "Volume") && type == MIXER_CTL_TYPE_INT) {
+				int min = mixer_ctl_get_range_min(ctl);
+				int max = mixer_ctl_get_range_max(ctl);
+				int volume = min + (val * (max - min)) / 100;
+				for (unsigned int j = 0; j < num_values; j++)
+					mixer_ctl_set_value(ctl, j, volume);
+			}
+			// the lowest step is usually still audible, mute for real at 0
+			else if (strstr(name, "Switch") && type == MIXER_CTL_TYPE_BOOL) {
+				for (unsigned int j = 0; j < num_values; j++)
+					mixer_ctl_set_value(ctl, j, val > 0);
 			}
 		}
 		mixer_close(mixer);

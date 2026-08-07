@@ -69,7 +69,7 @@ batmon.elf & # &> $SDCARD_PATH/batmon.txt &
 
 # start fresh, will be populated on the next connect
 rm -f $USERDATA_PATH/.asoundrc
-audiomon.elf & # &> $SDCARD_PATH/audiomon.txt &
+audiomon.elf &> $LOGS_PATH/audiomon.txt &
 
 # wifi handling
 wifion=$(nextval.elf wifi | sed -n 's/.*"wifi": \([0-9]*\).*/\1/p')

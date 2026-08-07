@@ -62,8 +62,37 @@ int exactMatch(char* str1, char* str2) {
 	return (strncmp(str1,str2,len1)==0);
 }
 
-static int	input_fd = 0;
 static struct input_event ev;
+
+#define MAX_EVENT_NODES 16
+static int inputs[MAX_EVENT_NODES];
+
+static int isUSBInput(int n) {
+	char path[32], link[512];
+	sprintf(path, "/sys/class/input/event%i", n);
+	ssize_t len = readlink(path, link, sizeof(link)-1);
+	if (len<0) return 0;
+	link[len] = '\0';
+	return strstr(link, "/usb")!=NULL;
+}
+
+// re-run periodically, USB nodes come and go
+static void scanInputs(void) {
+	for (int i=0; i<MAX_EVENT_NODES; i++) {
+		// adc-keys reports the same codes as event0 and would double every
+		// press, so past event0 only USB devices (eg. headset controls) count
+		int wanted = (i==0) || isUSBInput(i);
+		if (wanted && inputs[i]<0) {
+			char path[32];
+			sprintf(path, "/dev/input/event%i", i);
+			inputs[i] = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+		}
+		else if (!wanted && inputs[i]>=0) {
+			close(inputs[i]);
+			inputs[i] = -1;
+		}
+	}
+}
 
 static pthread_t ports_pt;
 #define JACK_STATE_PATH "/sys/class/gpio/gpio150/value"
@@ -114,9 +143,9 @@ int main (int argc, char *argv[]) {
 	InitSettings();
 	pthread_create(&ports_pt, NULL, &watchPorts, NULL);
 
-	input_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-	
-	uint32_t input;
+	for (int i=0; i<MAX_EVENT_NODES; i++) inputs[i] = -1;
+	uint32_t rescan_at = 0;
+
 	uint32_t val;
 	uint32_t menu_pressed = 0;
 	
@@ -142,30 +171,38 @@ int main (int argc, char *argv[]) {
 		now = tod.tv_sec * 1000 + tod.tv_usec / 1000;
 		// TODO: check if if necessary
 		if (now-then>1000) ignore = 1; // ignore input that arrived during sleep
-		
-		while(read(input_fd, &ev, sizeof(ev))==sizeof(ev)) {
-			if (ignore) continue;
-			val = ev.value;
 
-			if (( ev.type != EV_KEY ) || ( val > REPEAT )) continue;
-			// printf("code: %i (%i)\n", ev.code, val); fflush(stdout);
-			switch (ev.code) {
-				case CODE_MENU:
-					menu_pressed = val;
-					break;
-				case CODE_PLUS:
-					up_pressed = up_just_pressed = val;
-					if (val) up_repeat_at = now + 300;
-					break;
-				case CODE_MINUS:
-					down_pressed = down_just_pressed = val;
-					if (val) down_repeat_at = now + 300;
-					break;
-				default:
-					break;
+		if (now>=rescan_at) {
+			scanInputs();
+			rescan_at = now + 1000;
+		}
+
+		for (int i=0; i<MAX_EVENT_NODES; i++) {
+			if (inputs[i]<0) continue;
+			while(read(inputs[i], &ev, sizeof(ev))==sizeof(ev)) {
+				if (ignore) continue;
+				val = ev.value;
+
+				if (( ev.type != EV_KEY ) || ( val > REPEAT )) continue;
+				// printf("code: %i (%i)\n", ev.code, val); fflush(stdout);
+				switch (ev.code) {
+					case CODE_MENU:
+						menu_pressed = val;
+						break;
+					case CODE_PLUS:
+						up_pressed = up_just_pressed = val;
+						if (val) up_repeat_at = now + 300;
+						break;
+					case CODE_MINUS:
+						down_pressed = down_just_pressed = val;
+						if (val) down_repeat_at = now + 300;
+						break;
+					default:
+						break;
+				}
 			}
 		}
-		
+
 		if (ignore) {
 			menu_pressed = 0;
 			up_pressed = up_just_pressed = 0;
@@ -212,7 +249,8 @@ int main (int argc, char *argv[]) {
 		usleep(16666); // 60fps
 	}
 
-	close(input_fd);
+	for (int i=0; i<MAX_EVENT_NODES; i++)
+		if (inputs[i]>=0) close(inputs[i]);
 
 	pthread_cancel(ports_pt);
 	pthread_join(ports_pt, NULL);
