@@ -226,8 +226,8 @@ static void detect_device(void) {
 	// R3 = right). Exact RGXX_MODEL strings confirmed so far: RG28xx, RG34xx,
 	// RG34xxSP, RG40xxH, RG40xxV, RGSP, RGcubexx. The RG35xx family is matched
 	// by prefix/suffix until its exact strings are confirmed (same as msettings).
-	dev_has_lstick = 1; // unknown models keep the previous dual-stick layout
-	dev_has_rstick = 1;
+	dev_has_lstick = 0;
+	dev_has_rstick = 0;
 	if (is_rg28xx || is_rgsp) {
 		// The RG SP drops the RG34XXSP's sticks entirely: its device tree has no
 		// keyL3/keyR3 and none of the analog multiplexer pins (amux-en-gpios,
@@ -239,13 +239,15 @@ static void detect_device(void) {
 		dev_has_lstick = dev_has_rstick = exactMatch("RG34xxSP", model);
 	}
 	else if (exactMatch("RG40xxV", model)) {
-		dev_has_rstick = 0; // single left stick
+		dev_has_lstick = 1; // single left stick
+	}
+	else if (exactMatch("RG40xxH", model) || is_cube) {
+		dev_has_lstick = dev_has_rstick = 1;
 	}
 	else if ((model && prefixMatch("RG35xx", model)) || exactMatch("rg35xx", device)) {
-		// only the H and Pro have sticks; Plus/2024/SP (and unknown variants,
-		// since most of the family is stickless) don't
+		// Only the H and Pro have sticks; Plus/2024/SP and unknown variants don't.
 		char *suffix = (model && prefixMatch("RG35xx", model)) ? model + strlen("RG35xx") : "";
-		dev_has_lstick = dev_has_rstick = prefixMatch("H", suffix) || prefixMatch("Pro", suffix);
+		dev_has_lstick = dev_has_rstick = exactMatch("H", suffix) || prefixMatch("Pro", suffix);
 	}
 }
 
