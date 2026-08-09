@@ -59,20 +59,17 @@ static const struct DisplayCalDefaults DisplayCalDefaults_BrickPro = {
 	DISPLAYCAL_BRICKPRO_DEFAULT_BLUE_GAIN
 };
 
-// Anbernic H700 family. Not measured yet: disabled with neutral gains until
-// each panel is calibrated, at which point only the values below change.
+// Anbernic H700 family. Uncalibrated models remain disabled with neutral gains.
 #define DISPLAYCAL_H700_UNCALIBRATED { 0, 100, 100, 100 }
-static const struct DisplayCalDefaults DisplayCalDefaults_RG28XX = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG28XX = { 1, 100, 92, 65 };
 static const struct DisplayCalDefaults DisplayCalDefaults_RG34XX = DISPLAYCAL_H700_UNCALIBRATED;
-static const struct DisplayCalDefaults DisplayCalDefaults_RG34XXSP = DISPLAYCAL_H700_UNCALIBRATED;
-// RG SP: same panel as the RG34XXSP, kept separate so calibrating one does not
-// silently retune the other if the units turn out to differ.
-static const struct DisplayCalDefaults DisplayCalDefaults_RGSP = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG34XXSP = { 1, 100, 83, 86 };
+static const struct DisplayCalDefaults DisplayCalDefaults_RGSP = { 1, 100, 68, 61 };
 static const struct DisplayCalDefaults DisplayCalDefaults_RG35XX = DISPLAYCAL_H700_UNCALIBRATED; // Plus/H/2024
 static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXSP = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXPRO = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXH = DISPLAYCAL_H700_UNCALIBRATED;
-static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXV = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXV = { 1, 91, 100, 63 };
 static const struct DisplayCalDefaults DisplayCalDefaults_RGCubeXX = DISPLAYCAL_H700_UNCALIBRATED;
 
 enum DisplayCalPreset {
