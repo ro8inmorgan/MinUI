@@ -168,11 +168,13 @@ extern int dev_num_leds;
 
 ///////////////////////////////
 
-// Rows that fit above the button hints: (FIXED_HEIGHT/FIXED_SCALE - 2*PADDING - PILL_SIZE) / PILL_SIZE
-// 720-tall at scale 2 (HDMI and the cube's square panel) gives 10, like tg5050; 480 gives 6.
+// Rows that fit above the button hints: (FIXED_HEIGHT/FIXED_SCALE - 2*PADDING - PILL_SIZE) / PILL_SIZE.
+// The 480p layout needs the standard 10-unit padding so six rows and the
+// bottom hints keep the same vertical spacing. The roomier 720p layouts retain
+// their existing 5-unit edge padding.
 #define MAIN_ROW_COUNT ((hdmi_active||is_cube)?10:6)
 #define QUICK_SWITCHER_COUNT 3
-#define PADDING 5
+#define PADDING ((hdmi_active||is_cube)?5:10)
 
 ///////////////////////////////
 
