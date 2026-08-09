@@ -15,7 +15,7 @@ index a22eb5d..c55c8cf 100644
 +	SHARED := -shared -Wl,--no-undefined
 +	LDFLAGS += -shared -Wl,--version-script=link.T -ffast-math
 +	FLAGS += -DARM -DALIGN_DWORD -falign-functions=16 -pipe -fstack-protector
-+	FLAGS += -mtune=cortex-a55 -mcpu=cortex-a55 -march=armv8.2-a
++	FLAGS += -mcpu=cortex-a55
 +	fpic := -fPIC
 +	HAVE_NEON = 1
 +
