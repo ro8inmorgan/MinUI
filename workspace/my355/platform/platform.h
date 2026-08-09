@@ -39,10 +39,12 @@
 
 ///////////////////////////////
 
-#define CODE_UP			82
-#define CODE_DOWN		81
-#define CODE_LEFT		80
-#define CODE_RIGHT		79
+// The d-pad is reported twice: as arrow keys by the gpio-keys-polled kernel
+// driver, and as a hat by the gamepad miyoo_inputd creates.
+#define CODE_UP			CODE_NA
+#define CODE_DOWN		CODE_NA
+#define CODE_LEFT		CODE_NA
+#define CODE_RIGHT		CODE_NA
 
 #define CODE_SELECT		228
 #define CODE_START		40
