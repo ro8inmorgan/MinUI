@@ -417,6 +417,82 @@ ConnectionStrength PLAT_connectionStrength(void) {
 
 //////////////////////////////////////////////
 
+// Turbo is handled by the stock miyoo_inputd daemon.
+// The daemon additionally gates the whole feature behind enable_turbo_input.
+bool PLAT_canTurbo(void) { return true; }
+
+#define INPUTD_PATH "/tmp/miyoo_inputd"
+#define TURBO_ENABLE_PATH INPUTD_PATH "/enable_turbo_input"
+
+typedef struct TurboBtnPath {
+	int btn_id;
+	char *path;
+} TurboBtnPath;
+
+static TurboBtnPath turbo_mapping[] = {
+	{BTN_ID_A,  INPUTD_PATH "/turbo_a"},
+	{BTN_ID_B,  INPUTD_PATH "/turbo_b"},
+	{BTN_ID_X,  INPUTD_PATH "/turbo_x"},
+	{BTN_ID_Y,  INPUTD_PATH "/turbo_y"},
+	{BTN_ID_L1, INPUTD_PATH "/turbo_l"},
+	{BTN_ID_L2, INPUTD_PATH "/turbo_l2"},
+	{BTN_ID_R1, INPUTD_PATH "/turbo_r"},
+	{BTN_ID_R2, INPUTD_PATH "/turbo_r2"},
+	{0, NULL}
+};
+
+static int turbo_toggleFile(const char *path) {
+	if (access(path, F_OK) == 0) {
+		unlink(path);
+		return 0;
+	}
+	int fd = open(path, O_CREAT | O_WRONLY, 0644);
+	if (fd >= 0) {
+		close(fd);
+		return 1;
+	}
+	return -1; // error
+}
+
+static void turbo_syncEnableFlag(void) {
+	for (int i = 0; turbo_mapping[i].path; i++) {
+		if (access(turbo_mapping[i].path, F_OK) == 0) {
+			int fd = open(TURBO_ENABLE_PATH, O_CREAT | O_WRONLY, 0644);
+			if (fd >= 0) close(fd);
+			return;
+		}
+	}
+	unlink(TURBO_ENABLE_PATH);
+}
+
+int PLAT_toggleTurbo(int btn_id)
+{
+	// avoid extra file IO on each call
+	static int initialized = 0;
+	if (!initialized) {
+		mkdir(INPUTD_PATH, 0755);
+		initialized = 1;
+	}
+
+	for (int i = 0; turbo_mapping[i].path; i++) {
+		if (turbo_mapping[i].btn_id == btn_id) {
+			int ret = turbo_toggleFile(turbo_mapping[i].path);
+			turbo_syncEnableFlag();
+			return ret;
+		}
+	}
+	return 0;
+}
+
+void PLAT_clearTurbo() {
+	for (int i = 0; turbo_mapping[i].path; i++) {
+		unlink(turbo_mapping[i].path);
+	}
+	unlink(TURBO_ENABLE_PATH);
+}
+
+//////////////////////////////////////////////
+
 int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	char cmd[512];
 	sprintf(cmd, "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
