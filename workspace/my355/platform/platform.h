@@ -155,7 +155,9 @@ extern int on_hdmi;
 // #define HAS_NEON
 
 // this should be set to the devices native screen refresh rate
-#define SCREEN_FPS 60.0
+// modetest -M rockchip -c: 640x480, clk 32000kHz, htotal 1030, vtotal 518
+// 32000000 / (1030 * 518) = 59.9768
+#define SCREEN_FPS 59.9768
 ///////////////////////////////
 
 #endif

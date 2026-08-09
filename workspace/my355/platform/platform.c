@@ -157,6 +157,12 @@ void PLAT_getGPUSpeed() {
 	perf.gpu_speed = getInt("/sys/class/devfreq/fde60000.gpu/cur_freq")/1000000;
 }
 
+void PLAT_getGPUUsage() {
+	// the mali node reports a bare 0-100 integer, no parsing needed
+	// (devfreq's "load" reports the same value as "NN@<freq>Hz")
+	perf.gpu_usage = getInt("/sys/devices/platform/fde60000.gpu/utilisation");
+}
+
 static struct WIFI_connection connection = {
 	.valid = false,
 	.freq = -1,
