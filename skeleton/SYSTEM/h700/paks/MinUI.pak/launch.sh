@@ -35,6 +35,7 @@ LAUNCH_LOG="$LOGS_PATH/launch.txt"
 
 export PATH="$SYSTEM_PATH/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export LD_LIBRARY_PATH="$SYSTEM_PATH/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+export CURL_CA_BUNDLE="$SYSTEM_PATH/etc/ssl/certs/ca-certificates.crt"
 export SDL_VIDEODRIVER="mali"
 export SDL_AUDIODRIVER="alsa"
 export SDL_JOYSTICK_DISABLE_UDEV=1

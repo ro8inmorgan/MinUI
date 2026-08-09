@@ -42,6 +42,7 @@ limit on support.
 | BUILD-01 | CI-style H700 staging build (`make setup`, then `make h700`) | ✅ | CI/release build | H700 binaries, tools, cores, libraries, boot shim, and installer assets stage successfully |
 | BUILD-02 | Full tg5040 regression build after shared-code changes | ⬜ | Candidate-specific | Must be recorded for the actual candidate; single-pak builds are insufficient |
 | BUILD-03 | Jammy `settings.elf` runtime linkage check | ✅ | Automated container check | H700 library path resolves and required gio/glib linkage is present |
+| BUILD-04 | Bundled curl static linkage and HTTPS | ✅ | arm64 Jammy container | Pinned musl curl 8.21.0 + OpenSSL 3.5.7 has no dynamic section; DNS and TLS reach the RetroAchievements API using the bundled CA file (HTTP 422 is the expected unauthenticated response) |
 
 ## Boot, install, and launcher
 

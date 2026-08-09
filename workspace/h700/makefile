@@ -15,6 +15,8 @@ REQUIRES_JSTEST=other/jstest
 REQUIRES_UNZIP60=other/unzip60
 REQUIRES_FILEMGR=other/NextCommander
 REQUIRES_SDL2=other/sdl2
+
+.PHONY: curl-runtime
 FILEMGR_PATCH=patches/NextCommander-h700.patch
 FILEMGR_STAMP=.patched-h700-v3
 
@@ -23,7 +25,7 @@ all: readmes
 # SDL2 (mali-fbdev, alsa-shared, joystick patch) is prebaked into h700-toolchain
 # at PREFIX_LOCAL. Stage it + SDK companion libs into other/sdl2/output for packaging.
 # Rebuild only via the toolchain image (support/build-sdl2.sh + support/sdl2-h700.patch).
-early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR)
+early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILEMGR) curl-runtime
 	mkdir -p other
 	cd $(REQUIRES_EVTEST) && $(CROSS_COMPILE)gcc -o evtest evtest.c
 	cd $(REQUIRES_JSTEST) && $(CROSS_COMPILE)gcc -o jstest jstest.c
@@ -43,10 +45,14 @@ early: $(REQUIRES_EVTEST) $(REQUIRES_JSTEST) $(REQUIRES_UNZIP60) $(REQUIRES_FILE
 	cd $(REQUIRES_FILEMGR) && make -j PLATFORM=h700 && touch output/.platform-h700
 	cd boot && sh build.sh
 
+curl-runtime: curl/build.sh
+	cd curl && sh build.sh
+
 clean:
 	cd $(REQUIRES_FILEMGR) && make clean PLATFORM=h700
 	cd $(REQUIRES_UNZIP60) && make -f unix/Makefile.trimuismart clean
 	rm -rf $(REQUIRES_SDL2)/output
+	rm -rf curl/output curl/curl-* curl/musl-* curl/openssl-*
 	rm -rf boot/output
 
 ###########################################################

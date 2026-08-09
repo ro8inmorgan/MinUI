@@ -87,6 +87,15 @@ Bundle into `.system/h700/lib` only what the stock OS lacks or can't be trusted 
 Rule of thumb: `ldd` every shipped .elf against a clean stock rootfs; bundle exactly
 the misses, nothing more.
 
+The stock Anbernic OS also lacks the `curl` CLI used by NextUI's RetroAchievements
+HTTP layer. The H700 build therefore builds pinned curl 8.21.0 with pinned OpenSSL
+3.5.7 and musl 1.2.6 as a static aarch64 binary, verifies all source checksums and the
+final linkage, and stages it at `.system/h700/bin/curl`. Using musl avoids static
+glibc's runtime dependency on matching NSS modules for DNS. A private CA bundle is
+staged at `.system/h700/etc/ssl/certs/ca-certificates.crt`; `launch.sh` sets
+`CURL_CA_BUNDLE` to that path. Since NextUI's bin directory is first on `PATH`, this
+works on stock OS without installing or replacing anything on TF1.
+
 CI now applies that rule to the highest-risk h700 GUI binary:
 `workspace/h700/check-settings-ldd.sh` runs `ldd` for `settings.elf` in an Ubuntu
 22.04/Jammy arm64 runtime with `.system/h700/lib` first, and fails on unresolved
