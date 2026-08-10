@@ -43,6 +43,7 @@ void CFG_defaults(NextUISettings *cfg)
         .thumbRadius = CFG_DEFAULT_THUMBRADIUS,
         .gameArtWidth = CFG_DEFAULT_GAMEARTWIDTH,
 		.showFolderNamesAtRoot = CFG_DEFAULT_SHOWFOLDERNAMESATROOT,
+        .collateSubfolders = CFG_DEFAULT_COLLATESUBFOLDERS,
         .inputPromptStyle = CFG_DEFAULT_INPUT_PROMPT_STYLE,
         .paletteName = CFG_DEFAULT_PALETTE_NAME,
         .customColors = {CFG_DEFAULT_COLOR1, CFG_DEFAULT_COLOR2, CFG_DEFAULT_COLOR3,
@@ -311,6 +312,11 @@ void CFG_init(FontLoad_callback_t cb, ColorSet_callback_t ccb)
             if (sscanf(line, "showfoldernamesatroot=%i", &temp_value) == 1)
             {
                 CFG_setShowFolderNamesAtRoot((bool)temp_value);
+                continue;
+            }
+            if (sscanf(line, "collateSubfolders=%i", &temp_value) == 1)
+            {
+                CFG_setCollateSubfolders((bool)temp_value);
                 continue;
             }
             if (sscanf(line, "suspendTimeout=%i", &temp_value) == 1)
@@ -720,6 +726,17 @@ void CFG_setShowFolderNamesAtRoot(bool show)
 {
     settings.showFolderNamesAtRoot = show;
 	CFG_sync();
+}
+
+bool CFG_getCollateSubfolders(void)
+{
+    return settings.collateSubfolders;
+}
+
+void CFG_setCollateSubfolders(bool show)
+{
+    settings.collateSubfolders = show;
+    CFG_sync();
 }
 
 uint32_t CFG_getScreenTimeoutSecs(void)
@@ -1480,6 +1497,10 @@ void CFG_get(const char *key, char *value)
     {
         sprintf(value, "%i", CFG_getShowFolderNamesAtRoot());
     }
+    else if (strcmp(key, "collateSubfolders") == 0)
+    {
+        sprintf(value, "%i", CFG_getCollateSubfolders());
+    }
     else if (strcmp(key, "screentimeout") == 0)
     {
         sprintf(value, "%i", CFG_getScreenTimeoutSecs());
@@ -1709,6 +1730,7 @@ void CFG_sync(void)
     fprintf(file, "usecollectionsnestedmap=%i\n", settings.useCollectionsNestedMap);
     fprintf(file, "gameart=%i\n", settings.showGameArt);
     fprintf(file, "showfoldernamesatroot=%i\n", settings.showFolderNamesAtRoot);
+    fprintf(file, "collateSubfolders=%i\n", settings.collateSubfolders);
     fprintf(file, "screentimeout=%i\n", settings.screenTimeoutSecs);
     fprintf(file, "suspendTimeout=%i\n", settings.suspendTimeoutSecs);
     fprintf(file, "powerOffProtection=%i\n", settings.powerOffProtection);

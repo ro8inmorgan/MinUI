@@ -1067,9 +1067,24 @@ static int isConsoleDir(char* path) {
 static Array* getEntries(char* path){
 	Array* entries = Array_new();
 
-	if (isConsoleDir(path)) { // top-level console folder, might collate
+	char base_path[256];
+	strcpy(base_path, path);
+	char* sub_path = "";
+
+	// Separate the top-level console folder from any subfolders if Collate Subfolders is active
+	if (CFG_getCollateSubfolders() && prefixMatch(ROMS_PATH, path)) {
+		char* slash = strchr(path + strlen(ROMS_PATH) + 1, '/');
+		if (slash) {
+			base_path[slash - path] = '\0'; // Sample base_path result "Roms/Handheld (GB)"
+			sub_path = slash;               // Sample sub_path result "/Nintendo"
+		}
+	}
+
+	int collated = 0;
+	if (isConsoleDir(base_path)) { // top-level console folder, might collate
+		collated = 1;
 		char collated_path[256];
-		strcpy(collated_path, path);
+		strcpy(collated_path, base_path);
 		char* tmp = strrchr(collated_path, '(');
 		// 1 because we want to keep the opening parenthesis to avoid collating "Game Boy Color" and "Game Boy Advance" into "Game Boy"
 		// but conditional so we can continue to support a bare tag name as a folder name
@@ -1088,7 +1103,11 @@ static Array* getEntries(char* path){
 				strcpy(tmp, dp->d_name);
 
 				if (!prefixMatch(collated_path, full_path)) continue;
-				addEntries(entries, full_path);
+				
+				// Re-attach sub_path to search identical subfolders across all collated directories
+				char target_path[512];
+				sprintf(target_path, "%s%s", full_path, sub_path);
+				addEntries(entries, target_path);
 			}
 			closedir(dh);
 		}
@@ -1096,6 +1115,26 @@ static Array* getEntries(char* path){
 	else addEntries(entries, path); // just a subfolder
 
 	EntryArray_sort(entries);
+
+	// Deduplicate only if Collate Subfolders is active and any Subfolders were actually collated
+	if (collated && CFG_getCollateSubfolders()) {
+		int unique_count = 0;
+		for (int i = 0; i < entries->count; i++) {
+			Entry* entry = entries->items[i];
+			
+			if (unique_count > 0 && 
+			    entry->type == ENTRY_DIR && 
+			    ((Entry*)entries->items[unique_count - 1])->type == ENTRY_DIR &&
+			    exactMatch(((Entry*)entries->items[unique_count - 1])->name, entry->name)) {
+				
+				Entry_free(entry); // Remove the duplicate subfolder entry
+			} else {
+				entries->items[unique_count++] = entry; // Keep a unique entry
+			}
+		}
+		entries->count = unique_count;
+	}
+
 	return entries;
 }
 

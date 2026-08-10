@@ -140,6 +140,7 @@ typedef struct
 	bool useCollectionsNestedMap;
 	bool showGameArt;
 	bool showFolderNamesAtRoot;
+	bool collateSubfolders;
 	bool romsUseFolderBackground;
 	bool showQuickSwitcherUi;
 	bool showQuickSwitcherUiGames;
@@ -232,6 +233,7 @@ typedef struct
 #define CFG_DEFAULT_USECOLLECTIONSNESTEDMAP false
 #define CFG_DEFAULT_SHOWGAMEART true
 #define CFG_DEFAULT_SHOWFOLDERNAMESATROOT true
+#define CFG_DEFAULT_COLLATESUBFOLDERS false
 #define CFG_DEFAULT_GAMESWITCHERSCALING GFX_SCALE_FULLSCREEN
 #define CFG_DEFAULT_SCREENTIMEOUTSECS 60
 #define CFG_DEFAULT_SUSPENDTIMEOUTSECS 30
@@ -416,6 +418,9 @@ void CFG_setGameArtWidth(double zeroToOne);
 // Show/hide folder names at root directory.
 bool CFG_getShowFolderNamesAtRoot(void);
 void CFG_setShowFolderNamesAtRoot(bool show);
+// Collate subfolders within merged platform folders.
+bool CFG_getCollateSubfolders(void);
+void CFG_setCollateSubfolders(bool show);
 // WiFi on/off (if available)
 bool CFG_getWifi(void);
 void CFG_setWifi(bool on);

@@ -457,6 +457,10 @@ int main(int argc, char *argv[])
             []() -> std::any { return CFG_getShowFolderNamesAtRoot(); },
             [](const std::any &value) { CFG_setShowFolderNamesAtRoot(std::any_cast<bool>(value)); },
             []() { CFG_setShowFolderNamesAtRoot(CFG_DEFAULT_SHOWFOLDERNAMESATROOT);}});
+        appearanceItems.push_back(new MenuItem{ListItemType::Generic, "Collate Subfolders", "Merge duplicate subfolders in already merged platform folders.", {false, true}, on_off,
+            []() -> std::any { return CFG_getCollateSubfolders(); },
+            [](const std::any &value) { CFG_setCollateSubfolders(std::any_cast<bool>(value)); },
+            []() { CFG_setCollateSubfolders(CFG_DEFAULT_COLLATESUBFOLDERS);}});
         appearanceItems.push_back(new MenuItem{ListItemType::Generic, "Show Recents", "Show \"Recently Played\" menu entry in game list.", {false, true}, on_off,
             []() -> std::any { return CFG_getShowRecents(); },
             [](const std::any &value) { CFG_setShowRecents(std::any_cast<bool>(value)); },
