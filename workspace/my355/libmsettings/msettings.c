@@ -612,43 +612,43 @@ void SetRawDisplayCal(int enabled, int red_gain, int green_gain, int blue_gain) 
 
 // Find the first A2DP playback volume control via amixer
 static int get_a2dp_simple_control_name(char *buf, size_t buflen) {
-    FILE *fp = popen("amixer scontrols", "r");
+    FILE *fp = popen("amixer scontents", "r");
     if (!fp) return 0;
 
     char line[256];
+    char name[128] = {0};
+    int found = 0;
+
     while (fgets(line, sizeof(line), fp)) {
         char *start = strchr(line, '\'');
         char *end = strrchr(line, '\'');
-        if (start && end && end > start) {
+        if (start && end && end > start) { // "Simple mixer control 'NAME',0"
             size_t len = end - start - 1;
-            if (len < buflen) {
-                strncpy(buf, start + 1, len);
-                buf[len] = '\0';
-                if (strstr(buf, "A2DP")) { // first A2DP simple control
-                    pclose(fp);
-					char esc_buf[128];
-					char *src = buf;
-					char *dst = esc_buf;
-					while(*src && (dst - esc_buf) < (sizeof(esc_buf) - 4)) {
-						if(*src == '\"') {
-							*dst++ = '\\';
-							*dst++ = '\"';
-						} else {
-							*dst++ = *src;
-						}
-						src++;
-					}
-					*dst = '\0';
-					strncpy(buf, esc_buf, buflen);
-					buf[buflen - 1] = '\0';
-					return 1;
-                }
+            if (len < sizeof(name)) {
+                strncpy(name, start + 1, len);
+                name[len] = '\0';
             }
+            continue;
+        }
+        if (name[0] && strstr(line, "Capabilities:") && strstr(line, "volume")) {
+            found = 1;
+            break;
         }
     }
-
     pclose(fp);
-    return 0;
+    if (!found) return 0;
+
+    char esc_buf[128];
+    char *src = name;
+    char *dst = esc_buf;
+    while (*src && (dst - esc_buf) < (int)(sizeof(esc_buf) - 4)) {
+        if (*src == '"') *dst++ = '\\';
+        *dst++ = *src++;
+    }
+    *dst = '\0';
+    strncpy(buf, esc_buf, buflen);
+    buf[buflen - 1] = '\0';
+    return 1;
 }
 
 void SetRawVolume(int val) { // 0-100
