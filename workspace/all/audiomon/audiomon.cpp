@@ -412,6 +412,19 @@ int main(int argc, char* argv[]) {
                                         else
                                             handleDeviceDisconnected(conn, path);
                                     }
+                                    // BlueZ reports Connected before SDP finishes, so UUIDs can
+                                    // still be empty above and an audio device looks like a plain
+                                    // one. Check again once the services are actually resolved.
+                                    else if (std::string(key) == "ServicesResolved") {
+                                        dbus_message_iter_next(&dict);
+                                        DBusMessageIter variant;
+                                        dbus_message_iter_recurse(&dict, &variant);
+                                        dbus_bool_t resolved;
+                                        dbus_message_iter_get_basic(&variant, &resolved);
+
+                                        if (resolved)
+                                            handleDeviceConnected(conn, path);
+                                    }
 
                                     dbus_message_iter_next(&changed);
                                 }
