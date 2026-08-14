@@ -39,31 +39,31 @@
 
 ///////////////////////////////
 
-// The d-pad is reported twice: as arrow keys by the gpio-keys-polled kernel
-// driver, and as a hat by the gamepad miyoo_inputd creates.
+// Every button is reported twice: by the gpio-keys-polled kernel driver and by
+// the gamepad miyoo_inputd creates. Only the gamepad is used.
 #define CODE_UP			CODE_NA
 #define CODE_DOWN		CODE_NA
 #define CODE_LEFT		CODE_NA
 #define CODE_RIGHT		CODE_NA
 
-#define CODE_SELECT		228
-#define CODE_START		40
+#define CODE_SELECT		CODE_NA
+#define CODE_START		CODE_NA
 
-#define CODE_A			44
-#define CODE_B			224
-#define CODE_X			225
-#define CODE_Y			226
+#define CODE_A			CODE_NA
+#define CODE_B			CODE_NA
+#define CODE_X			CODE_NA
+#define CODE_Y			CODE_NA
 
-#define CODE_L1			43
-#define CODE_R1			42
-#define CODE_L2			75
-#define CODE_R2			78
-#define CODE_L3			230
-#define CODE_R3			229
+#define CODE_L1			CODE_NA
+#define CODE_R1			CODE_NA
+#define CODE_L2			CODE_NA
+#define CODE_R2			CODE_NA
+#define CODE_L3			CODE_NA
+#define CODE_R3			CODE_NA
 #define CODE_L4         CODE_NA
 #define CODE_R4         CODE_NA
 
-#define CODE_MENU		41
+#define CODE_MENU		CODE_NA
 #define CODE_POWER		102
 
 #define CODE_PLUS		128
@@ -71,29 +71,30 @@
 
 ///////////////////////////////
 
+						// HATS
 #define JOY_UP			JOY_NA
 #define JOY_DOWN		JOY_NA
 #define JOY_LEFT		JOY_NA
 #define JOY_RIGHT		JOY_NA
 
-#define JOY_SELECT		JOY_NA
-#define JOY_START		JOY_NA
+#define JOY_SELECT		6
+#define JOY_START		7
 
-#define JOY_A			JOY_NA
-#define JOY_B			JOY_NA
-#define JOY_X			JOY_NA
-#define JOY_Y			JOY_NA
+#define JOY_A			1
+#define JOY_B			0
+#define JOY_X			3
+#define JOY_Y			2
 
-#define JOY_L1			JOY_NA
-#define JOY_R1			JOY_NA
+#define JOY_L1			4
+#define JOY_R1			5
 #define JOY_L2			JOY_NA
 #define JOY_R2			JOY_NA
-#define JOY_L3			JOY_NA
-#define JOY_R3			JOY_NA
+#define JOY_L3			9
+#define JOY_R3			10
 #define JOY_L4			JOY_NA
 #define JOY_R4			JOY_NA
 
-#define JOY_MENU		JOY_NA
+#define JOY_MENU		8
 #define JOY_POWER		JOY_NA
 #define JOY_PLUS		JOY_NA
 #define JOY_MINUS		JOY_NA
@@ -108,6 +109,9 @@
 #define BTN_FN3_NAME	""
 
 ///////////////////////////////
+
+#define AXIS_L2	2
+#define AXIS_R2	5
 
 #define AXIS_LX	0
 #define AXIS_LY	1
