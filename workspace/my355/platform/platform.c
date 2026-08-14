@@ -26,14 +26,17 @@
 
 ///////////////////////////////
 
-int on_hdmi = 0;
-
 #define HDMI_STATE_PATH "/sys/class/drm/card0-HDMI-A-1/status"
 
-static int HDMI_enabled(void) {
-	char value[64];
-	getFile(HDMI_STATE_PATH, value, 64);
-	return exactMatch(value, "connected\n");
+// not GetHDMI(): minarch reads FIXED_WIDTH/HEIGHT before InitSettings()
+int PLAT_onHDMI(void) {
+	static int cached = -1;
+	if (cached<0) {
+		char value[64];
+		getFile(HDMI_STATE_PATH, value, 64);
+		cached = exactMatch(value, "connected\n");
+	}
+	return cached;
 }
 
 #define LID_PATH "/sys/devices/platform/hall-mh248/hallvalue" // 1 open, 0 closed

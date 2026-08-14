@@ -158,6 +158,34 @@ static int get_rockchip_card_num() {
 	return get_card_num("rockchiprk817"); // the built-in codec
 }
 
+// only while the built-in codec is the sink, so audiomon's BT/USB routing wins
+static void route_audio_to_hdmi(int enable) {
+	if (settings->audiosink != AUDIO_SINK_DEFAULT) return;
+
+	char path[512];
+	snprintf(path, sizeof(path), "%s/.asoundrc", getenv("USERDATA_PATH"));
+
+	if (!enable) {
+		unlink(path);
+		return;
+	}
+
+	int card = get_card_num("rockchiphdmi");
+	if (card < 0) {
+		printf("SetHDMI: no HDMI audio card\n");
+		return;
+	}
+
+	FILE *fp = fopen(path, "w");
+	if (!fp) return;
+	fprintf(fp,
+		"pcm.!default {\n    type hw\n    card %i\n}\n"
+		"ctl.!default {\n    type hw\n    card %i\n}\n", card, card);
+	fflush(fp);
+	fsync(fileno(fp));
+	fclose(fp);
+}
+
 void InitSettings(void) {
 	sprintf(SettingsPath, "%s/msettings.bin", getenv("USERDATA_PATH"));
 
@@ -214,6 +242,7 @@ void InitSettings(void) {
 	// Always re-set Jack and HDMI according to hardware state
 	settings->jack = JACK_enabled();
 	settings->hdmi = HDMI_enabled();
+	route_audio_to_hdmi(settings->hdmi); // per app start, launch.sh clears it at boot
 
 	printf("brightness: %i (hdmi: %i)\nspeaker: %i (jack: %i)\n", settings->brightness, settings->hdmi, settings->speaker, settings->jack); 
 	fflush(stdout);
@@ -399,11 +428,9 @@ void SetHDMI(int value){
 	printf("SetHDMI(%i)\n", value); fflush(stdout);
 
 	settings->hdmi = value;
-	if (value) {
-		SetRawVolume(100); // max
-		SaveSettings();
-	} 
-	else SetVolume(GetVolume()); // restore
+	route_audio_to_hdmi(value);
+	// volume on HDMI belongs to the sink; the rk817 mixer doesn't reach that card
+	if (!value) SetVolume(GetVolume());
 };
 
 void SetMute(int value){}
@@ -576,6 +603,7 @@ int scaleExposure(int value) {
 ///////// Platform specific, unscaled accessors
 
 void SetRawBrightness(int val) { // 0 - 255
+	if (settings->hdmi) val = 0; // panel is unused while docked
 	printf("SetRawBrightness(%i)\n", val); fflush(stdout);
 	putInt("/sys/class/backlight/backlight/brightness", val);
 }
