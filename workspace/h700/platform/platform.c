@@ -26,10 +26,9 @@
 #include <dirent.h>
 #include <stdint.h>
 
-int is_rg28xx = 0;
-int is_rg34xx = 0;
-int is_rgsp = 0;
-int is_cube = 0;
+int panel_w = 640;
+int panel_h = 480;
+int needs_portrait_sdl = 0;
 int hdmi_active = 0;
 int dev_has_lstick = 0;
 int dev_has_rstick = 0;
@@ -195,59 +194,39 @@ static void apply_hat_axis(int neg_id, int pos_id, int value, uint32_t tick) {
 
 static void detect_device(void) {
 	char *device = getenv("DEVICE");
-	char *model = getenv("RGXX_MODEL");
+	if (!device) device = "rg35xxplus";
 
-	is_rg28xx = exactMatch("rg28xx", device) || exactMatch("RG28xx", model);
-	is_rg34xx = exactMatch("rg34xx", device) || exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model);
-	// The RG SP is the RG34XXSP without the sticks: same panel (lcd_driver_name
-	// rg34xxsp_v1, identical DTB timings), bigger battery. Its stock RGXX_MODEL
-	// is a bare "RGSP", which no family glob matches -- hence its own flag
-	// rather than folding it into is_rg34xx, so stick and LED policy stay exact.
-	// Matched on the model as well as DEVICE, like the others: the installer shim
-	// (install/boot.sh) exports RGXX_MODEL but never DEVICE, so anything reached
-	// from that path sees only the model string.
-	is_rgsp = exactMatch("rgsp", device) || exactMatch("RGSP", model);
-	is_cube = exactMatch("cube", device) || (model && prefixMatch("RGcube", model));
+	// App framebuffer size from DEVICE. RG28XX's panel is physically 480x640
+	// portrait, but SDL_ROTATION presents a 640x480 landscape app space — keep
+	// FIXED_* at 640x480 and set needs_portrait_sdl for the driver/bootlogo.
+	panel_w = 640;
+	panel_h = 480;
+	needs_portrait_sdl = exactMatch("rg28xx", device);
+	if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
+		|| exactMatch("rgsp", device)) {
+		panel_w = 720;
+		panel_h = 480;
+	} else if (exactMatch("rgcubexx", device)) {
+		panel_w = 720;
+		panel_h = 720;
+	}
 
-	// RGB LEDs exist only on the RG40XX H, RG40XX V and RG CubeXX (same three
-	// models muOS flags with led/rgb=1); every other RG XX has just the binary
-	// work_led. The V has a single stick and one populated bank, the H and the
-	// Cube have two -- which is why the exact model matters here and the coarse
-	// DEVICE=rg40xx isn't enough.
-	int is_rg40xxv = exactMatch("RG40xxV", model);
-	int model_has_rgb = is_rg40xxv || is_cube || exactMatch("rg40xx", device) ||
-		(model && (prefixMatch("RG40xx", model) || prefixMatch("RG40XX", model)));
-	// launch.sh falls back to DEVICE=rg40xx for anything it doesn't recognise,
-	// so require the MCU transport to actually be there before we write to it
+	// RGB LEDs: rg40xxv (1 bank), rg40xxh / rgcubexx (2 banks). Require MCU.
+	int is_rg40xxv = exactMatch("rg40xxv", device);
+	int model_has_rgb = is_rg40xxv || exactMatch("rg40xxh", device)
+		|| exactMatch("rgcubexx", device);
 	dev_has_rgb = model_has_rgb && exists(H700_LED_TTY) && exists(H700_MCU_PWR);
 	dev_num_leds = !dev_has_rgb ? 0 : (is_rg40xxv ? 1 : 2);
 
-	// Analog sticks per model; every stick on these devices clicks (L3 = left,
-	// R3 = right). Exact RGXX_MODEL strings confirmed so far: RG28xx, RG34xx,
-	// RG34xxSP, RG40xxH, RG40xxV, RGSP, RGcubexx. The RG35xx family is matched
-	// by prefix/suffix until its exact strings are confirmed (same as msettings).
+	// Analog sticks per SKU; every stick clicks (L3 / R3).
 	dev_has_lstick = 0;
 	dev_has_rstick = 0;
-	if (is_rg28xx || is_rgsp) {
-		// The RG SP drops the RG34XXSP's sticks entirely: its device tree has no
-		// keyL3/keyR3 and none of the analog multiplexer pins (amux-en-gpios,
-		// A0/A1_gpio, adc-en-gpios), and the GPADC itself is status="disabled".
-		dev_has_lstick = dev_has_rstick = 0;
-	}
-	else if (is_rg34xx) {
-		// the RG34xx has no sticks, the RG34xxSP has two
-		dev_has_lstick = dev_has_rstick = exactMatch("RG34xxSP", model);
-	}
-	else if (exactMatch("RG40xxV", model)) {
-		dev_has_lstick = 1; // single left stick
-	}
-	else if (exactMatch("RG40xxH", model) || is_cube) {
+	if (is_rg40xxv) {
+		dev_has_lstick = 1;
+	} else if (exactMatch("rg40xxh", device) || exactMatch("rgcubexx", device)
+		|| exactMatch("rg34xxsp", device) || exactMatch("rg35xxh", device)
+		|| exactMatch("rg35xxpro", device)) {
 		dev_has_lstick = dev_has_rstick = 1;
-	}
-	else if ((model && prefixMatch("RG35xx", model)) || exactMatch("rg35xx", device)) {
-		// Only the H and Pro have sticks; Plus/2024/SP and unknown variants don't.
-		char *suffix = (model && prefixMatch("RG35xx", model)) ? model + strlen("RG35xx") : "";
-		dev_has_lstick = dev_has_rstick = exactMatch("H", suffix) || prefixMatch("Pro", suffix);
 	}
 }
 
@@ -270,7 +249,7 @@ void PLAT_initPlatform(void) {
 	// Aspect/Fullscreen scaling.
 	// On HDMI the fb is 1280x720 landscape, so that rotation must be off; this
 	// overrides the launch.sh export for the lifetime of this process.
-	if (is_rg28xx)
+	if (needs_portrait_sdl)
 		setenv("SDL_ROTATION", hdmi_active ? "0" : "1", 1);
 }
 

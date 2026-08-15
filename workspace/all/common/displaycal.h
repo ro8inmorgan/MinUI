@@ -65,7 +65,8 @@ static const struct DisplayCalDefaults DisplayCalDefaults_RG28XX = { 1, 100, 92,
 static const struct DisplayCalDefaults DisplayCalDefaults_RG34XX = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG34XXSP = { 1, 100, 83, 86 };
 static const struct DisplayCalDefaults DisplayCalDefaults_RGSP = { 1, 100, 68, 61 };
-static const struct DisplayCalDefaults DisplayCalDefaults_RG35XX = DISPLAYCAL_H700_UNCALIBRATED; // Plus/H/2024
+static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXPlus = DISPLAYCAL_H700_UNCALIBRATED;
+static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXH = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXSP = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG35XXPRO = DISPLAYCAL_H700_UNCALIBRATED;
 static const struct DisplayCalDefaults DisplayCalDefaults_RG40XXH = DISPLAYCAL_H700_UNCALIBRATED;
@@ -81,7 +82,8 @@ enum DisplayCalPreset {
 	DISPLAYCAL_PRESET_RG34XX,
 	DISPLAYCAL_PRESET_RG34XXSP,
 	DISPLAYCAL_PRESET_RGSP,
-	DISPLAYCAL_PRESET_RG35XX,
+	DISPLAYCAL_PRESET_RG35XXPLUS,
+	DISPLAYCAL_PRESET_RG35XXH,
 	DISPLAYCAL_PRESET_RG35XXSP,
 	DISPLAYCAL_PRESET_RG35XXPRO,
 	DISPLAYCAL_PRESET_RG40XXH,
@@ -97,7 +99,8 @@ static inline DisplayCalDefaults DisplayCal_getDefaultSettings(enum DisplayCalPr
 		case DISPLAYCAL_PRESET_RG34XX: return DisplayCalDefaults_RG34XX;
 		case DISPLAYCAL_PRESET_RG34XXSP: return DisplayCalDefaults_RG34XXSP;
 		case DISPLAYCAL_PRESET_RGSP: return DisplayCalDefaults_RGSP;
-		case DISPLAYCAL_PRESET_RG35XX: return DisplayCalDefaults_RG35XX;
+		case DISPLAYCAL_PRESET_RG35XXPLUS: return DisplayCalDefaults_RG35XXPlus;
+		case DISPLAYCAL_PRESET_RG35XXH: return DisplayCalDefaults_RG35XXH;
 		case DISPLAYCAL_PRESET_RG35XXSP: return DisplayCalDefaults_RG35XXSP;
 		case DISPLAYCAL_PRESET_RG35XXPRO: return DisplayCalDefaults_RG35XXPRO;
 		case DISPLAYCAL_PRESET_RG40XXH: return DisplayCalDefaults_RG40XXH;

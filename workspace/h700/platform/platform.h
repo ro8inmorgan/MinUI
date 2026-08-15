@@ -11,15 +11,14 @@
 
 ///////////////////////////////
 
-extern int is_rg28xx;
-extern int is_rg34xx;
-extern int is_rgsp;
-extern int is_cube;
+extern int panel_w;
+extern int panel_h;
 extern int hdmi_active;
 extern int dev_has_lstick;
 extern int dev_has_rstick;
 extern int dev_has_rgb;
 extern int dev_num_leds;
+extern int needs_portrait_sdl; // DEVICE=rg28xx: SDL rotates onto the portrait panel
 
 ///////////////////////////////
 
@@ -146,9 +145,9 @@ extern int dev_num_leds;
 
 // While an HDMI cable is connected the whole app runs at 1280x720 (the fb is
 // hardware-scaled to a 1080p60 signal by the display engine — see SetHDMI in
-// libmsettings). hdmi_active is latched once per process in PLAT_initPlatform,
-// so like is_cube these are constant for the process lifetime; the existing
-// hotplug quit-and-relaunch plumbing restarts apps on cable changes.
+// libmsettings). hdmi_active and panel_w/panel_h are latched once per process
+// in PLAT_initPlatform; the existing hotplug quit-and-relaunch plumbing
+// restarts apps on cable changes.
 // Values must match HDMI_LOGICAL_* in libmsettings/msettings.c.
 #define HAS_HDMI		1
 #define HDMI_WIDTH		1280
@@ -157,10 +156,11 @@ extern int dev_num_leds;
 #define HDMI_SIZE		(HDMI_PITCH * HDMI_HEIGHT)
 
 #define FIXED_SCALE 	2
-// 720 wide on the RG34xx family and the RG SP, which shares the RG34XXSP panel;
-// 720x720 on the cube's square panel; 640x480 everywhere else.
-#define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:(is_cube?720:((is_rg34xx||is_rgsp)?720:640)))
-#define FIXED_HEIGHT	(hdmi_active?HDMI_HEIGHT:(is_cube?720:480))
+// panel_w/panel_h are the app framebuffer size from DEVICE: 720x480 for
+// rg34xx/rg34xxsp/rgsp, 720x720 for rgcubexx, else 640x480 (including rg28xx,
+// whose portrait panel is handled by SDL_ROTATION via needs_portrait_sdl).
+#define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:panel_w)
+#define FIXED_HEIGHT	(hdmi_active?HDMI_HEIGHT:panel_h)
 #define FIXED_BPP		2
 #define FIXED_DEPTH		(FIXED_BPP * 8)
 #define FIXED_PITCH		(FIXED_WIDTH * FIXED_BPP)
@@ -172,9 +172,9 @@ extern int dev_num_leds;
 // The 480p layout needs the standard 10-unit padding so six rows and the
 // bottom hints keep the same vertical spacing. The roomier 720p layouts retain
 // their existing 5-unit edge padding.
-#define MAIN_ROW_COUNT ((hdmi_active||is_cube)?10:6)
+#define MAIN_ROW_COUNT ((hdmi_active||panel_h>=720)?10:6)
 #define QUICK_SWITCHER_COUNT 3
-#define PADDING ((hdmi_active||is_cube)?5:10)
+#define PADDING ((hdmi_active||panel_h>=720)?5:10)
 
 ///////////////////////////////
 
@@ -182,7 +182,7 @@ extern int dev_num_leds;
 #define MUTE_VOLUME_RAW 0
 
 #define SCREEN_FPS 60.0
-// ceiling, not the count: only the RG40XX H/V and RG CubeXX have RGB LEDs, and
+// ceiling, not the count: only rg40xxh/v and rgcubexx have RGB LEDs, and
 // the V populates one bank where the others populate two. PLAT_getNumLeds()
 // reports what the running device actually has.
 #define MAX_LIGHTS 2
@@ -195,7 +195,7 @@ extern int dev_num_leds;
 // driver, but the bootloader blits bootlogo.bmp panel-native, so the 480x640
 // presets are authored 90° CCW and must be rotated CW to preview how they
 // will actually appear at boot.
-#define BOOTLOGO_PREVIEW_ROTATE_CW (is_rg28xx)
+#define BOOTLOGO_PREVIEW_ROTATE_CW (needs_portrait_sdl)
 
 ///////////////////////////////
 

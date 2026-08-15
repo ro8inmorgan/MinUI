@@ -252,13 +252,13 @@ namespace {
             SmartPro,
             SmartProS,
             Flip,
-            RG40XX,
             RG40XXV,
             RG40XXH,
             RG34XX,
             RG34XXSP,
             RGSP, // RG34XXSP panel, no sticks
-            RG35XX, // Plus/H/2024
+            RG35XXPlus, // Plus and 2024 both report RG35xx
+            RG35XXH,
             RG35XXSP,
             RG35XXPRO,
             RG28XX,
@@ -296,17 +296,37 @@ namespace {
                     m_vendor = Trimui;
                     m_model = Flip;
                     m_platform = my355;
-                } else if(exactMatch("rg40xx", device)) {
+                } else if(exactMatch("rg40xxv", device)) {
                     m_vendor = Anbernic;
-                    m_model = RG40XX;
+                    m_model = RG40XXV;
                     m_platform = h700;
-                } else if(exactMatch("rg35xx", device)) {
+                } else if(exactMatch("rg40xxh", device)) {
                     m_vendor = Anbernic;
-                    m_model = RG35XX;
+                    m_model = RG40XXH;
+                    m_platform = h700;
+                } else if(exactMatch("rg35xxplus", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG35XXPlus;
+                    m_platform = h700;
+                } else if(exactMatch("rg35xxh", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG35XXH;
+                    m_platform = h700;
+                } else if(exactMatch("rg35xxsp", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG35XXSP;
+                    m_platform = h700;
+                } else if(exactMatch("rg35xxpro", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG35XXPRO;
                     m_platform = h700;
                 } else if(exactMatch("rg34xx", device)) {
                     m_vendor = Anbernic;
                     m_model = RG34XX;
+                    m_platform = h700;
+                } else if(exactMatch("rg34xxsp", device)) {
+                    m_vendor = Anbernic;
+                    m_model = RG34XXSP;
                     m_platform = h700;
                 } else if(exactMatch("rgsp", device)) {
                     m_vendor = Anbernic;
@@ -316,26 +336,10 @@ namespace {
                     m_vendor = Anbernic;
                     m_model = RG28XX;
                     m_platform = h700;
-                } else if(exactMatch("cube", device)) {
+                } else if(exactMatch("rgcubexx", device)) {
                     m_vendor = Anbernic;
                     m_model = RGCubeXX;
                     m_platform = h700;
-                }
-            }
-            // Anbernic stock firmware reports the exact model (e.g. RG40xxV,
-            // RG34xxSP); use it to refine the DEVICE-based family match.
-            char* rgModel = getenv("RGXX_MODEL");
-            if (m_platform == h700 && rgModel) {
-                std::string model(rgModel);
-                if (model == "RG40xxV") m_model = RG40XXV;
-                else if (model == "RG40xxH") m_model = RG40XXH;
-                else if (model == "RG34xxSP") m_model = RG34XXSP;
-                else if (model == "RGSP") m_model = RGSP;
-                else if (model.rfind("RG35xx", 0) == 0) {
-                    std::string suffix = model.substr(6);
-                    if (suffix.rfind("SP", 0) == 0) m_model = RG35XXSP;
-                    else if (suffix.rfind("Pro", 0) == 0 || suffix.rfind("PRO", 0) == 0) m_model = RG35XXPRO;
-                    else m_model = RG35XX;
                 }
             }
         }
@@ -371,7 +375,9 @@ namespace {
         }
 
         bool hasAnalogSticks() const {
-            return m_model == SmartPro || m_model == SmartProS || m_model == BrickPro || m_model == RG40XX || m_model == RGCubeXX;
+            return m_model == SmartPro || m_model == SmartProS || m_model == BrickPro
+                || m_model == RG40XXV || m_model == RG40XXH || m_model == RGCubeXX
+                || m_model == RG34XXSP || m_model == RG35XXH || m_model == RG35XXPRO;
         }
 
         bool hasWifi() const {
@@ -598,7 +604,8 @@ int main(int argc, char *argv[])
                 deviceInfo.getModel() == DeviceInfo::RG34XX ? DISPLAYCAL_PRESET_RG34XX :
                 deviceInfo.getModel() == DeviceInfo::RG34XXSP ? DISPLAYCAL_PRESET_RG34XXSP :
                 deviceInfo.getModel() == DeviceInfo::RGSP ? DISPLAYCAL_PRESET_RGSP :
-                deviceInfo.getModel() == DeviceInfo::RG35XX ? DISPLAYCAL_PRESET_RG35XX :
+                deviceInfo.getModel() == DeviceInfo::RG35XXPlus ? DISPLAYCAL_PRESET_RG35XXPLUS :
+                deviceInfo.getModel() == DeviceInfo::RG35XXH ? DISPLAYCAL_PRESET_RG35XXH :
                 deviceInfo.getModel() == DeviceInfo::RG35XXSP ? DISPLAYCAL_PRESET_RG35XXSP :
                 deviceInfo.getModel() == DeviceInfo::RG35XXPRO ? DISPLAYCAL_PRESET_RG35XXPRO :
                 deviceInfo.getModel() == DeviceInfo::RG40XXH ? DISPLAYCAL_PRESET_RG40XXH :

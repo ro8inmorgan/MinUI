@@ -320,29 +320,22 @@ static int prefixMatch(char* pre, char* str) {
 	return (strncmp(pre, str, strlen(pre))==0);
 }
 
-// Pick the displaycal preset for this device. Exact RGXX_MODEL strings confirmed
-// so far: RG28xx, RG34xx, RG34xxSP, RG40xxH, RG40xxV, RGSP, RGcubexx. The RG35xx
-// family is matched by prefix/suffix until its exact strings are confirmed.
+// Pick the displaycal preset from DEVICE (exact SKU contract). Measured panels
+// keep their gains; everything else stays uncalibrated (off + 100/100/100).
 static enum DisplayCalPreset displayCalPresetForDevice(void) {
 	char* device = getenv("DEVICE");
-	char* model = getenv("RGXX_MODEL");
 
-	if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) return DISPLAYCAL_PRESET_RG28XX;
-	// Before the RG34xx prefix test: the RG SP shares that panel but is its own
-	// preset, and its bare "RGSP" would not match the prefix anyway.
-	if (exactMatch("RGSP", model) || exactMatch("rgsp", device)) return DISPLAYCAL_PRESET_RGSP;
-	if (exactMatch("RG34xxSP", model)) return DISPLAYCAL_PRESET_RG34XXSP;
-	if (prefixMatch("RG34xx", model) || exactMatch("rg34xx", device)) return DISPLAYCAL_PRESET_RG34XX;
-	if (exactMatch("RG40xxV", model)) return DISPLAYCAL_PRESET_RG40XXV;
-	if (exactMatch("RG40xxH", model)) return DISPLAYCAL_PRESET_RG40XXH;
-	if (prefixMatch("RGcube", model) || exactMatch("cube", device)) return DISPLAYCAL_PRESET_RGCUBEXX;
-	if (prefixMatch("RG35xx", model)) {
-		char* suffix = model + strlen("RG35xx");
-		if (prefixMatch("SP", suffix)) return DISPLAYCAL_PRESET_RG35XXSP;
-		if (prefixMatch("Pro", suffix) || prefixMatch("PRO", suffix)) return DISPLAYCAL_PRESET_RG35XXPRO;
-		return DISPLAYCAL_PRESET_RG35XX; // Plus/H/2024 share a preset for now
-	}
-	// DEVICE=rg40xx alone can't distinguish V from H, so fall through to neutral
+	if (exactMatch("rg28xx", device)) return DISPLAYCAL_PRESET_RG28XX;
+	if (exactMatch("rgsp", device)) return DISPLAYCAL_PRESET_RGSP;
+	if (exactMatch("rg34xxsp", device)) return DISPLAYCAL_PRESET_RG34XXSP;
+	if (exactMatch("rg34xx", device)) return DISPLAYCAL_PRESET_RG34XX;
+	if (exactMatch("rg40xxv", device)) return DISPLAYCAL_PRESET_RG40XXV;
+	if (exactMatch("rg40xxh", device)) return DISPLAYCAL_PRESET_RG40XXH;
+	if (exactMatch("rgcubexx", device)) return DISPLAYCAL_PRESET_RGCUBEXX;
+	if (exactMatch("rg35xxsp", device)) return DISPLAYCAL_PRESET_RG35XXSP;
+	if (exactMatch("rg35xxpro", device)) return DISPLAYCAL_PRESET_RG35XXPRO;
+	if (exactMatch("rg35xxh", device)) return DISPLAYCAL_PRESET_RG35XXH;
+	if (exactMatch("rg35xxplus", device)) return DISPLAYCAL_PRESET_RG35XXPLUS;
 	return DISPLAYCAL_PRESET_DEFAULT;
 }
 
@@ -857,12 +850,11 @@ void SetAudioSink(int value) {
 
 static void panelSize(int* w, int* h) {
 	char* device = getenv("DEVICE");
-	char* model = getenv("RGXX_MODEL");
 	*w = 640; *h = 480;
-	if (exactMatch("RGcubexx", model) || exactMatch("cube", device)) { *w = 720; *h = 720; }
-	else if (exactMatch("RG34xx", model) || exactMatch("RG34xxSP", model) || exactMatch("rg34xx", device)
-		|| exactMatch("RGSP", model) || exactMatch("rgsp", device)) { *w = 720; *h = 480; } // RG SP shares the RG34XXSP panel
-	else if (exactMatch("RG28xx", model) || exactMatch("rg28xx", device)) { *w = 480; *h = 640; } // panel is mounted portrait
+	if (exactMatch("rgcubexx", device)) { *w = 720; *h = 720; }
+	else if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
+		|| exactMatch("rgsp", device)) { *w = 720; *h = 480; }
+	else if (exactMatch("rg28xx", device)) { *w = 480; *h = 640; } // physical portrait panel
 }
 
 // the live output type, read back from the disp driver so a stale state file

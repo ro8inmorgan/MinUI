@@ -76,10 +76,11 @@ int loadImages()
     char* device = getenv("DEVICE");
 #ifdef BOOTLOGO_RESOLUTION_DIRS
     // presets are shared between devices with the same panel resolution
-    char* folder = "640x480"; // rg35xx, rg40xx
+    char* folder = "640x480";
     if (exactMatch("rg28xx", device)) folder = "480x640";
-    else if (exactMatch("rg34xx", device) || exactMatch("rgsp", device)) folder = "720x480";
-    else if (exactMatch("cube", device)) folder = "720x720";
+    else if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
+		|| exactMatch("rgsp", device)) folder = "720x480";
+    else if (exactMatch("rgcubexx", device)) folder = "720x720";
     snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/%s/", TOOLS_PATH, folder);
 #else
     // This needs to get a bit more flexible down the line, but for now we either expect the files

@@ -3,7 +3,7 @@
 // Included from platform.c (like generic_video.c et al) so the 13 makefiles
 // that compile platform.c directly don't each need a new source file.
 //
-// Only three RG XX models have RGB LEDs: RG40XX H, RG40XX V and RG CubeXX.
+// Only three SKUs have RGB LEDs: rg40xxh, rg40xxv, and rgcubexx.
 // They are NOT in /sys/class/leds and there is no led_anim driver (that is
 // TrimUI only) -- they hang off a separate MCU reached over UART5 at 115200
 // 8N1, powered by the axp2202 mcu_pwr rail. The protocol is
