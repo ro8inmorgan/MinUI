@@ -4,8 +4,9 @@
 the TrimUI Brick (tg5040) — displaycal, WiFi/BT, first-class sleep — installed *on top
 of the stock Anbernic OS*, no reflash, fully reversible.
 
-**Lifecycle:** preparing the Beta candidate. See [09](09-roadmap.md) for stage gates
-and [08](08-testing-status.md) for current evidence.
+**Lifecycle:** `h700-rc8` is golden master — the build intended for the upstream merge
+PR. See [09](09-roadmap.md) for stage gates and [08](08-testing-status.md) for
+current evidence.
 
 This directory is the H700 maintainer knowledge base. Documents 00–07 record durable
 facts, architecture, decisions, rationale, failure analysis, diagnostics, and lessons

@@ -124,13 +124,9 @@ lid is still closed, the unit returns to sleep. Its lifecycle disposition is in 
   [roadmap](09-roadmap.md#accepted-behavior-and-non-gates).
 - Richer metrics (`time_to_empty_now`, `voltage_now`, `temp`, `charge_counter`) are
   available for future batmon extensions; not wired.
-- Standby-drain investigation: the first RG34XXSP observation was a capacity change
-  from 40% to 33% over about 8.5 hours of deep sleep. Capacity is coarse, and the UI
-  desynchronization above may muddy the observation; it also predates the Super
-  Standby `os_sleep=16` integration. Re-test with
-  `axp2202-battery/voltage_now` before/after and run the same interval on stock OS
-  for a baseline. POWER-06 records the evidence; the follow-up is tracked in the
-  [roadmap](09-roadmap.md#future-hardening).
+- Standby drain: [POWER-06](08-testing-status.md#power-sleep-and-battery) completed —
+  sleep-drain work verified against stock OS on RG34XXSP (supersedes the earlier
+  coarse 40%→33% / 8.5 h capacity-only observation from before Super Standby).
 
 ## Power off / reboot
 
@@ -192,10 +188,10 @@ powered-off case; leave it alone.
 - `--dry-run` reports the detected bus, resolved card path and planned writes, and
   touches nothing. Safe on a live device.
 
-## CPU governor
+## CPU / GPU governor
 
-`governor.sh` reads the available frequency list. Auto uses `schedutil` across the
-full advertised range, performance uses `performance` at the greatest advertised
+`governor.sh` reads the available CPU frequency list. Auto uses `schedutil` across
+the full advertised range, performance uses `performance` at the greatest advertised
 frequency, and powersave uses `conservative` capped mid-range. H700's advertised
 1.5 GHz ceiling is in-spec rather than an overclock, so Auto no longer caps its
 maximum one frequency step below that ceiling. Menu vs in-game profiles ride the
@@ -204,3 +200,11 @@ are clean.
 ~~RG34XXSP MD Auto CPU slowdown~~ Fixed (user-verified 2026-07-20): earlier, some
 shader/scale combos left Auto near 480 MHz and felt slow; that no longer reproduces.
 Manual powersave/performance were already smooth. Single cluster → no core pinning.
+
+The same script also manages the GPU floor. Stock `simple_ondemand` under-clocks
+vsync'd spiky shader loads (busy-% over 100 ms does not care about a single missed
+frame), so auto/performance raise GPU `min_freq` to the greatest advertised rate
+and powersave drops it to the minimum. Measured cost on RG40XXV is about 0.5% of
+a 6-hour run (~2 minutes); the HUD read path resolves the working `devfreq` node
+once (648 MHz last-resort fallback) so minarch does not burn CPU probing dead
+paths every frame.

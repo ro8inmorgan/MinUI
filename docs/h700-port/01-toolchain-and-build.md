@@ -164,9 +164,10 @@ links reappear.
 After `make setup && make h700`, the staging tree contains:
 - `build/SYSTEM/h700/bin/*` — nextui.elf, minarch.elf, keymon.elf, batmon.elf, audiomon.elf,
   gametimectl.elf, syncsettings.elf, nextval.elf, show2.elf, settings.elf, clock, …
-  (tg5040 list minus ledcontrol, which is gated to tg50x0; bootlogo.elf builds for
-  h700 too and ships in `EXTRAS/Tools/h700/Bootlogo.pak`) plus `rfkill`
-  (h700 builds its own minimal `/dev/rfkill` ioctl tool — stock rfkill may be absent)
+  plus `ledcontrol.elf` and `bootlogo.elf` (both gated to tg5040/tg5050/h700; Bootlogo
+  ships in `EXTRAS/Tools/h700/Bootlogo.pak`), `poweroff_next`/`reboot_next`, `curl`, and
+  `rfkill` (h700 builds its own minimal `/dev/rfkill` ioctl tool — stock rfkill may be
+  absent)
 - `build/SYSTEM/h700/lib/` — libmsettings.so, libbatmondb.so, libgametimedb.so, …
   plus the bundled SDL2/tinyalsa/libpng12 set above
 - `build/SYSTEM/h700/cores/*.so` — full tg5040-parity core list

@@ -32,7 +32,7 @@ repeated for that system.
 | SFC | Snes9x | ✅ | Launch and gameplay perfect |
 | MD | PicoDrive | ✅ | Launch and gameplay good. Former Auto CPU slowdown (some shader/scale combos stuck near 480 MHz) is fixed — user-verified 2026-07-20 |
 | FBN | FBNeo | ⚠️ | With required BIOS: launch and play OK (2026-07-20). Without BIOS: MinArch hard-locks (no menu/exit; power cycle required). The upstream FBNeo error path does not poll frontend input. Track upstream. |
-| PS | PCSX-ReARMed | ✅ | Launch and gameplay pass after a clean core rebuild. The earlier crashes across 2–3 titles were caused by a stale/corrupted core, not a model-specific runtime defect |
+| PS | PCSX-ReARMed | ✅ | Launch and gameplay pass after a clean core rebuild. The earlier crashes across 2–3 titles were caused by a stale/corrupted core, not a model-specific runtime defect. H700 `PS.pak/default.cfg` binds L3/R3 for DualShock stick clicks |
 | 32X | PicoDrive | ⬜ | — |
 | A2600 | Stella 2014 | ✅ | Launch and gameplay pass (2026-07-20) |
 | A5200 | a5200 | ⬜ | — |
@@ -48,7 +48,7 @@ repeated for that system.
 | MSX | blueMSX | ⬜ | — |
 | NGP | RACE | ⬜ | — |
 | NGPC | RACE | ⬜ | — |
-| P8 | Fake-08 | ⬜ | — |
+| P8 | Fake-08 | ✅ | Launch and gameplay pass (maintainer-tested) |
 | PCE | Mednafen PCE Fast | ⬜ | — |
 | PET | VICE xpet | ⬜ | — |
 | PKM | PokeMini | ⬜ | — |

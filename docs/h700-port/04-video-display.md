@@ -132,6 +132,14 @@ same way for free.
      whichever commit lands last wins against the attach path's restore; commit
      again after unblank. The blob's pans then keep the crop in sync (they copy
      the committed config).
+  3. **Reset the pan origin to page 0.** `fb_var_screeninfo`'s `xoffset`/`yoffset`
+     survive `FBIOPUT_VSCREENINFO` resize. Coming off a 640×480 panel, `yoffset`
+     can still be 480 — not a page boundary of the new 1280×720×2 buffer. Measured
+     on RG40XXV, that wedges the mali fbdev winsys (it never pans again; every
+     frame lands in page 0) while `commitLayerGeometry()` had cropped scanout to
+     page 1 → black on both TV and panel. `SetHDMI()` clears both offsets and
+     commits `crop.y = 0`, and the read-back retry also requires page 0 so a late
+     attach-path restore cannot revive the old offset.
 - **Hardware evidence (RG40XXV + TV, 2026-07-16):** plug/unplug in launcher and
   in-game (autosave →
   auto-resume), repeated cycles, game scaling correct at 1280×720, and HDMI audio
@@ -160,18 +168,27 @@ only when the file is missing or predates v11. Verified on RG40XXV: patched valu
 survive reboot. (tg5040 has the same latent bug, masked by its calibrated presets —
 flagged as a separate task.)
 
-**Per-model default presets — plumbed, not yet measured.** `displaycal.h` has a
-preset per H700 model (RG28XX, RG34XX, RG34XXSP, RGSP, RG35XX = Plus/H/2024 shared,
-RG35XXSP, RG35XXPRO, RG40XXH, RG40XXV, RGCubeXX), all currently disabled/neutral
-(100/100/100). The RG SP keeps its own preset rather than sharing the RG34XXSP's,
-so calibrating one panel cannot silently retune the other. Selection keys on
-`RGXX_MODEL` (exact-model string from stock `dmenu.bin`; confirmed so far:
-`RG28xx`, `RG34xx`, `RG34xxSP`, `RGSP`, `RG40xxH`, `RG40xxV`,
-`RGcubexx` — RG35xx-family strings matched by prefix until confirmed)
-with `DEVICE` fallback, in both h700 libmsettings and the settings app's
-reset-to-defaults. launch.sh now maps `RG35xx*` → `DEVICE=rg35xx` instead of lumping
-the 35xx family into rg40xx. Calibrating a panel later = editing numbers in
-displaycal.h only. Default brightness on h700 is 4 (tg5040 Brick keeps 2).
+**Per-model default presets — partly calibrated.** `displaycal.h` has a preset per
+H700 model (RG28XX, RG34XX, RG34XXSP, RGSP, RG35XX = Plus/H/2024 shared,
+RG35XXSP, RG35XXPRO, RG40XXH, RG40XXV, RGCubeXX). Calibrated and enabled today:
+
+| Model | Enabled | R / G / B |
+|---|---|---|
+| RG28XX | yes | 100 / 92 / 65 |
+| RG34XXSP | yes | 100 / 83 / 86 |
+| RG SP | yes | 100 / 68 / 61 |
+| RG40XXV | yes | 91 / 100 / 63 |
+
+The remaining models stay disabled with neutral 100/100/100 until measured. The
+RG SP keeps its own preset rather than sharing the RG34XXSP's, so calibrating one
+panel cannot silently retune the other. Selection keys on `RGXX_MODEL`
+(exact-model string from stock `dmenu.bin`; confirmed so far: `RG28xx`, `RG34xx`,
+`RG34xxSP`, `RGSP`, `RG40xxH`, `RG40xxV`, `RGcubexx` — RG35xx-family strings
+matched by prefix until confirmed) with `DEVICE` fallback, in both h700
+libmsettings and the settings app's reset-to-defaults. launch.sh maps `RG35xx*` →
+`DEVICE=rg35xx` instead of lumping the 35xx family into rg40xx. Further panel
+calibration = editing numbers in `displaycal.h` only. Default brightness on h700
+is 4 (tg5040 Brick keeps 2).
 
 **What actually works on RG XX panels:** LCD backlight brightness, color temperature,
 white-point correction (displaycal), RGB tuning. The `enhance_*` display controls

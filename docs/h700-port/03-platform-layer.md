@@ -24,16 +24,18 @@ R3 ⇔ right):
 |---|---|---|
 | RG28XX, RG34XX, RG35XX Plus/2024/SP | none | `RG28xx` / `RG34xx` exact; `RG35xx` prefix default |
 | RG SP | none | `RGSP` exact |
-| RG35XX H, RG35XX Pro | dual | `RG35xx` prefix + `H`/`Pro` suffix |
+| RG35XX H, RG35XX Pro | dual | `RG35xx` prefix + exact `H` / `Pro*` suffix |
 | RG34XXSP | dual | `RG34xxSP` exact |
-| RG40XX H, RG CubeXX, unknown | dual | `RG40xxH`, `RGcube*`; dual is the fallback |
+| RG40XX H, RG CubeXX | dual | `RG40xxH`, `RGcube*` / `DEVICE=cube` |
 | RG40XX V | left only | `RG40xxV` exact |
+| Unrecognized / missing model | none | conservative default — sticks stay off until a known match |
 
-Unknown `RG35xx` variants default to stickless (most of that family is); anything
-else unknown defaults to dual (today's behavior, covers `DEVICE=rg40xx` without a
-model string). No H700 Anbernic device has an Fn switch. Exact `RGXX_MODEL` strings
-still unconfirmed for the RG35xx family (same caveat as msettings' displaycal
-presets).
+Unknown `RG35xx` variants and any other unrecognized model stay stickless. That is
+deliberate: `DEVICE=rg40xx` alone (launch.sh fallback without a usable
+`RGXX_MODEL`) no longer assumes dual sticks. No H700 Anbernic device has an Fn
+switch. Exact `RGXX_MODEL` strings are still unconfirmed for the RG35xx family
+(same caveat as msettings' displaycal presets). The H700 PS1 pak binds L3/R3 so
+DualShock titles can use stick clicks on models that have them.
 
 The RG SP is stickless on device-tree evidence rather than spec sheets: its DTB has
 no `keyL3`/`keyR3` nodes, none of the analog multiplexer pins the RG34XXSP carries
@@ -51,6 +53,7 @@ left stick on RG40XXV and for both sticks on RG34XXSP.
 extern int is_rg28xx, is_rg34xx, is_rgsp, is_cube;
 extern int hdmi_active;
 extern int dev_has_lstick, dev_has_rstick;
+extern int dev_has_rgb, dev_num_leds;
 
 #define HDMI_WIDTH   1280
 #define HDMI_HEIGHT  720
@@ -61,7 +64,8 @@ extern int dev_has_lstick, dev_has_rstick;
 #define SCREEN_FPS    60.0            // ⚠ assumed, never measured per panel
 #define SDCARD_PATH   "/mnt/SDCARD"   // symlink to the real TF2 mountpoint (02)
 #define MAX_LIGHTS    2               // ceiling; PLAT_getNumLeds() reports 0/1/2 per model
-#define MAIN_ROW_COUNT (hdmi_active?10:(is_cube?8:6))
+#define MAIN_ROW_COUNT ((hdmi_active||is_cube)?10:6)  // cube was under-filled at 8
+#define PADDING        ((hdmi_active||is_cube)?5:10)  // 480p keeps standard 10-unit gaps
 ```
 
 ## Input — dual path, evdev primary (deviation from plan)
@@ -135,7 +139,7 @@ open/closed per poll and could drop the wake press between polls.
 | CPU speed | `governor.sh` via `system()`: auto=schedutil and performance both permit the greatest advertised frequency; powersave=conservative capped mid-range. H700's advertised 1.5 GHz ceiling is in-spec, not an overclock, so Auto no longer caps it one step below maximum. Manual changes work. Former MD Auto slowdown near 480 MHz is fixed (user-verified 2026-07-20). Single A53 cluster → `PLAT_pinToCores` no-op |
 | CPU temp | thermal_zone0 |
 | GPU temp | thermal_zone1 (zone map in 00 — zone2 is the video engine, a first draft got this wrong) |
-| GPU speed | devfreq `cur_freq` (two SoC paths) → debug clk paths → 660 MHz literal as last-resort fallback |
+| GPU speed / governor | HUD read resolves `devfreq`/`clk` paths once (first readable candidate wins) with a 648 MHz last-resort fallback. `governor.sh` also pins GPU `min_freq` to max under auto/performance and to min under powersave — `simple_ondemand` under-clocks vsync'd spiky loads (06) |
 | Rumble | `echo 1/0 > axp2202-battery/moto` — on/off only, strength>0 → 1. Works (tested). Input-FF (event1 advertises FF bits) unexplored |
 | LEDs | RGB on RG40XX H / RG40XX V / RG CubeXX only, via an MCU on `/dev/ttyS5` (115200 8N1) gated by `axp2202-battery/mcu_pwr` — see `platform/led.c`. `MAX_LIGHTS 2` is a ceiling; `PLAT_getNumLeds()` returns 0 (no RGB), 1 (RG40XXV, one populated bank) or 2. Effects are rendered by the MCU firmware, not in userspace. `work_led` remains the sleep/backlight indicator on every model |
 | Backlight | raw brightness 0 via disp ioctl + fb blank + `work_led` on/off around it |
@@ -207,8 +211,8 @@ integration. Review them when rebasing or adding another platform:
   LUT after suspend.
 - `workspace/all/bootlogo/bootlogo.c` contains the diagnostic empty-state handling
   and the optional `BOOTLOGO_PREVIEW_ROTATE_CW` hook used by RG28XX.
-- Root/workspace makefiles register the H700 platform, tg5040-image reuse, rfkill,
-  and the H700 Bootlogo build.
+- Root/workspace makefiles register the H700 platform, dedicated `h700-toolchain`,
+  rfkill, LedControl, and the H700 Bootlogo build.
 
 Any change in this surface requires the H700 build plus the tg5040 regression build
 recorded as BUILD-01 and BUILD-02 in 08. A new shared button or `PLAT_*` hook must be

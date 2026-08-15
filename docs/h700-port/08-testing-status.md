@@ -6,7 +6,9 @@ blocks Alpha, Beta, RC, or Release; those decisions live in
 [09-roadmap.md](09-roadmap.md). Detailed per-core coverage lives in
 [10-core-game-matrix.md](10-core-game-matrix.md).
 
-Results recorded through 2026-07-20.
+Results recorded through 2026-08-09. Artifact lineage: Alpha → `h700-beta1` →
+`h700-rc1`…`h700-rc8`. **`h700-rc8` is GM** (rebuild on the NextUI v6.14.0 commit to
+keep RetroAchievements working; see [09](09-roadmap.md#current-position)).
 
 ## Status and evidence rules
 
@@ -40,7 +42,7 @@ limit on support.
 | ID | Test | Status | Evidence/device | Result and notes |
 |---|---|---|---|---|
 | BUILD-01 | CI-style H700 staging build (`make setup`, then `make h700`) | ✅ | CI/release build | H700 binaries, tools, cores, libraries, boot shim, and installer assets stage successfully |
-| BUILD-02 | Full tg5040 regression build after shared-code changes | ⬜ | Candidate-specific | Must be recorded for the actual candidate; single-pak builds are insufficient |
+| BUILD-02 | Full tg5040 regression build after shared-code changes | ✅ | TrimUI Brick / shared `h700-rc8` artifact | Same candidate runs on tg5040. Users report LedControl settings do not stick on TrimUI in this version ([#23](https://github.com/pvaibhav/NextUI/issues/23)); H700 LED path is separate (LED-01…), treat as a tg5040 regression to track rather than an H700 build failure |
 | BUILD-03 | Jammy `settings.elf` runtime linkage check | ✅ | Automated container check | H700 library path resolves and required gio/glib linkage is present |
 | BUILD-04 | Bundled curl static linkage and HTTPS | ✅ | arm64 Jammy container | Pinned musl curl 8.21.0 + OpenSSL 3.5.7 has no dynamic section; DNS and TLS reach the RetroAchievements API using the bundled CA file (HTTP 422 is the expected unauthenticated response) |
 
@@ -50,7 +52,7 @@ limit on support.
 |---|---|---|---|---|
 | BOOT-01 | Cold boot to NextUI and 10+ reboot soak | ✅ | RG40XXV | Stable boot with reasonable startup time |
 | BOOT-02 | Stock-card hijack with the required **old style** theme | ✅ | RG40XXV/RG34XXSP | `/mnt/mmc/dmenu.bin` launches NextUI from TF2 |
-| BOOT-03 | Repeated launcher crash limit | ⬜ | Code present | The launcher implements a five-consecutive-crash cutoff followed by poweroff, but it has not been exercised end to end |
+| BOOT-03 | Repeated launcher crash limit | ➖ | Design / accepted | Five-crash cutoff then poweroff is implemented; deliberately not required as an induced E2E release gate for `h700-rc8` |
 | BOOT-04 | Remove `dmenu.bin` to restore stock boot | ➖ | Design inspection | Stock `dmenu_ln` cannot launch NextUI when the single hijack file is absent; no separate uninstall workflow exists |
 | BOOT-05 | Stock **MU style** theme behavior | ✅ | On-device observation | MU style bypasses `/mnt/mmc/dmenu.bin` and boots the stock/MU frontend; NextUI cannot display an in-shim warning |
 
@@ -85,7 +87,7 @@ limit on support.
 | AUDIO-01 | Internal volume UI, mute, and levels from 0–100% | ✅ | RG40XXV, RG34XXSP | Audible levels and reversed `digital volume` scale behave correctly |
 | AUDIO-02 | Game audio and underruns | ✅ | RG40XXV, tested RG34XXSP games | GBA/SNES and broader gameplay have clean audio with no observed underruns |
 | AUDIO-03 | Headphone insertion and speaker routing | ✅ | RG34XXSP | Hardware auto-mutes the speaker and routes to headphones; NextUI does not expose a separate HP icon/volume |
-| AUDIO-04 | Bluetooth A2DP pairing and playback | ✅ | RG40XXV + AirPods 4 ANC | Pairing is remembered; manual Connect routes audible SBC audio; returning AirPods to the case restores the internal speaker. Nearby iPhone/Mac devices may win auto-connect |
+| AUDIO-04 | Bluetooth A2DP pairing and playback | ✅ | RG40XXV + AirPods 4 ANC | Pairing is remembered; manual Connect routes audible SBC audio; returning AirPods to the case restores the internal speaker. Nearby iPhone/Mac devices may win auto-connect. One post-sleep auto-repair report is expected-not-supported behavior pending triage ([#20](https://github.com/pvaibhav/NextUI/issues/20)) |
 | AUDIO-05 | HDMI audio routing and restoration | ✅ | RG40XXV + TV | HDMI route is audible; unplug restores the panel/internal route |
 
 ## Network and online features
@@ -107,7 +109,7 @@ limit on support.
 | POWER-03 | RG34XXSP lid close/open | ✅ | RG34XXSP | Close sleeps and open wakes. POWER may wake light sleep with lid closed; deep sleep re-sleeps while the lid remains closed |
 | POWER-04 | Charging indication and sleep while charging | ✅ | RG34XXSP | Indicator works; shared product behavior permits light/screen-off sleep and suppresses deep sleep while charging |
 | POWER-05 | Battery percentage versus stock | ✅ | RG34XXSP | Fresh-boot percentage matches stock; after long sleep the top-bar icon and Battery pak briefly disagreed with each other |
-| POWER-06 | Overnight suspend drain versus stock | ⚠️ | RG34XXSP | First point: about 7% over 8.5 hours. No voltage-based stock comparison is recorded |
+| POWER-06 | Overnight suspend drain versus stock | ✅ | RG34XXSP | Sleep-drain work completed and verified against stock OS |
 
 ## Games and performance
 
@@ -120,12 +122,12 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 | GAME-03 | MD/PicoDrive launch, gameplay, and Auto CPU | ✅ | RG34XXSP | Former slowdown near 480 MHz is fixed |
 | GAME-04 | PS1/PCSX-ReARMed launch and performance | ✅ | RG40XXV, RG34XXSP | Clean core rebuild fixed the stale/corrupted packaged artifact |
 | GAME-05 | FBNeo happy path and missing-BIOS error path | ⚠️ | RG34XXSP | With required BIOS, launch/play pass. Without BIOS, the upstream core stops polling frontend input and MinArch cannot open menu/exit |
-| GAME-06 | Remaining EXTRAS core smoke | ⚠️ | RG34XXSP | A2600, MGBA, and SMS pass; the remaining long-tail systems are not fully covered |
+| GAME-06 | Remaining EXTRAS core smoke | ⚠️ | RG34XXSP (maintainer) | Maintainer-tested Pass: A2600, mGBA, SMS, and Pico-8 (Fake-08). Remaining long-tail systems in [10](10-core-game-matrix.md) are untested by the maintainer; other users may have exercised them — no specific bug reports so far. Known incomplete coverage, not a merge blocker |
 | PERF-01 | GBA/SNES full speed with vsync | ✅ | RG40XXV, tested RG34XXSP games | Full speed with no observed audio underruns |
 | PERF-02 | Frame pacing, tearing, and input latency | ✅ | RG40XXV | No visible issue during gameplay; result is observational, not instrumented |
 | PERF-03 | Manual CPU governor changes during play | ✅ | RG34XXSP | Powersave/performance changes do not stutter audio |
 | PERF-04 | Automatic governor load/frequency selection | ✅ | RG34XXSP | MD Auto CPU regression is resolved |
-| PERF-05 | Auto governor full-range scaling | ⬜ | Implementation ready; hardware result pending | With Auto selected, `scaling_max_freq` should equal the greatest advertised frequency (about 1.5 GHz) and schedutil should scale up to it under load without new performance, thermal, or audio regressions |
+| PERF-05 | Auto governor full-range scaling | ✅ | Representative H700 device | With Auto selected, `scaling_max_freq` reaches the greatest advertised frequency (~1.5 GHz) and schedutil scales under load; no new performance, thermal, or audio regressions observed |
 
 ## Applications and device-specific hardware
 
@@ -136,7 +138,7 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 | DEV-01 | RG40XXV 640×480/single-stick baseline | ✅ | RG40XXV | UI, input, game runtime, HDMI, and Bluetooth paths pass |
 | DEV-02 | RG34XXSP 720×480/lid/dual-stick delta | ✅ | RG34XXSP | UI scaling, lid, controls, apps, and games pass |
 | DEV-03 | RG28XX 480×640 rotation delta | ✅ | RG28XX | UI, game Aspect/Fullscreen scaling, bootlogo apply, and rotated preview pass |
-| DEV-04 | RGcubexx 720×720 delta | ⚠️ | Community report | General UI scaling passes; the main list under-filled the panel (8 rows instead of the 10 that fit) until [#18](https://github.com/pvaibhav/NextUI/issues/18) — fix is untested on cube hardware; no full local functional/core walk exists |
+| DEV-04 | RGcubexx 720×720 delta | ✅ | Community / user confirmation | General UI scaling passes. [#18](https://github.com/pvaibhav/NextUI/issues/18) under-fill fixed (`MAIN_ROW_COUNT` 10 on cube/HDMI); user confirmed the 10-row layout on cube hardware |
 | DEV-05 | Bootlogo 640×480 apply/backup | ✅ | RG40XXV | Carousel, apply, backup, and original entry pass; restore uses the same apply path |
 | DEV-06 | Bootlogo 720×480 preview/apply/backup/restore | ✅ | RG34XXSP | All 23 presets render; first backup and restore pass |
 | DEV-07 | Bootlogo 480×640 apply and preview orientation | ✅ | RG28XX | Applied logo and rotated previews are upright |
@@ -145,8 +147,8 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 
 | ID | Test | Status | Evidence/device | Result and notes |
 |---|---|---|---|---|
-| ROBUST-01 | Stock `launcher.sh stop` SIGUSR1 does not terminate the NextUI boot shim | ⬜ | Code present | The shim deliberately ignores USR1 with `trap '' USR1`; no end-to-end result is recorded |
-| ROBUST-02 | Dirty FAT card recovery via `fsck.fat -a` | ⬜ | Code present | Boot hook exists; no induced dirty-card recovery result is recorded |
+| ROBUST-01 | Stock `launcher.sh stop` SIGUSR1 does not terminate the NextUI boot shim | ➖ | Design / accepted | Shim uses `trap '' USR1`; not exercised end to end and not required as a Release blocker for `h700-rc8` |
+| ROBUST-02 | Dirty FAT card recovery via `fsck.fat -a` | ➖ | Design / accepted | Boot `fsck.fat -a` / repair path exists; not induced end to end and not required as a Release blocker for `h700-rc8` |
 
 ## Capability boundaries
 
@@ -157,16 +159,16 @@ See [10-core-game-matrix.md](10-core-game-matrix.md) for the game-by-game ledger
 | LED-01 | RGB LEDs driven over the UART5 MCU | ✅ | RG40XXV | Verified end to end: raw frames light the L stick ring, and NextUI drives it with the seeded `0x440044` default after update. Second bank drives nothing on the V, confirming `dev_num_leds = 1`. `/dev/ttyS5` is free (console and getty are on `ttyS0`) |
 | LED-02 | Colour, brightness, all four effects | ✅ | RG40XXV | User-verified in LedControl |
 | LED-03 | Ambient Mode narrowed to Off/On | ✅ | RG40XXV | User-verified |
-| LED-01b | Two-bank models, bank order | ⏳ | RG40XX H / RG CubeXX | Untested — nobody in the fleet has one. Gated to 2 zones, `H700_LED_RIGHT_FIRST 1` per muOS. The V cannot settle bank order: with one populated bank both halves get the same colour, so its "first bank lights the left stick" observation does not generalise |
-| LED-06 | tg5040 regression after `PLAT_getNumLeds` | ✅ | TrimUI Brick | Per-LED mapping still correct — each LED responded to its own mode change. This is the path where a wrong count would write brightness 0 to the global `max_scale` and kill every LED |
+| LED-04 | LedControl on a model without RGB | ✅ | RG34XXSP, RG28XX | Shows the "no RGB lights" screen, exits on B, and does not open `/dev/ttyS5` |
 | LED-05 | Speed control | ✅ | RG40XXV | Rainbow/Rainbow Multi take a continuous 0-255 speed byte and vary smoothly across the whole 0-4900 range. Breathe has only the three firmware rates (modes 2/3/4), so its Speed row quantises into thirds — a known cosmetic wart, not a defect |
-| LED-02 | LedControl on a model without RGB | ⏳ | RG34XXSP / RG28XX | Pak now ships to every h700 device; must show the "no RGB lights" screen, exit on B, and never open `/dev/ttyS5` |
-| LED-03 | Ambient Mode narrowed to Off/On | ⏳ | RG40XXV | Option is hidden entirely at 0 lights and reduced to two entries at ≤2 |
+| LED-06 | tg5040 regression after `PLAT_getNumLeds` | ✅ | TrimUI Brick | Per-LED mapping still correct — each LED responded to its own mode change. This is the path where a wrong count would write brightness 0 to the global `max_scale` and kill every LED |
+| LED-07 | Ambient Mode UI when lights ≤2 / 0 | ✅ | RG40XXV, RG34XXSP | Ambient Mode appears on RG40XXV (≤2 lights, Off/On). Hidden on RG34XXSP (0 lights / no RGB) |
+| LED-01b | Two-bank models, bank order | ⚠️ | External users (RG40XX H / RG CubeXX class) | Only the right LED responds; the left cannot be changed. Likely bank-order / `H700_LED_RIGHT_FIRST` mapping. Single-bank RG40XXV path (LED-01) remains Pass. **Accepted known bug** for the merge PR — maintainer has no dual-bank device; upstream decides merge-with-bug vs wait-for-fix |
 
 ## Test execution protocol
 
-- Candidate builds must record BUILD-01, BUILD-02, and BUILD-03 against the actual
-  artifact being promoted.
+- Candidate builds must record BUILD-01, BUILD-02, BUILD-03, and BUILD-04 against
+  the actual artifact being promoted.
 - Changes under `workspace/all/` require both H700 and tg5040 builds.
 - A new device needs a short shared-runtime smoke plus tests for its hardware/model
   delta; it does not need the full matrix repeated without a specific risk.

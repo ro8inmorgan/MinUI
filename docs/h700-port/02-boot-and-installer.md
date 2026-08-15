@@ -132,8 +132,10 @@ Responsibilities as shipped (`skeleton/SYSTEM/h700/paks/MinUI.pak/launch.sh`, ~2
 - Spawns `keymon.elf`, `batmon.elf`, `audiomon.elf`; wifi/bt init per settings (07);
   runs boot hooks; then the standard crash-restart loop around `nextui.elf` /
   `/tmp/next` chaining.
-- Poweroff/reboot via sentinel files: `/tmp/poweroff` → `poweroff`, `/tmp/reboot` →
-  `reboot` (systemd handles clean unmounts — works; no `poweroff_next` port needed).
+- Poweroff/reboot via sentinel files: `/tmp/poweroff` → `poweroff_next`,
+  `/tmp/reboot` → `reboot_next`, each falling back to plain `poweroff`/`reboot` if
+  the tool exits non-zero. Bare systemd `poweroff` is not enough on this PMIC —
+  see 06.
 - Crash-loop handling: after 5 consecutive `nextui.elf` crashes, the loop logs the
   crash limit, removes `/tmp/nextui_exec`, and falls through to poweroff. H700 does
   not ship an automatic WiFi/SSH rescue path in the release runtime.

@@ -295,5 +295,5 @@ is not the whole story — see the libasound symbol-versioning and libpng12 pitf
 2. Exact stock `RGXX_MODEL` strings for the RG35XX family. (RG40XXH is now
    confirmed as `RG40xxH`, read from its StockMod `dmenu.bin`.)
 3. RG SP support is derived entirely from firmware analysis — never run on the
-   hardware. Panel geometry, stickless input and the displaycal preset all need
-   confirming on a real unit.
+   hardware. Panel geometry, stickless input, and the calibrated displaycal
+   preset all need confirming on a real unit.
