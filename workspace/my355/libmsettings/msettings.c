@@ -92,7 +92,7 @@ void putFile(char* path, char* contents) {
 	}
 }
 void putInt(char* path, int value) {
-	char buffer[8];
+	char buffer[16]; // ns periods don't fit in 8
 	sprintf(buffer, "%d", value);
 	putFile(path, buffer);
 }
@@ -542,19 +542,20 @@ int scaleVolume(int value) {
 
 int scaleBrightness(int value) {
 	int raw;
+	// even 1.48x steps, floored where the backlight still lights
 	switch (value) {
-		// TODO :revisit
-		case  0: raw =   1; break;	// 
-		case  1: raw =   6; break;	// 
-		case  2: raw =  10; break;	// 
-		case  3: raw =  16; break;	// 
-		case  4: raw =  32; break;	// 
-		case  5: raw =  48; break;	// 
-		case  6: raw =  64; break;	// 
-		case  7: raw =  96; break;	// 
-		case  8: raw = 128; break;	// 
-		case  9: raw = 192; break;	// 
-		case 10: raw = 255; break;	// 
+		case  0: raw =   5; break;	//   2.0%
+		case  1: raw =   7; break;	//   2.7%
+		case  2: raw =  11; break;	//   4.3%
+		case  3: raw =  16; break;	//   6.3%
+		case  4: raw =  24; break;	//   9.4%
+		case  5: raw =  36; break;	//  14.1%
+		case  6: raw =  53; break;	//  20.8%
+		case  7: raw =  78; break;	//  30.6%
+		case  8: raw = 116; break;	//  45.5%
+		case  9: raw = 172; break;	//  67.5%
+		case 10: raw = 255; break;	// 100.0%
+		default: raw = 255; break;
 	}
 	return raw;
 }
@@ -603,10 +604,17 @@ int scaleExposure(int value) {
 
 ///////// Platform specific, unscaled accessors
 
+#define BL_PWM "/sys/class/pwm/pwmchip0/pwm0" // launch.sh takes it from pwm-backlight
+#define BL_PERIOD 1250000 // ns, the 800Hz the driver used
+
 void SetRawBrightness(int val) { // 0 - 255
 	if (settings->hdmi) val = 0; // panel is unused while docked
 	printf("SetRawBrightness(%i)\n", val); fflush(stdout);
-	putInt("/sys/class/backlight/backlight/brightness", val);
+
+	// all three every time, so the channel recovers if it loses state
+	putInt(BL_PWM "/period", BL_PERIOD);
+	putInt(BL_PWM "/duty_cycle", val * BL_PERIOD / 255);
+	putInt(BL_PWM "/enable", val > 0);
 }
 
 void SetRawColortemp(int val) { // 0 - 100

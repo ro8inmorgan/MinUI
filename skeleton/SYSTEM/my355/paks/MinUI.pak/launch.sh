@@ -47,6 +47,10 @@ echo -n 0 > /sys/class/gpio/gpio20/value
 #keyboard
 echo 0 > /sys/class/miyooio_chr_dev/joy_type
 
+#backlight, the driver's brightness-levels won't go below 7.8% duty
+echo backlight > /sys/bus/platform/drivers/pwm-backlight/unbind
+echo 0 > /sys/class/pwm/pwmchip0/export
+
 # disable system-level lid handling
 mv /dev/input/event1 /dev/input/event1.disabled
 
