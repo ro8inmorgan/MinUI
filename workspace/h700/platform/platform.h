@@ -156,9 +156,9 @@ extern int needs_portrait_sdl; // DEVICE=rg28xx: SDL rotates onto the portrait p
 #define HDMI_SIZE		(HDMI_PITCH * HDMI_HEIGHT)
 
 #define FIXED_SCALE 	2
-// panel_w/panel_h are the app framebuffer size from DEVICE: 720x480 for
-// rg34xx/rg34xxsp/rgsp, 720x720 for rgcubexx, else 640x480 (including rg28xx,
-// whose portrait panel is handled by SDL_ROTATION via needs_portrait_sdl).
+// panel_w/panel_h: app framebuffer — 720x480 (rg34xx/rg34xxsp/rgsp),
+// 720x720 (rgcubexx), else 640x480. RG28XX stays 640x480 here; portrait is
+// handled by SDL_ROTATION via needs_portrait_sdl.
 #define FIXED_WIDTH		(hdmi_active?HDMI_WIDTH:panel_w)
 #define FIXED_HEIGHT	(hdmi_active?HDMI_HEIGHT:panel_h)
 #define FIXED_BPP		2

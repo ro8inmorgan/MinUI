@@ -320,8 +320,8 @@ static int prefixMatch(char* pre, char* str) {
 	return (strncmp(pre, str, strlen(pre))==0);
 }
 
-// Pick the displaycal preset from DEVICE (exact SKU contract). Measured panels
-// keep their gains; everything else stays uncalibrated (off + 100/100/100).
+// Displaycal defaults for this DEVICE. Measured panels keep their gains;
+// everything else stays uncalibrated (off + 100/100/100).
 static enum DisplayCalPreset displayCalPresetForDevice(void) {
 	char* device = getenv("DEVICE");
 

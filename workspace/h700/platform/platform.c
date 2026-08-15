@@ -196,9 +196,9 @@ static void detect_device(void) {
 	char *device = getenv("DEVICE");
 	if (!device) device = "rg35xxplus";
 
-	// App framebuffer size from DEVICE. RG28XX's panel is physically 480x640
-	// portrait, but SDL_ROTATION presents a 640x480 landscape app space — keep
-	// FIXED_* at 640x480 and set needs_portrait_sdl for the driver/bootlogo.
+	// App framebuffer size. RG28XX's panel is physically 480x640 portrait, but
+	// SDL_ROTATION presents a 640x480 landscape app space — keep FIXED_* there
+	// and set needs_portrait_sdl for the driver/bootlogo.
 	panel_w = 640;
 	panel_h = 480;
 	needs_portrait_sdl = exactMatch("rg28xx", device);

@@ -1,10 +1,7 @@
 #!/bin/sh
-# H700 DEVICE contract
+# Map stock RGXX_MODEL (from dmenu.bin) to DEVICE.
+# Behaviour keys on DEVICE; RGXX_MODEL is for display/logs only.
 #
-# PLATFORM=h700 is the SoC/OS tree. DEVICE is the exact SKU id used for
-# behaviour. RGXX_MODEL is the stock firmware string (scrape + display only).
-#
-# Stock RGXX_MODEL → DEVICE
 #   RG28xx     rg28xx
 #   RG34xx     rg34xx
 #   RG34xxSP   rg34xxsp

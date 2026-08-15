@@ -166,7 +166,7 @@ Not simple enough for you (or maybe your kids)? NextUI has a simple mode that hi
 ----------------------------------------
 Advanced
 
-NextUI can automatically run a user-authored shell script on boot. Just place a file named "auto.sh" in "/.userdata/<DEVICE>/". If you're on Windows, make sure your text editor uses Unix line-endings (eg. `\n`), these devices usually choke on Windows line-endings (eg. `\r\n`).
+NextUI can automatically run a user-authored shell script on boot. Just place a file named "auto.sh" in "/.userdata/<PLATFORM>/" (eg. `/.userdata/h700/` or `/.userdata/tg5040/`). If you're on Windows, make sure your text editor uses Unix line-endings (eg. `\n`), these devices usually choke on Windows line-endings (eg. `\r\n`).
 
 ----------------------------------------
 Thanks

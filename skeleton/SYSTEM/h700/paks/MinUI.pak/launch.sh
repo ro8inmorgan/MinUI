@@ -94,7 +94,6 @@ mkdir -p "$BIOS_PATH" "$ROMS_PATH" "$SAVES_PATH" "$CHEATS_PATH"
 mkdir -p "$USERDATA_PATH" "$LOGS_PATH" "$HOOKS_PATH" "$SHARED_USERDATA_PATH/.minui"
 echo "launch: starting $(date)" > "$LAUNCH_LOG"
 
-# DEVICE contract: exact SKU from stock RGXX_MODEL (see h700-device.sh).
 . "$SYSTEM_PATH/bin/h700-device.sh"
 h700_export_device
 if [ "$DEVICE" = "rg28xx" ]; then
