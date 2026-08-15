@@ -1,4 +1,4 @@
-<h1>This project is currently undergoing a license transition. See [#765](https://github.com/LoveRetro/NextUI/issues/765) for details.</h1>
+<h1>This project is currently undergoing a license transition. See <a href="https://github.com/LoveRetro/NextUI/issues/765">#765</a> for details.</h1>
 
 <div align="center">
 
