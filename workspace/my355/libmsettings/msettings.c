@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <string.h>
+#include <linux/i2c-dev.h>
 #include <tinyalsa/mixer.h>
 
 #include "msettings.h"
@@ -638,6 +639,28 @@ void SetRawDisplayCal(int enabled, int red_gain, int green_gain, int blue_gain) 
 	(void)blue_gain;
 }
 
+// "SPK Volume" only reaches -37.5dB of the codec's -95dB range, so the bottom of
+// the curve goes straight to its DAC volume registers.
+#define RK817_I2C_DEV "/dev/i2c-0"
+#define RK817_I2C_ADDR 0x20
+#define RK817_DDAC_VOLL 0x31
+#define RK817_DDAC_VOLR 0x32
+#define RK817_MIXER_MAX 100 // most attenuation "SPK Volume" can express
+#define RK817_VOL_STEPS 8 // per volume level, so 3dB a step and -57dB at level 1
+
+static void set_rk817_dac_volume(int att) { // 0-255, 0.375dB a step, 0 is 0dB
+	int fd = open(RK817_I2C_DEV, O_RDWR);
+	if (fd < 0) return;
+
+	if (ioctl(fd, I2C_SLAVE_FORCE, RK817_I2C_ADDR) >= 0) { // the driver holds it
+		unsigned char buf[2] = { RK817_DDAC_VOLL, att };
+		write(fd, buf, sizeof(buf));
+		buf[0] = RK817_DDAC_VOLR;
+		write(fd, buf, sizeof(buf));
+	}
+	close(fd);
+}
+
 // Find the first A2DP playback volume control via amixer
 static int get_a2dp_simple_control_name(char *buf, size_t buflen) {
     FILE *fp = popen("amixer scontents", "r");
@@ -759,14 +782,21 @@ void SetRawVolume(int val) { // 0-100
 		struct mixer_ctl *hp_sw = mixer_get_ctl_by_name(mixer, "Headphone Switch");
 		if (hp_sw) mixer_ctl_set_value(hp_sw, 0, (settings->jack && val > 0));
 
+		int att = ((100 - val) * RK817_VOL_STEPS) / 5;
+
 		struct mixer_ctl *vol = mixer_get_ctl_by_name(mixer, "SPK Volume");
 		if (vol) {
+			int capped = att > RK817_MIXER_MAX ? RK817_MIXER_MAX : att;
 			unsigned int num_values = mixer_ctl_get_num_values(vol);
 			for (unsigned int i = 0; i < num_values; i++) {
-				mixer_ctl_set_value(vol, i, val);
+				mixer_ctl_set_value(vol, i, RK817_MIXER_MAX - capped);
 			}
 		}
 
 		mixer_close(mixer);
+
+		// after Playback Path, which resets it, and unconditional because ALSA
+		// skips writes that leave the control's value unchanged
+		set_rk817_dac_volume(att);
 	}
 }
