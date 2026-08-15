@@ -422,6 +422,7 @@ void SetAudioSink(int value) {
 	printf("SetAudioSink(%i)\n", value); fflush(stdout);
 
 	settings->audiosink = value;
+	if (value == AUDIO_SINK_DEFAULT) route_audio_to_hdmi(settings->hdmi);
 	SetVolume(GetVolume());
 }
 
@@ -430,6 +431,7 @@ void SetHDMI(int value){
 
 	settings->hdmi = value;
 	route_audio_to_hdmi(value);
+	SetBrightness(GetBrightness()); // the panel is only blanked while docked
 	// volume on HDMI belongs to the sink; the rk817 mixer doesn't reach that card
 	if (!value) SetVolume(GetVolume());
 };
@@ -621,21 +623,21 @@ void SetRawColortemp(int val) { // 0 - 100
 	// not supported on this device, so do nothing
 }
 
+#define PANEL_CONNECTOR_ID 179 // DSI-1, the internal panel; HDMI-A-1 is 164
+
+static void set_panel_property(const char* name, int val) {
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "modetest -M rockchip -w %d:%s:%d", PANEL_CONNECTOR_ID, name, val);
+	system(cmd);
+}
+
 void SetRawContrast(int val){
 	printf("SetRawContrast(%i)\n", val); fflush(stdout);
-
-	// modetest -M rockchip -w 179:contrast:<val>
-	char cmd[128];
-    snprintf(cmd, sizeof(cmd), "modetest -M rockchip -w 179:contrast:%d", val);
-	system(cmd);
+	set_panel_property("contrast", val);
 }
 void SetRawSaturation(int val){
 	printf("SetRawSaturation(%i)\n", val); fflush(stdout);
-
-	// modetest -M rockchip -w 179:saturation:<val>
-	char cmd[128];
-    snprintf(cmd, sizeof(cmd), "modetest -M rockchip -w 179:saturation:%d", val);
-	system(cmd);
+	set_panel_property("saturation", val);
 }
 void SetRawExposure(int val){
 	// not supported on this device, so do nothing
@@ -669,7 +671,7 @@ static void set_rk817_dac_volume(int att) { // 0-255, 0.375dB a step, 0 is 0dB
 	close(fd);
 }
 
-// Find the first A2DP playback volume control via amixer
+// Find the first playback volume control via amixer.
 static int get_a2dp_simple_control_name(char *buf, size_t buflen) {
     FILE *fp = popen("amixer scontents", "r");
     if (!fp) return 0;
