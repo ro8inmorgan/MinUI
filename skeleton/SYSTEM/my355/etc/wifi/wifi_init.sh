@@ -23,7 +23,9 @@ start() {
 	rfkill.elf unblock wifi
 	/etc/init.d/S36load_wifi_modules start
 	wait_for_interface
-	/etc/init.d/S40network start
+
+	# udhcpc used to run alongside dhcpcd and they fought over wlan0's address;
+	# S40network only bounced loopback, /etc/network/interfaces lists only lo.
 	/etc/init.d/S41dhcpcd start
 
 	# Start wpa_supplicant if not running
@@ -31,16 +33,10 @@ start() {
 		wpa_supplicant -B -i $WIFI_INTERFACE -c $WPA_SUPPLICANT_CONF -O /var/run/wpa_supplicant -D nl80211 2>/dev/null
 		sleep 0.5
 	fi
-
-	# Start DHCP client to obtain IP address
-	if ! pidof udhcpc > /dev/null 2>&1; then	
-		udhcpc -i $WIFI_INTERFACE -b 2>/dev/null
-	fi
 }
 
 stop() {
 	/etc/init.d/S41dhcpcd stop
-	/etc/init.d/S40network stop
 	/etc/init.d/S36load_wifi_modules stop
 
 	rfkill.elf block wifi
@@ -48,7 +44,7 @@ stop() {
 	# Kill wpa_supplicant
 	killall wpa_supplicant 2>/dev/null
 
-	# Kill DHCP client
+	# leftover from older installs
 	killall udhcpc 2>/dev/null
 }
 
