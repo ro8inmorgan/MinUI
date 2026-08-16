@@ -2,6 +2,10 @@
 #define __SCALER_H__
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //
 //	arm NEON / C integer scalers for rg35xx
 //	args/	src :	src offset		address of top left corner
@@ -186,5 +190,9 @@ void scale4x_line(void* __restrict src, void* __restrict dst, uint32_t sw, uint3
 
 void scale2x_grid(void* __restrict src, void* __restrict dst, uint32_t sw, uint32_t sh, uint32_t sp, uint32_t dw, uint32_t dh, uint32_t dp);
 void scale3x_grid(void* __restrict src, void* __restrict dst, uint32_t sw, uint32_t sh, uint32_t sp, uint32_t dw, uint32_t dh, uint32_t dp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,4 +1,7 @@
 #pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct MenuList MenuList; // forward declaration (full def in minarch_frontend_opts.h)
 
@@ -20,3 +23,7 @@ void Menu_initState(void);
 void Menu_loop(void);
 void Menu_setCoreVersionDesc(const char* version);
 void Menu_waitScreenshot(void);
+
+#ifdef __cplusplus
+}
+#endif

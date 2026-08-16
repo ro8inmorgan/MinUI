@@ -1,6 +1,9 @@
 #pragma once
 
 #include "ma_internal.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // -----------------------------------------------------------------------
 // Menu type system
@@ -70,3 +73,7 @@ int OptionCheats_openMenu(MenuList* list, int i);
 int OptionControls_openMenu(MenuList* list, int i);
 int OptionShortcuts_openMenu(MenuList* list, int i);
 int OptionSaveChanges_openMenu(MenuList* list, int i);
+
+#ifdef __cplusplus
+}
+#endif

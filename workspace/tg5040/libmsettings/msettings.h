@@ -1,6 +1,10 @@
 #ifndef __msettings_h__
 #define __msettings_h__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SETTINGS_DEFAULT_BRIGHTNESS 2
 #define SETTINGS_DEFAULT_COLORTEMP 20
 #define SETTINGS_DEFAULT_CONTRAST 0
@@ -104,5 +108,9 @@ void SetMuteTurboL1(int);
 void SetMuteTurboL2(int);
 void SetMuteTurboR1(int);
 void SetMuteTurboR2(int);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // __msettings_h__

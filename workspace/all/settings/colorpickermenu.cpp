@@ -1,5 +1,6 @@
 #include "colorpickermenu.hpp"
 
+#include "core/surface.h"
 #include <cmath>
 
 static constexpr int NUM_SLIDERS = 4;
@@ -175,12 +176,12 @@ static void drawRoundedAlphaRect(SDL_Surface *surface, const SDL_Rect &rect, int
 {
     if (rect.w <= 0 || rect.h <= 0) return;
 
-    SDL_Surface *tmp = SDL_CreateRGBSurfaceWithFormat(0, rect.w, rect.h,
-                                                      32, SDL_PIXELFORMAT_ARGB8888);
+    core::SurfacePtr tmp{SDL_CreateRGBSurfaceWithFormat(0, rect.w, rect.h,
+                                                        32, SDL_PIXELFORMAT_ARGB8888)};
     if (!tmp) return;
 
-    SDL_SetSurfaceBlendMode(tmp, SDL_BLENDMODE_BLEND);
-    SDL_FillRect(tmp, nullptr, SDL_MapRGBA(tmp->format, 0, 0, 0, 0));
+    SDL_SetSurfaceBlendMode(tmp.get(), SDL_BLENDMODE_BLEND);
+    SDL_FillRect(tmp.get(), nullptr, SDL_MapRGBA(tmp->format, 0, 0, 0, 0));
 
     auto remap = [&](uint32_t c) -> uint32_t {
         uint8_t rr, gg, bb, aa;
@@ -189,21 +190,20 @@ static void drawRoundedAlphaRect(SDL_Surface *surface, const SDL_Rect &rect, int
     };
 
     SDL_Rect r0 = {0, 0, rect.w, rect.h};
-    drawSolidRoundedRect(tmp, r0, radius, remap(outer));
+    drawSolidRoundedRect(tmp.get(),r0, radius, remap(outer));
     if (rect.w > 2 && rect.h > 2)
     {
         SDL_Rect r1 = {1, 1, rect.w - 2, rect.h - 2};
-        drawSolidRoundedRect(tmp, r1, std::max(0, radius - 1), remap(middle));
+        drawSolidRoundedRect(tmp.get(),r1, std::max(0, radius - 1), remap(middle));
     }
     if (rect.w > 4 && rect.h > 4)
     {
         SDL_Rect r2 = {2, 2, rect.w - 4, rect.h - 4};
-        drawSolidRoundedRect(tmp, r2, std::max(0, radius - 2), remap(fill));
+        drawSolidRoundedRect(tmp.get(),r2, std::max(0, radius - 2), remap(fill));
     }
 
     SDL_Rect dst = rect;
-    SDL_BlitSurface(tmp, nullptr, surface, &dst);
-    SDL_FreeSurface(tmp);
+    SDL_BlitSurface(tmp.get(), nullptr, surface, &dst);
 }
 
 static void drawGradientCapsule(SDL_Surface *surface, const SDL_Rect &bar,
@@ -214,11 +214,11 @@ static void drawGradientCapsule(SDL_Surface *surface, const SDL_Rect &bar,
 
     // SDL_FillRect does not alpha blend into destination surfaces. Build the
     // gradient into an ARGB temp surface, then alpha-blit it onto destination.
-    SDL_Surface *grad = SDL_CreateRGBSurfaceWithFormat(0, bar.w, bar.h,
-                                                       32, SDL_PIXELFORMAT_ARGB8888);
+    core::SurfacePtr grad{SDL_CreateRGBSurfaceWithFormat(0, bar.w, bar.h,
+                                                         32, SDL_PIXELFORMAT_ARGB8888)};
     if (!grad) return;
-    SDL_SetSurfaceBlendMode(grad, SDL_BLENDMODE_BLEND);
-    SDL_FillRect(grad, nullptr, SDL_MapRGBA(grad->format, 0, 0, 0, 0));
+    SDL_SetSurfaceBlendMode(grad.get(), SDL_BLENDMODE_BLEND);
+    SDL_FillRect(grad.get(), nullptr, SDL_MapRGBA(grad->format, 0, 0, 0, 0));
 
     for (int x = 0; x < bar.w; x++)
     {
@@ -246,12 +246,11 @@ static void drawGradientCapsule(SDL_Surface *surface, const SDL_Rect &bar,
         int col_h = bar.h - 2 * y_inset;
         if (col_h <= 0) continue;
         SDL_Rect col_rect = {x, y_inset, 1, col_h};
-        SDL_FillRect(grad, &col_rect, col);
+        SDL_FillRect(grad.get(), &col_rect, col);
     }
 
     SDL_Rect dst = bar;
-    SDL_BlitSurface(grad, nullptr, surface, &dst);
-    SDL_FreeSurface(grad);
+    SDL_BlitSurface(grad.get(), nullptr, surface, &dst);
 }
 
 void ColorPickerMenu::drawSlider(SDL_Surface *surface, const SDL_Rect &row,
@@ -266,31 +265,29 @@ void ColorPickerMenu::drawSlider(SDL_Surface *surface, const SDL_Rect &row,
     int label_fixed_w;
     {
         int wr, wg, wb, wa;
-        TTF_SizeUTF8(font.small, "R", &wr, nullptr);
-        TTF_SizeUTF8(font.small, "G", &wg, nullptr);
-        TTF_SizeUTF8(font.small, "B", &wb, nullptr);
-        TTF_SizeUTF8(font.small, "A", &wa, nullptr);
+        TTF_SizeUTF8(GFX_getFonts()->small, "R", &wr, nullptr);
+        TTF_SizeUTF8(GFX_getFonts()->small, "G", &wg, nullptr);
+        TTF_SizeUTF8(GFX_getFonts()->small, "B", &wb, nullptr);
+        TTF_SizeUTF8(GFX_getFonts()->small, "A", &wa, nullptr);
         label_fixed_w = std::max({wr, wg, wb, wa});
     }
     int hex_fixed_w;
-    TTF_SizeUTF8(font.tiny, "00", &hex_fixed_w, nullptr);
+    TTF_SizeUTF8(GFX_getFonts()->tiny, "00", &hex_fixed_w, nullptr);
 
     // Channel label ("R", "G", "B", "A") — centered in fixed-width slot
-    SDL_Surface *label_surf = TTF_RenderUTF8_Blended(font.small, label, text_color);
+    core::SurfacePtr label_surf{TTF_RenderUTF8_Blended(GFX_getFonts()->small, label, text_color)};
     int label_x = row.x + SCALE1(OPTION_PADDING) + (label_fixed_w - label_surf->w) / 2;
-    SDL_BlitSurfaceCPP(label_surf, {}, surface,
+    SDL_BlitSurfaceCPP(label_surf.get(), {}, surface,
                        {label_x, row.y + (row.h - label_surf->h) / 2});
-    SDL_FreeSurface(label_surf);
 
     // Hex value right-aligned in fixed-width slot
     char hex_str[4];
     snprintf(hex_str, sizeof(hex_str), "%02X", value);
-    SDL_Surface *hex_surf = TTF_RenderUTF8_Blended(font.tiny, hex_str, text_color);
+    core::SurfacePtr hex_surf{TTF_RenderUTF8_Blended(GFX_getFonts()->tiny, hex_str, text_color)};
     int hex_slot_x = row.x + row.w - SCALE1(OPTION_PADDING) - hex_fixed_w;
-    SDL_BlitSurfaceCPP(hex_surf, {}, surface,
+    SDL_BlitSurfaceCPP(hex_surf.get(), {}, surface,
                        {hex_slot_x + (hex_fixed_w - hex_surf->w),
                         row.y + (row.h - hex_surf->h) / 2});
-    SDL_FreeSurface(hex_surf);
 
     // Slider bar — stable bounds derived from fixed label/hex widths
     int bar_x = row.x + SCALE1(OPTION_PADDING) + label_fixed_w + SCALE1(OPTION_PADDING);
@@ -326,23 +323,22 @@ void ColorPickerMenu::drawSlider(SDL_Surface *surface, const SDL_Rect &row,
 
         // Draw the thumb onto a temporary ARGB surface so alpha blending works.
         // SDL_FillRect writes directly (no blend); blitting FROM an alpha surface does blend.
-        SDL_Surface *thumb = SDL_CreateRGBSurfaceWithFormat(0, circ_d, circ_d,
-                                                            32, SDL_PIXELFORMAT_ARGB8888);
-        SDL_SetSurfaceBlendMode(thumb, SDL_BLENDMODE_BLEND);
-        SDL_SetColorKey(thumb, SDL_FALSE, 0);
-        SDL_FillRect(thumb, nullptr, SDL_MapRGBA(thumb->format, 0, 0, 0, 0));
+        core::SurfacePtr thumb{SDL_CreateRGBSurfaceWithFormat(0, circ_d, circ_d,
+                                                              32, SDL_PIXELFORMAT_ARGB8888)};
+        SDL_SetSurfaceBlendMode(thumb.get(), SDL_BLENDMODE_BLEND);
+        SDL_SetColorKey(thumb.get(), SDL_FALSE, 0);
+        SDL_FillRect(thumb.get(), nullptr, SDL_MapRGBA(thumb->format, 0, 0, 0, 0));
 
         SDL_Rect thumb_outer = {0, 0, circ_d, circ_d};
         uint32_t thumbB = SDL_MapRGBA(thumb->format, 0, 0, 0, 200);
-        drawSolidRoundedRect(thumb, thumb_outer, circ_d / 2, thumbB);
+        drawSolidRoundedRect(thumb.get(),thumb_outer, circ_d / 2, thumbB);
         int inner_d = circ_d - circ_border * 2;
         SDL_Rect thumb_inner = {circ_border, circ_border, inner_d, inner_d};
         uint32_t thumbF = SDL_MapRGBA(thumb->format, 255, 255, 255, 200);
-        drawSolidRoundedRect(thumb, thumb_inner, inner_d / 2, thumbF);
+        drawSolidRoundedRect(thumb.get(),thumb_inner, inner_d / 2, thumbF);
 
         SDL_Rect outer_rect = {cx - circ_d / 2, cy - circ_d / 2, circ_d, circ_d};
-        SDL_BlitSurface(thumb, nullptr, surface, &outer_rect);
-        SDL_FreeSurface(thumb);
+        SDL_BlitSurface(thumb.get(), nullptr, surface, &outer_rect);
     }
 }
 
@@ -366,19 +362,17 @@ void ColorPickerMenu::drawPreset(SDL_Surface *surface, const SDL_Rect &row,
     // Hex value "#RRGGBBAA"
     char hex_str[10];
     snprintf(hex_str, sizeof(hex_str), "#%08X", preset.color);
-    SDL_Surface *hex_surf = TTF_RenderUTF8_Blended(font.tiny, hex_str, text_color);
+    core::SurfacePtr hex_surf{TTF_RenderUTF8_Blended(GFX_getFonts()->tiny, hex_str, text_color)};
     int hex_x = sq_rect.x + sq + SCALE1(OPTION_PADDING / 2 + 2);
-    SDL_BlitSurfaceCPP(hex_surf, {}, surface,
+    SDL_BlitSurfaceCPP(hex_surf.get(), {}, surface,
                        {hex_x, row.y + (row.h - hex_surf->h) / 2});
     int hex_w = hex_surf->w;
-    SDL_FreeSurface(hex_surf);
 
     // Name label
-    SDL_Surface *name_surf = TTF_RenderUTF8_Blended(font.tiny, preset.label.c_str(), text_color);
-    SDL_BlitSurfaceCPP(name_surf, {}, surface,
+    core::SurfacePtr name_surf{TTF_RenderUTF8_Blended(GFX_getFonts()->tiny, preset.label.c_str(), text_color)};
+    SDL_BlitSurfaceCPP(name_surf.get(), {}, surface,
                        {hex_x + hex_w + SCALE1(OPTION_PADDING),
                         row.y + (row.h - name_surf->h) / 2});
-    SDL_FreeSurface(name_surf);
 }
 
 void ColorPickerMenu::drawCustom(SDL_Surface *surface, const SDL_Rect &dst, const SDL_Rect &dstTitle)
@@ -387,12 +381,11 @@ void ColorPickerMenu::drawCustom(SDL_Surface *surface, const SDL_Rect &dst, cons
     if(dstTitle.h > 0 && dstTitle.w > 0)
     {
         char display_name[256];
-        GFX_truncateText(font.large, label_.c_str(), display_name,
+        GFX_truncateText(GFX_getFonts()->large, label_.c_str(), display_name,
                          dstTitle.w, SCALE1(OPTION_PADDING * 2));
-        SDL_Surface *title_text = TTF_RenderUTF8_Blended(font.large, display_name, uintToColour(THEME_COLOR4_255));
+        core::SurfacePtr title_text{TTF_RenderUTF8_Blended(GFX_getFonts()->large, display_name, uintToColour(THEME_COLOR4_255))};
         // hate the hardcoded +4, but we are matching MinUI code here
-        SDL_BlitSurfaceCPP(title_text, {}, surface, {dstTitle.x + SCALE1(BUTTON_PADDING), dstTitle.y + 4, dstTitle.w - SCALE1(BUTTON_PADDING * 2), title_text->h});
-        SDL_FreeSurface(title_text);
+        SDL_BlitSurfaceCPP(title_text.get(), {}, surface, {dstTitle.x + SCALE1(BUTTON_PADDING), dstTitle.y + 4, dstTitle.w - SCALE1(BUTTON_PADDING * 2), title_text->h});
     }
 
     // Button hints at the bottom of the screen

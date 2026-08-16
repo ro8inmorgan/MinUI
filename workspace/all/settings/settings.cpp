@@ -1,5 +1,3 @@
-extern "C"
-{
 #include "msettings.h"
 
 #include "defines.h"
@@ -8,7 +6,8 @@ extern "C"
 #include "displaycal.h"
 #include "ra_auth.h"
 #include "ra_sync.h"
-}
+
+#include "core/surface.h"
 
 #include <csignal>
 #include <cstdlib>
@@ -250,7 +249,7 @@ namespace {
             BrickPro,
             SmartPro,
             SmartProS,
-            Flip
+            Flip,
         };
 
         enum Platform {
@@ -536,7 +535,7 @@ int main(int argc, char *argv[])
         if(deviceInfo.hasDisplayCal())
         {
             const DisplayCalDefaults defaultDisplayCal = DisplayCal_getDefaultSettings(
-                deviceInfo.getModel() == DeviceInfo::Brick ? DISPLAYCAL_PRESET_BRICK : 
+                deviceInfo.getModel() == DeviceInfo::Brick ? DISPLAYCAL_PRESET_BRICK :
                 deviceInfo.getModel() == DeviceInfo::BrickPro ? DISPLAYCAL_PRESET_BRICKPRO :
                 deviceInfo.getModel() == DeviceInfo::SmartPro ? DISPLAYCAL_PRESET_SMARTPRO : DISPLAYCAL_PRESET_DEFAULT);
             displayItems.push_back(
@@ -1082,14 +1081,15 @@ int main(int argc, char *argv[])
 
         ctx.menu = new MenuList(MenuItemType::List, "Main", mainItems);
 
-        SDL_Surface* bgbmp = IMG_Load(SDCARD_PATH "/bg.png");
-        SDL_Surface* convertedbg = SDL_ConvertSurfaceFormat(bgbmp, SDL_PIXELFORMAT_RGB565, 0);
-        if (convertedbg) {
-            SDL_FreeSurface(bgbmp);
-            SDL_Surface* scaled = SDL_CreateRGBSurfaceWithFormat(0, ctx.screen->w, ctx.screen->h, 32, SDL_PIXELFORMAT_RGB565);
-            GFX_blitScaleToFill(convertedbg, scaled);
-            bgbmp = scaled;
-        }
+        core::SurfacePtr bgbmp{IMG_Load(SDCARD_PATH "/bg.png")};
+        {
+            core::SurfacePtr convertedbg{SDL_ConvertSurfaceFormat(bgbmp.get(), SDL_PIXELFORMAT_RGB565, 0)};
+            if (convertedbg) {
+                core::SurfacePtr scaled{SDL_CreateRGBSurfaceWithFormat(0, ctx.screen->w, ctx.screen->h, 32, SDL_PIXELFORMAT_RGB565)};
+                GFX_blitScaleToFill(convertedbg.get(), scaled.get());
+                bgbmp = std::move(scaled); // move-assign frees the original IMG_Load surface
+            }
+        } // convertedbg freed here (was previously leaked on the success path)
 
         // main content (list)
         // PADDING all around
@@ -1127,7 +1127,7 @@ int main(int argc, char *argv[])
                 GFX_clear(ctx.screen);
                 if(bgbmp) {
                     SDL_Rect image_rect = {0, 0, ctx.screen->w, ctx.screen->h};
-                    SDL_BlitSurface(bgbmp, NULL, ctx.screen, &image_rect);
+                    SDL_BlitSurface(bgbmp.get(), NULL, ctx.screen, &image_rect);
                 } else {
                     uint32_t bgc = CFG_getColor(COLOR_BACKGROUND);
                     SDL_FillRect(ctx.screen, NULL, SDL_MapRGBA(ctx.screen->format, (bgc >> 24) & 0xFF, (bgc >> 16) & 0xFF, (bgc >> 8) & 0xFF, bgc & 0xFF));
@@ -1146,15 +1146,13 @@ int main(int argc, char *argv[])
                 if (ctx.appManagesTitle)
                 {
                     char display_name[256];
-                    int text_width = GFX_truncateText(font.large, "Some title", display_name, max_width, SCALE1(BUTTON_PADDING * 2));
+                    int text_width = GFX_truncateText(GFX_getFonts()->large, "Some title", display_name, max_width, SCALE1(BUTTON_PADDING * 2));
                     max_width = MIN(max_width, text_width);
 
-                    SDL_Surface *text;
-                    text = TTF_RenderUTF8_Blended(font.large, display_name, COLOR_WHITE);
+                    core::SurfacePtr text{TTF_RenderUTF8_Blended(GFX_getFonts()->large, display_name, COLOR_WHITE)};
                     SDL_Rect target = {SCALE1(PADDING), SCALE1(PADDING), max_width, SCALE1(PILL_SIZE)};
                     GFX_blitPillLight(ASSET_WHITE_PILL, ctx.screen, &target);
-                    SDL_BlitSurfaceCPP(text, {0, 0, max_width - SCALE1(BUTTON_PADDING * 2), text->h}, ctx.screen, {SCALE1(PADDING + BUTTON_PADDING), SCALE1(PADDING + 4)});
-                    SDL_FreeSurface(text);
+                    SDL_BlitSurfaceCPP(text.get(), {0, 0, max_width - SCALE1(BUTTON_PADDING * 2), text->h}, ctx.screen, {SCALE1(PADDING + BUTTON_PADDING), SCALE1(PADDING + 4)});
                 }
                 else {
                     // just set the titleRect and we will pass it on to the list to populate as needed

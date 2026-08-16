@@ -46,3 +46,7 @@ workspace/.container_runtime
 AGENTS.md
 CLAUDE.md
 .worktrees/
+
+# local tooling data (headroom memory, graphify output)
+.headroom/
+graphify-out/

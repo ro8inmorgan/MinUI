@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int prefixMatch(char* pre, const char* str);
 int suffixMatch(char* suf,const char* str);
 int exactMatch(const char* str1, const char* str2);
@@ -36,11 +40,11 @@ void trimSortingMeta(char** str);
 int exists(char* path);
 void touch(char* path);
 int toggle(char *path); // creates or removes file
-void putFile(char *path, char *contents);
+void putFile(const char *path, char *contents);
 char* allocFile(char* path); // caller must free
 void getFile(char* path, char* buffer, size_t buffer_size);
-void putInt(char* path, int value);
-int getInt(char* path);
+void putInt(const char* path, int value);
+int getInt(const char* path);
 
 uint64_t getMicroseconds(void);
 
@@ -48,5 +52,9 @@ int clamp(int x, int lower, int upper);
 double clampd(double x, double lower, double upper);
 
 char* findFileInDir(const char *directory, const char *filename);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

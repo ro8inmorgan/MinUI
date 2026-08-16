@@ -4,6 +4,9 @@
 #include <stdbool.h>
 
 #include "defines.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define CHEAT_TYPE_SET_TO_VALUE 1
 #define CHEAT_MAX_COUNT         4096
@@ -39,3 +42,7 @@ void Cheat_getPaths(char paths[CHEAT_MAX_PATHS][MAX_PATH], int* count);
 void Cheats_free(void);
 bool Cheats_load(void);
 void Cheats_apply(void);
+
+#ifdef __cplusplus
+}
+#endif

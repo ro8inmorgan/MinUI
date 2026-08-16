@@ -1,6 +1,10 @@
 #ifndef __RA_AUTH_H__
 #define __RA_AUTH_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Handles RA login outside of rc_client for use before rc_client initialization.
 // See: https://github.com/RetroAchievements/rcheevos/wiki/rc_client-integration#login
 
@@ -55,5 +59,9 @@ void RA_authenticate(const char* username, const char* password,
  */
 RA_AuthResult RA_authenticateSync(const char* username, const char* password,
                                   RA_AuthResponse* response);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __RA_AUTH_H__

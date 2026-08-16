@@ -320,7 +320,7 @@ GLuint load_shader_from_file(GLenum type, const char* filepath) {
     LOG_info("load shader from file %s\n", filepath);
 
     // Filter out lines starting with "#pragma parameter"
-    char* cleaned = malloc(strlen(source) + 1);
+    char* cleaned = (char*)malloc(strlen(source) + 1);
     if (!cleaned) {
         fprintf(stderr, "Out of memory\n");
         free(source);
@@ -475,7 +475,7 @@ GLuint load_shader_from_file(GLenum type, const char* filepath) {
 
 #define MAX_SHADER_PRAGMAS 32
 void loadShaderPragmas(ShaderProgram *shader, const char *shaderSource) {
-	shader->pragmas = calloc(MAX_SHADER_PRAGMAS, sizeof(ShaderParam));
+	shader->pragmas = (ShaderParam*)calloc(MAX_SHADER_PRAGMAS, sizeof(ShaderParam));
 	if (!shader->pragmas) {
 		fprintf(stderr, "Out of memory allocating pragmas for %s\n", shader->filename);
 		return;
@@ -906,12 +906,12 @@ static struct FX_Context {
 	int live_type;
 } effect = {
 	.scale = 1,
-	.next_scale = 1,
 	.type = EFFECT_NONE,
-	.next_type = EFFECT_NONE,
-	.live_type = EFFECT_NONE,
 	.color = 0,
+	.next_scale = 1,
+	.next_type = EFFECT_NONE,
 	.next_color = 0,
+	.live_type = EFFECT_NONE,
 };
 static void rgb565_to_rgb888(uint32_t rgb565, uint8_t *r, uint8_t *g, uint8_t *b) {
     // Extract the red component (5 bits)
@@ -1048,7 +1048,7 @@ void PLAT_setOverlay(const char* filename, const char* tag) {
     }
 
     size_t path_len = strlen(OVERLAYS_FOLDER) + strlen(tag) + strlen(filename) + 4; // +3 for slashes and null-terminator
-    overlay_path = malloc(path_len);
+    overlay_path = (char*)malloc(path_len);
 
     if (!overlay_path) {
         perror("malloc failed");
@@ -1586,7 +1586,7 @@ void setRectToAspectRatio(SDL_Rect* dst_rect) {
         dst_rect->w = w;
         dst_rect->h = h;
     } else if (vid.blit->aspect > 0) {
-        if (should_rotate) {
+        if (gfx_render.should_rotate) {
             h = device_width;
             w = h * vid.blit->aspect;
             if (w > device_height) {
@@ -1608,8 +1608,8 @@ void setRectToAspectRatio(SDL_Rect* dst_rect) {
     } else {
         dst_rect->x = screenx;
         dst_rect->y = screeny;
-        dst_rect->w = should_rotate ? device_height : device_width;
-        dst_rect->h = should_rotate ? device_width : device_height;
+        dst_rect->w = gfx_render.should_rotate ? device_height : device_width;
+        dst_rect->h = gfx_render.should_rotate ? device_width : device_height;
     }
 }
 
@@ -1690,12 +1690,12 @@ void PLAT_flip(SDL_Surface* IGNORED, int ignored) {
         target = vid.target;
     }
 
-    SDL_Rect* src_rect = &(SDL_Rect){x, y, w, h};
-    SDL_Rect* dst_rect = &(SDL_Rect){0, 0, device_width, device_height};
+    SDL_Rect src_rect = {x, y, w, h};
+    SDL_Rect dst_rect = {0, 0, device_width, device_height};
 
-    setRectToAspectRatio(dst_rect);
+    setRectToAspectRatio(&dst_rect);
 
-    SDL_RenderCopy(vid.renderer, target, src_rect, dst_rect);
+    SDL_RenderCopy(vid.renderer, target, &src_rect, &dst_rect);
 
     SDL_RenderPresent(vid.renderer);
     vid.blit = NULL;
@@ -2174,13 +2174,13 @@ void PLAT_GL_Swap() {
         static int shaderinfocount = 0;
         static int shaderinfoscreen = 0;
         if (shaderinfocount > 600 && shaderinfoscreen == i) {
-            currentshaderpass = i + 1;
-            currentshadertexw = shaders[i].texw;
-            currentshadertexh = shaders[i].texh;
-            currentshadersrcw = shaders[i].srcw;
-            currentshadersrch = shaders[i].srch;
-            currentshaderdstw = dst_w;
-            currentshaderdsth = dst_h;
+            gfx_render.pass = i + 1;
+            gfx_render.tex_w = shaders[i].texw;
+            gfx_render.tex_h = shaders[i].texh;
+            gfx_render.src_w = shaders[i].srcw;
+            gfx_render.src_h = shaders[i].srch;
+            gfx_render.dst_w = dst_w;
+            gfx_render.dst_h = dst_h;
             shaderinfocount = 0;
             shaderinfoscreen++;
             if (shaderinfoscreen >= nrofshaders)
@@ -2310,7 +2310,7 @@ unsigned char* PLAT_GL_screenCapture(int* outWidth, int* outHeight) {
     if (outWidth) *outWidth = width;
     if (outHeight) *outHeight = height;
 
-    unsigned char* pixels = malloc(width * height * 4); // RGBA
+    unsigned char* pixels = (unsigned char*)malloc(width * height * 4); // RGBA
     if (!pixels) return NULL;
 
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);

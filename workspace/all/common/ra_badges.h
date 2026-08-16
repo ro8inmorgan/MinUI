@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Implements the badge download/caching that the integration guide leaves to the emulator.
 // See: https://github.com/RetroAchievements/rcheevos/wiki/rc_client-integration#showing-the-game-placard
 
@@ -109,5 +113,9 @@ void RA_Badges_getCachePath(const char* badge_name, bool locked, char* buffer, s
  * @param buffer_size Size of the output buffer
  */
 void RA_Badges_getUrl(const char* badge_name, bool locked, char* buffer, size_t buffer_size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __RA_BADGES_H__

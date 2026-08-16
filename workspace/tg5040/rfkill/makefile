@@ -5,10 +5,11 @@ endif
 TARGET = rfkill
 PRODUCT = $(TARGET).elf
 
-CC = $(CROSS_COMPILE)gcc 
+CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
 FLAGS	= -Os -lrt -ldl -Wl,--gc-sections -s
 
 all:
-	$(CC) $(TARGET).c -o $(PRODUCT) $(FLAGS)
+	$(CXX) $(TARGET).cpp -o $(PRODUCT) $(FLAGS)
 clean:
 	rm -rf $(PRODUCT)

@@ -12,6 +12,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Open a track from a CHD file.
  * 
@@ -64,5 +68,9 @@ uint32_t chd_first_track_sector(void* track_handle);
  * @return Non-zero if the file has a .chd extension
  */
 int chd_reader_is_chd(const char* path);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CHD_READER_H */

@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 ///////////////////////////////
 // Notification System
 // Toast-style notifications for save states, achievements, etc.
@@ -156,5 +160,9 @@ void Notification_setProgressIndicatorPersistent(bool persistent);
  * @return true if a progress indicator is active
  */
 bool Notification_hasProgressIndicator(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __NOTIFICATION_H__

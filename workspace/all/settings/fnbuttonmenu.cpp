@@ -1,9 +1,7 @@
 #include "fnbuttonmenu.hpp"
 
-extern "C" {
 #include "config.h"
 #include "utils.h"
-}
 
 #include <algorithm>
 #include <cstring>

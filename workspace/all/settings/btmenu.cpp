@@ -4,6 +4,8 @@
 #   include "btagent.hpp"
 #endif
 
+#include "core/surface.h"
+
 #include <unordered_set>
 #include <map>
 
@@ -290,7 +292,6 @@ PairableItem::PairableItem(BT_device d, MenuList* submenu)
 void PairableItem::drawCustomItem(SDL_Surface *surface, const SDL_Rect &dst, const AbstractMenuItem &item, bool selected) const
 {
     SDL_Color text_color = uintToColour(THEME_COLOR4_255);
-    SDL_Surface *text = TTF_RenderUTF8_Blended(font.tiny, item.getLabel().c_str(), COLOR_WHITE); // always white
 
     // hack - this should be correlated to max_width
     int mw = dst.w;
@@ -315,15 +316,14 @@ void PairableItem::drawCustomItem(SDL_Surface *surface, const SDL_Rect &dst, con
     {
         // white pill
         int w = 0;
-        TTF_SizeUTF8(font.small, item.getName().c_str(), &w, NULL);
+        TTF_SizeUTF8(GFX_getFonts()->small, item.getName().c_str(), &w, NULL);
         w += SCALE1(OPTION_PADDING * 2);
         GFX_blitPillDarkCPP(ASSET_BUTTON, surface, {dst.x, dst.y, w, SCALE1(BUTTON_SIZE)});
         text_color = uintToColour(THEME_COLOR5_255);
     }
 
-    text = TTF_RenderUTF8_Blended(font.small, item.getName().c_str(), text_color);
-    SDL_BlitSurfaceCPP(text, {}, surface, {dst.x + SCALE1(OPTION_PADDING), dst.y + SCALE1(1)});
-    SDL_FreeSurface(text);
+    core::SurfacePtr text{TTF_RenderUTF8_Blended(GFX_getFonts()->small, item.getName().c_str(), text_color)};
+    SDL_BlitSurfaceCPP(text.get(), {}, surface, {dst.x + SCALE1(OPTION_PADDING), dst.y + SCALE1(1)});
 }
 
 PairedItem::PairedItem(BT_devicePaired d, MenuList* submenu)
@@ -333,7 +333,6 @@ PairedItem::PairedItem(BT_devicePaired d, MenuList* submenu)
 void PairedItem::drawCustomItem(SDL_Surface *surface, const SDL_Rect &dst, const AbstractMenuItem &item, bool selected) const
 {
     SDL_Color text_color = uintToColour(THEME_COLOR4_255);
-    SDL_Surface *text = TTF_RenderUTF8_Blended(font.tiny, item.getLabel().c_str(), COLOR_WHITE); // always white
 
     // hack - this should be correlated to max_width
     int mw = dst.w;
@@ -377,13 +376,12 @@ void PairedItem::drawCustomItem(SDL_Surface *surface, const SDL_Rect &dst, const
     {
         // white pill
         int w = 0;
-        TTF_SizeUTF8(font.small, item.getName().c_str(), &w, NULL);
+        TTF_SizeUTF8(GFX_getFonts()->small, item.getName().c_str(), &w, NULL);
         w += SCALE1(OPTION_PADDING * 2);
         GFX_blitPillDarkCPP(ASSET_BUTTON, surface, {dst.x, dst.y, w, SCALE1(BUTTON_SIZE)});
         text_color = uintToColour(THEME_COLOR5_255);
     }
 
-    text = TTF_RenderUTF8_Blended(font.small, item.getName().c_str(), text_color);
-    SDL_BlitSurfaceCPP(text, {}, surface, {dst.x + SCALE1(OPTION_PADDING), dst.y + SCALE1(1)});
-    SDL_FreeSurface(text);
+    core::SurfacePtr text{TTF_RenderUTF8_Blended(GFX_getFonts()->small, item.getName().c_str(), text_color)};
+    SDL_BlitSurfaceCPP(text.get(), {}, surface, {dst.x + SCALE1(OPTION_PADDING), dst.y + SCALE1(1)});
 }

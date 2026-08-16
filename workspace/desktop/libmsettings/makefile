@@ -11,7 +11,13 @@ TARGET=msettings
 .PHONY: clean
 
 CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
 CFLAGS = -I../../all/common
+# msettings is C++ but uses no C++ runtime; -fno-exceptions/-fno-rtti keeps the
+# object free of libstdc++ so libmsettings.so still links with plain gcc.
+# -Wno-write-strings: msettings passes string literals to char* helpers
+# (touch/putInt); benign, tolerated elsewhere in the tree.
+CXXFLAGS = $(CFLAGS) -std=gnu++2a -fno-exceptions -fno-rtti -Wno-write-strings
 
 ifeq ($(PROFILE), 1)
 CFLAGS  += -pg
@@ -23,8 +29,8 @@ LDFLAGS = -ldl
 
 OPTM=-Ofast
 
-build: 
-	$(CC) -c -Werror -fpic "$(TARGET).c" $(CFLAGS) -Wl,--no-as-needed $(LDFLAGS)
+build:
+	$(CXX) -c -Werror -fpic "$(TARGET).cpp" $(CXXFLAGS) -Wl,--no-as-needed $(LDFLAGS)
 	$(CC) -shared -o "lib$(TARGET).so" "$(TARGET).o" $(LDFLAGS)
 	mkdir -p "$(PREFIX_LOCAL)/include"
 	mkdir -p "$(PREFIX_LOCAL)/lib"

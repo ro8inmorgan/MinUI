@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // portability, deprecated
 extern uint32_t THEME_COLOR1_255;
 extern uint32_t THEME_COLOR2_255;
@@ -478,5 +482,9 @@ void CFG_setRAAchievementSortOrder(int sortOrder);
 
 void CFG_sync(void);
 void CFG_quit(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

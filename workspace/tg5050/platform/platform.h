@@ -2,6 +2,7 @@
 
 #ifndef PLATFORM_H
 #define PLATFORM_H
+#include "device.h"
 
 ///////////////////////////////
 
@@ -90,15 +91,15 @@
 #define JOY_R1			5
 #define JOY_L2			JOY_NA
 #define JOY_R2			JOY_NA
-#define JOY_L3			9
-#define JOY_R3			10
+#define JOY_L3			(deviceModel->joy_l3)
+#define JOY_R3			(deviceModel->joy_r3)
 #define JOY_L4          JOY_NA
 #define JOY_R4          JOY_NA
 
 #define JOY_MENU		8
 #define JOY_POWER		102
-#define JOY_PLUS		128
-#define JOY_MINUS		129
+#define JOY_PLUS		(deviceModel->joy_plus)
+#define JOY_MINUS		(deviceModel->joy_minus)
 
 ///////////////////////////////
 // USER-ASSIGNABLE BUTTONS
@@ -132,9 +133,9 @@
 
 ///////////////////////////////
 
-#define FIXED_SCALE 	2
-#define FIXED_WIDTH		1280
-#define FIXED_HEIGHT	720
+#define FIXED_SCALE	(deviceModel->scale)
+#define FIXED_WIDTH		(deviceModel->width)
+#define FIXED_HEIGHT	(deviceModel->height)
 #define FIXED_BPP		2
 #define FIXED_DEPTH		(FIXED_BPP * 8)
 #define FIXED_PITCH		(FIXED_WIDTH * FIXED_BPP)
@@ -142,9 +143,9 @@
 
 ///////////////////////////////
 
-#define MAIN_ROW_COUNT  10
-#define QUICK_SWITCHER_COUNT 4
-#define PADDING 10
+#define MAIN_ROW_COUNT		(deviceModel->main_row_count)
+#define QUICK_SWITCHER_COUNT	(deviceModel->quick_switcher_count)
+#define PADDING	(deviceModel->padding)
 
 ///////////////////////////////
 

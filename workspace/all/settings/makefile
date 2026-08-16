@@ -21,15 +21,18 @@ SDL?=SDL
 
 TARGET = settings
 INCDIR = -I. -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = -c ../common/utils.c ../common/api.c ../common/config.c ../common/palette.c ../common/scaler.c ../common/http.c ../common/ra_auth.c ../common/ra_offline.c ../common/ra_sync.c ../common/ra_event_queue.c ../../$(PLATFORM)/platform/platform.c
-CXXSOURCE = $(TARGET).cpp menu.cpp colorpickermenu.cpp palettemenu.cpp fnbuttonmenu.cpp wifimenu.cpp btmenu.cpp keyboardprompt.cpp
-CXXSOURCE += build/$(PLATFORM)/utils.o build/$(PLATFORM)/api.o build/$(PLATFORM)/config.o build/$(PLATFORM)/palette.o build/$(PLATFORM)/scaler.o build/$(PLATFORM)/http.o build/$(PLATFORM)/ra_auth.o build/$(PLATFORM)/ra_offline.o build/$(PLATFORM)/ra_sync.o build/$(PLATFORM)/ra_event_queue.o build/$(PLATFORM)/platform.o
+SOURCE = -c ../../$(PLATFORM)/platform/platform.cpp
+CXXSOURCE = ../common/palette.cpp ../common/utils.cpp ../common/config.cpp ../common/scaler.cpp ../common/api.cpp ../common/ra_offline.cpp ../common/ra_sync.cpp ../common/ra_event_queue.cpp ../common/http.cpp ../common/ra_auth.cpp $(TARGET).cpp menu.cpp colorpickermenu.cpp palettemenu.cpp fnbuttonmenu.cpp wifimenu.cpp btmenu.cpp keyboardprompt.cpp
+CXXSOURCE += build/$(PLATFORM)/platform.o
 
 CC = $(CROSS_COMPILE)gcc
 CXX = $(CROSS_COMPILE)g++
+# Prefer real C++20; fall back to gnu++2a on older toolchains (e.g. the current
+# gcc 8.3 tg5040 cross-compiler, which predates the -std=gnu++20 spelling).
+CXXSTD := $(shell printf 'int main(){return 0;}' | $(CXX) -std=gnu++20 -x c++ - -o /dev/null >/dev/null 2>&1 && echo gnu++20 || echo gnu++2a)
 CFLAGS += $(OPT)
 CFLAGS += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\"
-CXXFLAGS += $(CFLAGS) -std=c++17
+CXXFLAGS += $(CFLAGS) -std=$(CXXSTD)
 CFLAGS += -fpermissive
 LDFLAGS +=  -lmsettings -lcrypto
 ifeq ($(PLATFORM), tg5040)
@@ -49,11 +52,11 @@ PRODUCT= build/$(PLATFORM)/$(TARGET).elf
 
 all: $(PREFIX_LOCAL)/include/msettings.h
 	mkdir -p build/$(PLATFORM)
-	$(CC) $(SOURCE) $(CFLAGS) $(LDFLAGS)
-	mv utils.o api.o config.o palette.o scaler.o http.o ra_auth.o ra_offline.o ra_sync.o ra_event_queue.o platform.o build/$(PLATFORM)
+	$(CXX) $(SOURCE) $(CXXFLAGS) $(LDFLAGS)
+	mv platform.o build/$(PLATFORM)
 	$(CXX) $(CXXSOURCE) -o $(PRODUCT) $(CXXFLAGS) $(LDFLAGS) -lstdc++
 clean:
 	rm -f $(PRODUCT)
 
-$(PREFIX_LOCAL)/include/msettings.h:
+$(PREFIX_LOCAL)/include/msettings.h: ../../$(PLATFORM)/libmsettings/msettings.h
 	cd ../../$(PLATFORM)/libmsettings && make

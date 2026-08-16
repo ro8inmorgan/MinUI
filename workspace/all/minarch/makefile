@@ -22,20 +22,35 @@ SDL?=SDL
 TARGET = minarch
 PRODUCT= build/$(PLATFORM)/$(TARGET).elf
 INCDIR = -I. -I./libretro-common/include/ -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = $(TARGET).c ma_cheats.c ma_rewind.c ma_audio.c ma_input.c \
-         ma_options.c ma_frontend_opts.c ma_saves.c ma_video.c ma_core.c ma_game.c ma_environment.c ma_config.c ma_menu.c ma_runframe.c \
-         ../common/scaler.c ../common/utils.c ../common/config.c ../common/api.c \
-         ../common/notification.c ../../$(PLATFORM)/platform/platform.c
+
+# C and C++ translation units are listed separately. C files compile as C;
+# C++ files compile as C++; everything links through g++ so the two can mix
+# as modules are migrated to C++ incrementally.
+CSOURCE =
+CXXSOURCE = ../../$(PLATFORM)/platform/platform.cpp $(TARGET).cpp ../common/notification.cpp ../common/utils.cpp ../common/config.cpp ../common/scaler.cpp ../common/api.cpp \
+         ma_audio.cpp ma_input.cpp ma_runframe.cpp ma_cheats.cpp ma_core.cpp \
+         ma_rewind.cpp ma_saves.cpp ma_game.cpp ma_environment.cpp \
+         ma_options.cpp ma_video.cpp ma_menu.cpp ma_frontend_opts.cpp ma_config.cpp
 
 # RA support
 ifneq (,$(filter $(PLATFORM),tg5040 tg5050 my355 desktop))
-# RA source files
-SOURCE += ../common/http.c ../common/ra_badges.c ../common/ra_offline.c ../common/ra_sync.c ../common/ra_event_queue.c ra_integration.c chd_reader.c
+# RA source files (shared common/ helpers stay C; the two minarch-local RA units
+# are C++). ra_integration sits on the rcheevos C callback boundary — kept
+# mechanical, no throwing constructs on that path.
+CXXSOURCE += ra_integration.cpp chd_reader.cpp ../common/ra_offline.cpp ../common/ra_sync.cpp ../common/ra_event_queue.cpp ../common/http.cpp ../common/ra_badges.cpp
 endif
 
-CC = $(CROSS_COMPILE)gcc
+CC  = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+# Prefer real C++20; fall back to gnu++2a on older toolchains (e.g. the current
+# gcc 8.3 tg5040 cross-compiler, which predates the -std=gnu++20 spelling).
+CXXSTD := $(shell printf 'int main(){return 0;}' | $(CXX) -std=gnu++20 -x c++ - -o /dev/null >/dev/null 2>&1 && echo gnu++20 || echo gnu++2a)
 CFLAGS  += $(OPT)
-CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
+CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\"
+# CXXFLAGS inherits the platform CFLAGS (SDL/GL/PREFIX include paths) before the
+# C-only -std is appended, so C++ TUs get the same include/define environment.
+CXXFLAGS += $(CFLAGS) -std=$(CXXSTD)
+CFLAGS  += -std=gnu99
 LDFLAGS	 += -lmsettings -lsamplerate
 
 ifeq ($(PROFILE), 1)
@@ -94,14 +109,24 @@ BUILD_DATE!=date +%Y.%m.%d
 BUILD_HASH!=cat ../../hash.txt
 CFLAGS += -DBUILD_DATE=\"${BUILD_DATE}\" -DBUILD_HASH=\"${BUILD_HASH}\"
 
+OBJ_DIR = build/$(PLATFORM)
+OBJS = $(addprefix $(OBJ_DIR)/,$(notdir $(CSOURCE:.c=.o))) \
+       $(addprefix $(OBJ_DIR)/,$(notdir $(CXXSOURCE:.cpp=.o)))
+DEPS = $(OBJS:.o=.d)
+
+# Locate sources across their directories so single pattern rules suffice.
+vpath %.c   . ../common ../../$(PLATFORM)/platform
+vpath %.cpp . ../common ../../$(PLATFORM)/platform
+
 ifeq ($(PLATFORM), desktop)
-all: clean libretro-common rcheevos libchdr $(PREFIX_LOCAL)/include/msettings.h
-	mkdir -p build/$(PLATFORM)
-	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+all: clean libretro-common rcheevos libchdr $(PREFIX_LOCAL)/include/msettings.h $(PRODUCT)
 else ifneq (,$(filter $(PLATFORM),tg5040 tg5050 my355))
 # Platforms with RA support
-all: clean libretro-common libsrm.a rcheevos libchdr $(PREFIX_LOCAL)/include/msettings.h
-	mkdir -p build/$(PLATFORM)
+all: clean libretro-common libsrm.a rcheevos libchdr $(PREFIX_LOCAL)/include/msettings.h copylibs $(PRODUCT)
+endif
+
+# Runtime shared libraries copied next to the binary on handheld platforms.
+copylibs: | $(OBJ_DIR)
 	cp -L $(PREFIX)/lib/libsamplerate.so.* build/$(PLATFORM)
 	cp -L $(PREFIX)/lib/libcrypto.so.* build/$(PLATFORM)
 	chmod a+r build/$(PLATFORM)/libcrypto.so.*
@@ -117,8 +142,18 @@ endif
 	cp -L $(PREFIX)/lib/libzstd.so.1 build/$(PLATFORM)
 	cp -L $(PREFIX)/lib/liblz4.so.1 build/$(PLATFORM)
 	cp -L libchdr/build/$(PLATFORM)/libchdr.so.0 build/$(PLATFORM)
-	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
-endif
+
+$(PRODUCT): $(OBJS)
+	$(CXX) $(OBJS) -o $(PRODUCT) $(LDFLAGS) -lstdc++
+
+$(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
 
 libretro-common:
 	git clone https://github.com/libretro/libretro-common
@@ -143,7 +178,7 @@ libchdr/CMakeLists.txt:
 $(PREFIX_LOCAL)/lib/libchdr.so:
 	cd libchdr && make build install PLATFORM=$(PLATFORM)
   
-$(PREFIX_LOCAL)/include/msettings.h:
+$(PREFIX_LOCAL)/include/msettings.h: ../../$(PLATFORM)/libmsettings/msettings.h
 	cd ../../$(PLATFORM)/libmsettings && make
 
 ### libsrm stuff
@@ -155,6 +190,9 @@ $(OBJECTS) :
 libsrm.a: $(OBJECTS)
 	cd libretro-common && $(AR) $(ARFLAGS) $@ $?
 
+-include $(DEPS)
+
 clean:
 	rm -f $(PRODUCT)
+	rm -f $(OBJS) $(DEPS)
 	rm -f $(OBJECTS) $(LIBRARY)

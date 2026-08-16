@@ -11,8 +11,18 @@
 
 ///////////////////////////////
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern int is_brick;
 extern int is_brickpro;
+
+#ifdef __cplusplus
+}
+#endif
+
+#include "device.h"
 
 ///////////////////////////////
 
@@ -65,8 +75,8 @@ extern int is_brickpro;
 #define CODE_R2			CODE_NA
 #define CODE_L3			CODE_NA
 #define CODE_R3			CODE_NA
-#define CODE_L4         CODE_NA
-#define CODE_R4         CODE_NA
+#define CODE_L4			CODE_NA
+#define CODE_R4			CODE_NA
 
 #define CODE_MENU		CODE_NA
 #define CODE_POWER		102
@@ -94,16 +104,16 @@ extern int is_brickpro;
 #define JOY_R1			5
 #define JOY_L2			JOY_NA
 #define JOY_R2			JOY_NA
-#define JOY_L3			(is_brick||is_brickpro?9:JOY_NA)
-#define JOY_R3			(is_brick||is_brickpro?10:JOY_NA)
-#define JOY_L4          (is_brickpro?11:JOY_NA)
-#define JOY_R4          (is_brickpro?12:JOY_NA)
+#define JOY_L3			(deviceModel->joy_l3)
+#define JOY_R3			(deviceModel->joy_r3)
+#define JOY_L4			(deviceModel->joy_l4)
+#define JOY_R4			(deviceModel->joy_r4)
 
 #define JOY_MENU		8
-#define JOY_MENU_ALT    (is_brickpro?15:JOY_NA)
+#define JOY_MENU_ALT	(deviceModel->joy_menu_alt)
 #define JOY_POWER		102
-#define JOY_PLUS		(is_brick||is_brickpro?14:128)
-#define JOY_MINUS		(is_brick||is_brickpro?13:129)
+#define JOY_PLUS		(deviceModel->joy_plus)
+#define JOY_MINUS		(deviceModel->joy_minus)
 
 ///////////////////////////////
 // USER-ASSIGNABLE BUTTONS
@@ -137,9 +147,9 @@ extern int is_brickpro;
 
 ///////////////////////////////
 
-#define FIXED_SCALE 	(is_brick||is_brickpro?3:2)
-#define FIXED_WIDTH		(is_brick||is_brickpro?1024:1280)
-#define FIXED_HEIGHT	(is_brick||is_brickpro?768:720)
+#define FIXED_SCALE 	(deviceModel->scale)
+#define FIXED_WIDTH		(deviceModel->width)
+#define FIXED_HEIGHT	(deviceModel->height)
 #define FIXED_BPP		2
 #define FIXED_DEPTH		(FIXED_BPP * 8)
 #define FIXED_PITCH		(FIXED_WIDTH * FIXED_BPP)
@@ -147,9 +157,9 @@ extern int is_brickpro;
 
 ///////////////////////////////
 
-#define MAIN_ROW_COUNT (is_brick||is_brickpro ? 7 : 10)
-#define QUICK_SWITCHER_COUNT (is_brick||is_brickpro ? 3 : 4)
-#define PADDING (is_brick||is_brickpro ? 5 : 10)
+#define MAIN_ROW_COUNT (deviceModel->main_row_count)
+#define QUICK_SWITCHER_COUNT (deviceModel->quick_switcher_count)
+#define PADDING (deviceModel->padding)
 
 ///////////////////////////////
 

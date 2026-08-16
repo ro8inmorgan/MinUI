@@ -1,4 +1,7 @@
 #pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 char* getScreenScalingDesc(void);
 int getScreenScalingCount(void);
@@ -17,3 +20,7 @@ void Config_syncShaders(char* key, int value);
 void applyShaderSettings(void);
 void initShaders(void);
 char** list_files_in_folder(const char* folderPath, int* fileCount, const char* defaultElement, const char* extensionFilter);
+
+#ifdef __cplusplus
+}
+#endif

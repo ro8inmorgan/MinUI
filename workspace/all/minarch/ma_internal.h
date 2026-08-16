@@ -12,6 +12,9 @@
 #include "api.h"
 #include "config.h"
 #include "utils.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct Core {
 	int initialized;
@@ -89,18 +92,37 @@ extern SDL_Surface *screen;
 extern int quit;
 extern int show_menu;
 extern int newScreenshot;
-extern int fast_forward;
-extern int rewinding;
-extern int ff_audio;
 extern int use_core_fps;
-extern int rewind_pressed;
-extern int rewind_toggle;
-extern int ff_toggled;
-extern int ff_hold_active;
-extern int ff_paused_by_rewind_hold;
 
-extern int screen_scaling;
-extern int screen_effect;
+// Rewind runtime state, grouped out of the flat global soup (config lives in
+// the RewindConfig struct).
+typedef struct RewindState {
+	int active;       // was rewinding
+	int pressed;      // was rewind_pressed
+	int toggle;       // was rewind_toggle
+	int last_pressed; // was last_rewind_pressed
+} RewindState;
+extern RewindState rewind_st;
+
+// Fast-forward runtime state, grouped out of the flat global soup.
+typedef struct FastForward {
+	int active;                // was fast_forward
+	int audio;                 // was ff_audio
+	int toggled;               // was ff_toggled
+	int hold_active;           // was ff_hold_active
+	int paused_by_rewind_hold; // was ff_paused_by_rewind_hold
+} FastForward;
+extern FastForward ff;
+
+// Display configuration, grouped out of the flat global soup.
+typedef struct DisplayConfig {
+	int scaling;   // screen_scaling
+	int effect;    // screen_effect
+	int sharpness; // screen_sharpness
+	int screenx;   // cfg_screenx
+	int screeny;   // cfg_screeny
+} DisplayConfig;
+extern DisplayConfig display_cfg;
 
 extern int DEVICE_WIDTH;
 extern int DEVICE_HEIGHT;
@@ -112,20 +134,21 @@ extern int shader_reset_suppressed;
 extern char* scaling_labels[];
 extern int simple_mode;
 extern int resampling_quality;
-extern int screen_sharpness;
-extern int cfg_screenx;
-extern int cfg_screeny;
 extern int overlay;
 extern int sync_ref;
 extern int max_ff_speed;
 extern int overclock;
 
-extern int rewind_cfg_enable;
-extern int rewind_cfg_buffer_mb;
-extern int rewind_cfg_granularity;
-extern int rewind_cfg_audio;
-extern int rewind_cfg_compress;
-extern int rewind_cfg_lz4_acceleration;
+// Rewind configuration, grouped out of the flat global soup.
+typedef struct RewindConfig {
+	int enable;
+	int buffer_mb;
+	int granularity;
+	int audio;
+	int compress;
+	int lz4_acceleration;
+} RewindConfig;
+extern RewindConfig rewind_cfg;
 extern int rewind_init_ready;
 
 #include "ma_rewind.h"
@@ -198,7 +221,6 @@ extern struct Config config;
 extern ButtonMapping default_button_mapping[];
 extern ButtonMapping core_button_mapping[];
 extern int gamepad_type;
-extern int last_rewind_pressed;
 
 void Config_syncFrontend(char* key, int value);
 
@@ -327,3 +349,7 @@ void Core_applyCheats(struct Cheats *cheats);
 
 #include "ma_config.h"
 #include "ma_menu.h"
+
+#ifdef __cplusplus
+}
+#endif

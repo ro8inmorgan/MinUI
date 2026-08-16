@@ -1,6 +1,9 @@
 #pragma once
 
 #include "ma_internal.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Option value helpers
 int   Option_getValueIndex(Option *item, const char *value);
@@ -18,3 +21,7 @@ char   *OptionList_getOptionValue(OptionList *list, const char *key);
 void    OptionList_setOptionValue(OptionList *list, const char *key, const char *value);
 void    OptionList_setOptionRawValue(OptionList *list, const char *key, int value);
 void    OptionList_setOptionVisibility(OptionList *list, const char *key, int visible);
+
+#ifdef __cplusplus
+}
+#endif

@@ -21,20 +21,31 @@ SDL?=SDL
 
 TARGET = bootlogo
 INCDIR = -I. -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = $(TARGET).c ../common/utils.c ../common/api.c ../common/config.c ../common/scaler.c ../../$(PLATFORM)/platform/platform.c
+# Shared common/ + platform stay C; the tool itself is C++20. Compile the C
+# units to objects, then compile the .cpp and link everything through g++.
+SOURCE = -c ../../$(PLATFORM)/platform/platform.cpp
+CXXSOURCE = $(TARGET).cpp ../common/utils.cpp ../common/config.cpp ../common/scaler.cpp ../common/api.cpp
+CXXSOURCE += build/$(PLATFORM)/platform.o
 
 CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+# Prefer real C++20; fall back to gnu++2a on older toolchains (e.g. the current
+# gcc 8.3 tg5040 cross-compiler, which predates the -std=gnu++20 spelling).
+CXXSTD := $(shell printf 'int main(){return 0;}' | $(CXX) -std=gnu++20 -x c++ - -o /dev/null >/dev/null 2>&1 && echo gnu++20 || echo gnu++2a)
 CFLAGS  += $(OPT)
-CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
+CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\"
+CXXFLAGS += $(CFLAGS) -std=$(CXXSTD)
 LDFLAGS	 += -lmsettings
 
 PRODUCT= build/$(PLATFORM)/$(TARGET).elf
 
 all: $(PREFIX_LOCAL)/include/msettings.h
 	mkdir -p build/$(PLATFORM)
-	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
+	$(CXX) $(SOURCE) $(CXXFLAGS) $(LDFLAGS)
+	mv platform.o build/$(PLATFORM)
+	$(CXX) $(CXXSOURCE) -o $(PRODUCT) $(CXXFLAGS) $(LDFLAGS) -lstdc++
 clean:
 	rm -f $(PRODUCT)
 
-$(PREFIX_LOCAL)/include/msettings.h:
+$(PREFIX_LOCAL)/include/msettings.h: ../../$(PLATFORM)/libmsettings/msettings.h
 	cd ../../$(PLATFORM)/libmsettings && make

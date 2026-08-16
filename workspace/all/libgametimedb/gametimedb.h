@@ -2,6 +2,10 @@
 #ifndef __gametime_db_h__
 #define __gametime_db_h__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct ROM ROM;
 typedef struct PlayActivity PlayActivity;
 typedef struct PlayActivities PlayActivities;
@@ -41,5 +45,9 @@ void play_activity_resume(void);
 void play_activity_stop(char *rom_file_path);
 void play_activity_stop_all(void);
 void play_activity_list_all(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __gametime_db_h__

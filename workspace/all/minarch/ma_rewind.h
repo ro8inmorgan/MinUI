@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <pthread.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MINARCH_DEFAULT_REWIND_ENABLE           0
 #define MINARCH_DEFAULT_REWIND_BUFFER_MB        64
@@ -98,3 +101,7 @@ void Rewind_push(int force);
 int  Rewind_step_back(void);
 void Rewind_sync_encode_state(void);
 void Rewind_on_state_change(void);
+
+#ifdef __cplusplus
+}
+#endif

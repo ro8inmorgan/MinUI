@@ -10,11 +10,12 @@ TARGET = keymon
 PRODUCT = $(TARGET).elf
 
 CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
 CFLAGS	= -Os -lmsettings -lpthread -lrt -ldl -Wl,--gc-sections -s
 CFLAGS  += -I. -I../../all/common -I../platform/ -I$(PREFIX_LOCAL)/include -L$(PREFIX_LOCAL)/lib -DPLATFORM=\"$(UNION_PLATFORM)\"
 
 all: $(PREFIX)/include/msettings.h
-	$(CC) $(TARGET).c -o $(PRODUCT) $(CFLAGS)
+	$(CXX) $(TARGET).cpp -o $(PRODUCT) $(CFLAGS)
 clean:
 	rm -rf $(PRODUCT)
 

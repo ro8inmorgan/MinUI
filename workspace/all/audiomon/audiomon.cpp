@@ -17,11 +17,8 @@
 #include <syslog.h>
 #include <errno.h>
 
-extern "C"
-{
 #include "msettings.h"
 #include "defines.h"
-}
 
 #define AUDIO_FILE "/mnt/SDCARD/.userdata/" PLATFORM "/.asoundrc"
 #define UUID_A2DP "0000110b-0000-1000-8000-00805f9b34fb"

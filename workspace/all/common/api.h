@@ -6,6 +6,10 @@
 #include "config.h"
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 ///////////////////////////////
 
 enum {
@@ -103,16 +107,21 @@ typedef struct {
 
 extern PerfProfile perf;
 
-// TODO: do we need that many free externs? This should move
-// to a structure or something.
-extern int currentshaderpass;
-extern int currentshadersrcw;
-extern int currentshadersrch;
-extern int currentshaderdstw;
-extern int currentshaderdsth;
-extern int currentshadertexw;
-extern int currentshadertexh;
-extern int should_rotate;
+// Current render-pass state, shared between the core renderer (api.c),
+// the platform GLES pipeline (generic_video.c) and minarch's video path
+// (ma_video.c). Was eight loose `extern int`s; grouped into one struct so
+// there's a single well-named extern instead of the soup this used to be.
+typedef struct GFX_RenderState {
+	int pass;          // was currentshaderpass
+	int src_w;         // currentshadersrcw
+	int src_h;         // currentshadersrch
+	int dst_w;         // currentshaderdstw
+	int dst_h;         // currentshaderdsth
+	int tex_w;         // currentshadertexw
+	int tex_h;         // currentshadertexh
+	int should_rotate; // was should_rotate
+} GFX_RenderState;
+extern GFX_RenderState gfx_render;
 enum {
 	ASSET_WHITE_PILL,
 	ASSET_BLACK_PILL,
@@ -222,7 +231,9 @@ typedef struct GFX_Fonts {
 	TTF_Font* tiny; 	// multi char button label
 	TTF_Font* micro; 	// icon overlay text
 } GFX_Fonts;
-extern GFX_Fonts font;
+// The loaded fonts live inside api.c; reach them through this accessor rather
+// than a bare extern global.
+GFX_Fonts* GFX_getFonts(void);
 
 enum {
 	SHARPNESS_SHARP,
@@ -489,7 +500,6 @@ typedef struct LID_Context {
 	int has_lid;
 	int is_open;
 } LID_Context;
-extern LID_Context lid;
 
 void PLAT_initLid(void);
 int PLAT_lidChanged(int* state);
@@ -513,7 +523,9 @@ typedef struct PAD_Context {
 	PAD_Axis laxis;
 	PAD_Axis raxis;
 } PAD_Context;
-extern PAD_Context pad;
+// The pad state lives inside api.c; reach it through this accessor rather than
+// a bare extern global. Most consumers should use the PAD_* facade instead.
+PAD_Context* PAD_getContext(void);
 
 #define PAD_REPEAT_DELAY	300
 #define PAD_REPEAT_INTERVAL 100
@@ -965,5 +977,9 @@ void PLAT_bluetoothSetVolume(int vol);
 #define BT_isConnected PLAT_bluetoothConnected
 #define BT_getVolume PLAT_bluetoothVolume
 #define BT_setVolume PLAT_bluetoothSetVolume
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -5,6 +5,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // See: https://github.com/RetroAchievements/rcheevos/wiki/rc_client-integration
 
 /**
@@ -170,5 +174,9 @@ void RA_setMemoryMap(const void* mmap);
  * @param console_id The rcheevos console ID for the loaded game
  */
 void RA_initMemoryRegions(uint32_t console_id);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __RA_INTEGRATION_H__

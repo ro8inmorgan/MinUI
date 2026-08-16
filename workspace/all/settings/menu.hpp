@@ -1,11 +1,8 @@
 #pragma once
 
-extern "C"
-{
 #include "sdl.h"
 #include "defines.h"
 #include "api.h"
-}
 
 #include <cassert>
 #include <string>

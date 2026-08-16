@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Offline RetroAchievements support for NextUI.
  * 
@@ -311,5 +315,9 @@ void RA_Offline_clearPendingCache(void);
 void RA_Offline_patchStartsessionCacheWithUnlock(const char* game_hash,
                                                   uint32_t achievement_id,
                                                   uint32_t timestamp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* RA_OFFLINE_H */

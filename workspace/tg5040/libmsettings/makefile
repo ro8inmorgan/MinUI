@@ -11,15 +11,21 @@ TARGET=msettings
 .PHONY: clean
 
 CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
 
 CFLAGS = -I../../all/common
+# displaycal is C++ but uses no C++ runtime; -fno-exceptions/-fno-rtti keeps the
+# object free of libstdc++ symbols so libmsettings.so still links with plain gcc.
+# -Wno-write-strings: msettings passes string literals to char* helpers
+# (touch/putInt); benign, tolerated elsewhere in the tree.
+CXXFLAGS = $(CFLAGS) -std=gnu++2a -fno-exceptions -fno-rtti -Wno-write-strings
 LDFLAGS = -ltinyalsa -ldl -lrt -lm -s
 
 OPTM=-Ofast
 
 build: 
-	$(CC) -c -Werror -fpic "$(TARGET).c" $(CFLAGS) -Wl,--no-as-needed $(LDFLAGS)
-	$(CC) -c -Werror -fpic "../../all/common/displaycal.c" $(CFLAGS) -Wl,--no-as-needed $(LDFLAGS)
+	$(CXX) -c -Werror -fpic "$(TARGET).cpp" $(CXXFLAGS) -Wl,--no-as-needed $(LDFLAGS)
+	$(CXX) -c -Werror -fpic "../../all/common/displaycal.cpp" $(CXXFLAGS) -Wl,--no-as-needed $(LDFLAGS)
 	$(CC) -shared -o "lib$(TARGET).so" "$(TARGET).o" "displaycal.o" $(LDFLAGS)
 	mkdir -p "$(PREFIX_LOCAL)/include"
 	mkdir -p "$(PREFIX_LOCAL)/lib"
