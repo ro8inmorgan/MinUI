@@ -47,6 +47,7 @@ endif
 	cd ./all/libgametimedb/ && make
 	cd ./all/gametimectl/ && make
 	cd ./all/gametime/ && make
+	cd ./all/parental/ && make
 	cd ./all/minput/ && make
 	cd ./all/syncsettings/ && make
 	cd ./all/nextval/ && make
@@ -95,6 +96,7 @@ endif
 	cd ./all/libgametimedb/ && make clean
 	cd ./all/gametimectl/ && make clean
 	cd ./all/gametime/ && make clean
+	cd ./all/parental/ && make clean
 	cd ./all/minput/ && make clean
 	cd ./all/nextval/ && make clean
 	cd ./all/settings/ && make clean

@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <signal.h>
 #include <msettings.h>
 
 #include <SDL2/SDL_image.h>
@@ -108,6 +109,51 @@ static void Special_quit(void) {
 
 ///////////////////////////////
 
+///////////////////////////////
+// external control signals
+//
+// SIGUSR1: save and quit, as if the player had put the device to sleep and
+//          then exited. SIGUSR2: show the message left in NOTIFY_PATH over the
+//          running game. Handlers only raise a flag: the work happens once per
+//          frame on the main thread in sigmon(), because neither
+//          Menu_beforeSleep() nor Notification_push() is async-signal-safe
+//          (and Notification_push() mutates its queue without a mutex).
+
+static volatile sig_atomic_t sig_stop_requested = 0;
+static volatile sig_atomic_t sig_notify_requested = 0;
+
+static void sigHandler(int sig) {
+	switch (sig) {
+		case SIGUSR1: sig_stop_requested = 1; break;
+		case SIGUSR2: sig_notify_requested = 1; break;
+		default: break;
+	}
+}
+
+static void sigmon(void) {
+	if (sig_notify_requested) {
+		sig_notify_requested = 0;
+		if (exists(NOTIFY_PATH)) {
+			char msg[NOTIFICATION_MAX_MESSAGE];
+			getFile(NOTIFY_PATH, msg, sizeof(msg));
+			unlink(NOTIFY_PATH);
+			trimTrailingNewlines(msg);
+			if (msg[0]) Notification_push(NOTIFICATION_SYSTEM, msg, NULL);
+		}
+	}
+
+	if (sig_stop_requested) {
+		sig_stop_requested = 0;
+
+		LOG_info("stopping on SIGUSR1...\n");
+		Menu_beforeSleep();
+		show_menu = 0;
+		quit = 1;
+	}
+}
+
+///////////////////////////////
+
 void hdmimon(void) {
 	// handle HDMI change
 	static int had_hdmi = -1;
@@ -207,7 +253,10 @@ int main(int argc , char* argv[]) {
 	InitSettings(); // after we initialize audio
 	Menu_init();
 	Notification_init();
-	
+
+	signal(SIGUSR1, sigHandler);
+	signal(SIGUSR2, sigHandler);
+
 	// Load game for RetroAchievements tracking (must be after Notification_init)
 	// Pass ROM data if available, otherwise just path (for cores that load from file)
 	{
@@ -324,6 +373,7 @@ int main(int argc , char* argv[]) {
 		Audio_checkAndResetIfNeeded();
 
 		hdmimon();
+		sigmon();
 	}
 	int cw, ch;
 	unsigned char* pixels = GFX_GL_screenCapture(&cw, &ch);

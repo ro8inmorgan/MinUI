@@ -65,11 +65,36 @@ echo "$(date): launched $HOOK_ROM_PATH" >> "$LOGS_PATH/launches.log"
 
 ## Rules
 
-- Each script runs in a subshell. A crash or non-zero exit will not affect the launcher or other hooks.
+- Each script runs in a subshell. A crash will not affect the launcher or other hooks.
 - Script output (stdout/stderr) is suppressed. If you need logging, write to your own log file.
-- Pre-launch hooks cannot cancel the launch. They are for observation and setup only.
+- A **synchronous** pre-launch hook (`*.sync.sh`) that exits non-zero **cancels the launch**: the rom or pak is never started, and `post-launch.d` is skipped. See "Vetoing a launch" below.
+- Background hooks cannot cancel anything — their exit status is not recoverable from `wait` in POSIX sh, so only `.sync.sh` hooks get a vote. A non-zero exit from a background hook is ignored, as is any exit status outside `pre-launch.d`.
 - Keep hooks fast. A slow hook delays the launch or the return to the menu.
 - Unlike auto.sh, each pak should manage their own hook and use a descriptive filename to avoid collisions.
+
+
+## Vetoing a launch
+
+Name the hook `*.sync.sh` and exit non-zero:
+
+```sh
+#!/bin/sh
+# no-roms-before-noon.sync.sh
+
+[ "$HOOK_TYPE" = "rom" ] || exit 0
+[ "$(date +%H)" -ge 12 ] && exit 0
+
+show2.elf --mode=simple --text="Not before noon" --timeout=3
+exit 1
+```
+
+Two things to know when you cancel a rom launch:
+
+- The launcher has already run `gametimectl.elf start` for that rom by the time the
+  hook runs, so a vetoing hook should call `gametimectl.elf stop_all` to avoid leaving
+  an open play session behind.
+- Nothing is displayed for you. If the user should know why nothing happened, say so —
+  `show2.elf` is the usual way.
 
 
 ## Example: sync after ROM exit
