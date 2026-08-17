@@ -60,6 +60,9 @@ typedef struct {
 	unsigned long code_hash;
 	int code_len;
 	char exempt[EXEMPT_MAX];
+	int extra_minutes;      // one-off top-up on top of limit_minutes
+	int extra_day;          // startOfToday() when extra_minutes was granted; a
+	                         // stale (non-matching) value means it has expired
 } Config;
 
 // Buttons a code can be made of. B is deliberately absent: it always means
@@ -110,6 +113,8 @@ static void configSave(const Config *cfg)
 	fprintf(file, "code_hash=%lu\n", cfg->code_hash);
 	fprintf(file, "code_len=%d\n", cfg->code_len);
 	fprintf(file, "exempt=%s\n", cfg->exempt);
+	fprintf(file, "extra_minutes=%d\n", cfg->extra_minutes);
+	fprintf(file, "extra_day=%d\n", cfg->extra_day);
 	fclose(file);
 	sync();
 }
@@ -121,6 +126,8 @@ static void configLoad(Config *cfg)
 	cfg->code_hash = hashCode(DEFAULT_CODE, DEFAULT_CODE_LEN);
 	cfg->code_len = DEFAULT_CODE_LEN;
 	cfg->exempt[0] = '\0';
+	cfg->extra_minutes = 0;
+	cfg->extra_day = 0;
 
 	FILE *file = fopen(PARENTAL_CFG_PATH, "r");
 	if (!file) {
@@ -147,6 +154,8 @@ static void configLoad(Config *cfg)
 			strncpy(cfg->exempt, value, EXEMPT_MAX - 1);
 			cfg->exempt[EXEMPT_MAX - 1] = '\0';
 		}
+		else if (strcmp(key, "extra_minutes") == 0) cfg->extra_minutes = atoi(value);
+		else if (strcmp(key, "extra_day") == 0) cfg->extra_day = atoi(value);
 	}
 	fclose(file);
 
@@ -282,11 +291,19 @@ static int secondsPlayedToday(void)
 	return play_activity_get_play_time_since(startOfToday());
 }
 
+// Extra minutes granted for today, or 0 once the day has moved on. Expires
+// on its own -- a stale extra_day just stops counting, nothing to clean up.
+static int extraMinutesToday(const Config *cfg)
+{
+	return cfg->extra_day == startOfToday() ? cfg->extra_minutes : 0;
+}
+
 // Seconds left today, or -1 when there is no limit.
 static int remainingFrom(const Config *cfg, int played)
 {
 	if (cfg->limit_minutes <= 0) return -1;
-	int remaining = cfg->limit_minutes * 60 - played;
+	int budget_minutes = cfg->limit_minutes + extraMinutesToday(cfg);
+	int remaining = budget_minutes * 60 - played;
 	return remaining < 0 ? 0 : remaining;
 }
 
@@ -394,12 +411,14 @@ enum {
 	SCREEN_CODE,
 	SCREEN_ADMIN,
 	SCREEN_LIMIT,
+	SCREEN_EXTRA,
 	SCREEN_NEWCODE,
 	SCREEN_EXEMPT,
 };
 
 enum {
 	ADMIN_LIMIT,
+	ADMIN_EXTRA,
 	ADMIN_EXEMPT,
 	ADMIN_CODE,
 	ADMIN_COUNT,
@@ -689,6 +708,13 @@ int main(int argc, char *argv[])
 					edit_field = FIELD_HOURS;
 					state = SCREEN_LIMIT;
 				}
+				else if (admin_selected == ADMIN_EXTRA) {
+					int extra = extraMinutesToday(&cfg);
+					edit_hours = extra / 60;
+					edit_minutes = extra % 60;
+					edit_field = FIELD_HOURS;
+					state = SCREEN_EXTRA;
+				}
 				else if (admin_selected == ADMIN_EXEMPT) {
 					emu_count = scanEmulators(emus);
 					emu_selected = 0;
@@ -728,6 +754,35 @@ int main(int argc, char *argv[])
 				cfg.limit_minutes = edit_hours * 60 + edit_minutes;
 				configSave(&cfg);
 				toast(cfg.limit_minutes > 0 ? "Limit saved" : "Limit disabled");
+				state = SCREEN_ADMIN;
+				dirty = 1;
+			}
+			else if (PAD_justPressed(BTN_B)) {
+				state = SCREEN_ADMIN;
+				dirty = 1;
+			}
+			break;
+
+		case SCREEN_EXTRA:
+			if (PAD_justRepeated(BTN_LEFT) || PAD_justRepeated(BTN_RIGHT)) {
+				edit_field = (edit_field + 1) % FIELD_COUNT;
+				dirty = 1;
+			}
+			else if (PAD_justRepeated(BTN_UP)) {
+				if (edit_field == FIELD_HOURS) edit_hours = (edit_hours + 1) % 24;
+				else edit_minutes = (edit_minutes + 5) % 60;
+				dirty = 1;
+			}
+			else if (PAD_justRepeated(BTN_DOWN)) {
+				if (edit_field == FIELD_HOURS) edit_hours = (edit_hours + 23) % 24;
+				else edit_minutes = (edit_minutes + 55) % 60;
+				dirty = 1;
+			}
+			else if (PAD_justPressed(BTN_A)) {
+				cfg.extra_minutes = edit_hours * 60 + edit_minutes;
+				cfg.extra_day = startOfToday();
+				configSave(&cfg);
+				toast(cfg.extra_minutes > 0 ? "Extra time added" : "Extra time cleared");
 				state = SCREEN_ADMIN;
 				dirty = 1;
 			}
@@ -845,6 +900,9 @@ int main(int argc, char *argv[])
 
 				// from the cached total (see the "played" refresh above), so this
 				// bar does not move just from having the screen open
+				int extra_today = extraMinutesToday(&cfg);
+				int budget_minutes = cfg.limit_minutes + extra_today;
+
 				int remaining = remainingFrom(&cfg, played);
 				if (remaining < 0) renderTextCentered("No limit", font.large, COLOR_WHITE, content_y + SCALE1(16));
 				else {
@@ -852,7 +910,7 @@ int main(int argc, char *argv[])
 					snprintf(buffer, sizeof(buffer), "%s left today", formatted);
 					renderTextCentered(buffer, font.large, remaining > 0 ? COLOR_WHITE : COLOR_LIGHT_TEXT, content_y + SCALE1(16));
 
-					float fraction = cfg.limit_minutes > 0 ? (float)remaining / (cfg.limit_minutes * 60) : 0;
+					float fraction = budget_minutes > 0 ? (float)remaining / (budget_minutes * 60) : 0;
 					renderProgressBar(content_y + SCALE1(46), fraction);
 				}
 
@@ -861,8 +919,14 @@ int main(int argc, char *argv[])
 				renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(66));
 
 				if (cfg.limit_minutes > 0) {
-					serializeTime(formatted, cfg.limit_minutes * 60);
-					snprintf(buffer, sizeof(buffer), "Daily limit  %s", formatted);
+					char limit[25], extra[32] = { 0 };
+					serializeTime(limit, cfg.limit_minutes * 60);
+					if (extra_today > 0) {
+						char extra_time[25];
+						serializeTime(extra_time, extra_today * 60);
+						snprintf(extra, sizeof(extra), "  (+%s today)", extra_time);
+					}
+					snprintf(buffer, sizeof(buffer), "Daily limit  %s%s", limit, extra);
 					renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(82));
 				}
 
@@ -887,9 +951,15 @@ int main(int argc, char *argv[])
 				if (cfg.limit_minutes > 0) serializeTime(limit, cfg.limit_minutes * 60);
 				else snprintf(limit, sizeof(limit), "Off");
 
+				char extra[25];
+				int extra_today = extraMinutesToday(&cfg);
+				if (extra_today > 0) serializeTime(extra, extra_today * 60);
+				else snprintf(extra, sizeof(extra), "None");
+
 				renderRow("Daily limit", limit, 0, admin_selected == ADMIN_LIMIT);
-				renderRow("Emulators", cfg.exempt[0] ? "Some allowed" : "All blocked", 1, admin_selected == ADMIN_EXEMPT);
-				renderRow("Change code", NULL, 2, admin_selected == ADMIN_CODE);
+				renderRow("Extra time", extra, 1, admin_selected == ADMIN_EXTRA);
+				renderRow("Emulators", cfg.exempt[0] ? "Some allowed" : "All blocked", 2, admin_selected == ADMIN_EXEMPT);
+				renderRow("Change code", NULL, 3, admin_selected == ADMIN_CODE);
 
 				if (show_setting) GFX_blitHardwareHints(screen, show_setting);
 				else GFX_blitButtonGroup((char *[]){ "U/D", "SELECT", "A", "EDIT", NULL }, 0, screen, 0);
@@ -919,6 +989,36 @@ int main(int argc, char *argv[])
 					GFX_blitPill(ASSET_UNDERLINE, screen, &(SDL_Rect){ x, uy, hw });
 				else
 					GFX_blitPill(ASSET_UNDERLINE, screen, &(SDL_Rect){ x + hw + gap, uy, mw });
+
+				if (show_setting) GFX_blitHardwareHints(screen, show_setting);
+				else GFX_blitButtonGroup((char *[]){ "L/R", "FIELD", "U/D", "ADJUST", NULL }, 0, screen, 0);
+				GFX_blitButtonGroup((char *[]){ "A", "SAVE", "B", "BACK", NULL }, 1, screen, 1);
+				break;
+			}
+
+			case SCREEN_EXTRA: {
+				renderTextCentered("Extra time today", font.medium, COLOR_WHITE, content_y + SCALE1(10));
+
+				char hours[8], minutes[8];
+				snprintf(hours, sizeof(hours), "%02dh", edit_hours);
+				snprintf(minutes, sizeof(minutes), "%02dm", edit_minutes);
+
+				int hw = textWidth(hours, font.large);
+				int mw = textWidth(minutes, font.large);
+				int gap = SCALE1(16);
+				int x = (screen->w - (hw + gap + mw)) / 2;
+				int y = content_y + SCALE1(44);
+
+				renderText(hours, font.large, COLOR_WHITE, x, y);
+				renderText(minutes, font.large, COLOR_WHITE, x + hw + gap, y);
+
+				int uy = y + SCALE1(FONT_LARGE + 6);
+				if (edit_field == FIELD_HOURS)
+					GFX_blitPill(ASSET_UNDERLINE, screen, &(SDL_Rect){ x, uy, hw });
+				else
+					GFX_blitPill(ASSET_UNDERLINE, screen, &(SDL_Rect){ x + hw + gap, uy, mw });
+
+				renderTextCentered("Resets at midnight", font.small, COLOR_DARK_TEXT, content_y + SCALE1(80));
 
 				if (show_setting) GFX_blitHardwareHints(screen, show_setting);
 				else GFX_blitButtonGroup((char *[]){ "L/R", "FIELD", "U/D", "ADJUST", NULL }, 0, screen, 0);
