@@ -522,6 +522,12 @@ static void renderRow(const char *label, const char *value, int row, bool select
 
 // A track + fill bar, same width as renderRow. fraction is clamped to [0,1];
 // the fill never drops below a full circle so it stays visible near empty.
+//
+// GFX_blitPill always draws a complete rounded pill (both ends), it doesn't
+// clip a partial one -- so the track is drawn as a 1px stroke (outer pill,
+// then a same-shaped black pill inset by 1px punched back on top of it) and
+// the fill is a separate, smaller pill inset 2px further inside that stroke,
+// rather than a fill pill drawn flush over a solid track.
 static void renderProgressBar(int y, float fraction)
 {
 	int x = SCALE1(PADDING);
@@ -531,10 +537,15 @@ static void renderProgressBar(int y, float fraction)
 	if (fraction < 0) fraction = 0;
 	if (fraction > 1) fraction = 1;
 
-	GFX_blitPill(ASSET_BLACK_PILL, screen, &(SDL_Rect){ x, y, w, h });
+	int stroke = SCALE1(1);
+	int inset = stroke + SCALE1(2); // stroke + margin, from the outer edge to the fill
 
-	int fill_w = (int)(w * fraction);
-	if (fill_w > 0) GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x, y, fill_w, h });
+	GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x, y, w, h });
+	GFX_blitPill(ASSET_BLACK_PILL, screen, &(SDL_Rect){ x + stroke, y + stroke, w - stroke * 2, h - stroke * 2 });
+
+	int fill_max_w = w - inset * 2;
+	int fill_w = (int)(fill_max_w * fraction);
+	if (fill_w > 0) GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x + inset, y + inset, fill_w, h - inset * 2 });
 }
 
 // How many rows fit between the title and the button hints.
