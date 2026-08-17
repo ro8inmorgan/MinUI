@@ -143,10 +143,13 @@ int play_activity_get_play_time_since(int since_epoch)
     int play_time = 0;
     // play_time is only written when a session is stopped, so the session that
     // is running right now still has it NULL -- fall back to the elapsed time
-    // since created_at for those, otherwise an in-progress session counts as 0.
+    // since created_at for that one. A *stopped* session can legitimately have
+    // play_time = 0 (launched then immediately backed out), so don't fold that
+    // into the same branch -- it would be misread as still running and grow
+    // unbounded for the rest of the day.
     char *sql =
         "SELECT COALESCE(SUM("
-        "    CASE WHEN play_time IS NULL OR play_time <= 0 "
+        "    CASE WHEN play_time IS NULL "
         "         THEN strftime('%s', 'now') - created_at "
         "         ELSE play_time END"
         "), 0) FROM play_activity WHERE created_at >= ?;";
