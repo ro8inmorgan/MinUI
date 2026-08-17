@@ -501,6 +501,23 @@ static void renderRow(const char *label, const char *value, int row, bool select
 	}
 }
 
+// A track + fill bar, same width as renderRow. fraction is clamped to [0,1];
+// the fill never drops below a full circle so it stays visible near empty.
+static void renderProgressBar(int y, float fraction)
+{
+	int x = SCALE1(PADDING);
+	int w = screen->w - SCALE1(PADDING * 2);
+	int h = SCALE1(10);
+
+	if (fraction < 0) fraction = 0;
+	if (fraction > 1) fraction = 1;
+
+	GFX_blitPill(ASSET_BLACK_PILL, screen, &(SDL_Rect){ x, y, w, h });
+
+	int fill_w = (int)(w * fraction);
+	if (fill_w > 0) GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x, y, fill_w, h });
+}
+
 // How many rows fit between the title and the button hints.
 static int listRows(void)
 {
@@ -826,23 +843,27 @@ int main(int argc, char *argv[])
 				char buffer[64];
 				char formatted[25];
 
-				// from the cached total, this runs on every redrawn frame
+				// from the cached total (see the "played" refresh above), so this
+				// bar does not move just from having the screen open
 				int remaining = remainingFrom(&cfg, played);
 				if (remaining < 0) renderTextCentered("No limit", font.large, COLOR_WHITE, content_y + SCALE1(16));
 				else {
 					serializeTime(formatted, remaining);
 					snprintf(buffer, sizeof(buffer), "%s left today", formatted);
 					renderTextCentered(buffer, font.large, remaining > 0 ? COLOR_WHITE : COLOR_LIGHT_TEXT, content_y + SCALE1(16));
+
+					float fraction = cfg.limit_minutes > 0 ? (float)remaining / (cfg.limit_minutes * 60) : 0;
+					renderProgressBar(content_y + SCALE1(46), fraction);
 				}
 
 				serializeTime(formatted, played);
 				snprintf(buffer, sizeof(buffer), "Played today  %s", formatted);
-				renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(44));
+				renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(66));
 
 				if (cfg.limit_minutes > 0) {
 					serializeTime(formatted, cfg.limit_minutes * 60);
 					snprintf(buffer, sizeof(buffer), "Daily limit  %s", formatted);
-					renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(60));
+					renderTextCentered(buffer, font.small, COLOR_DARK_TEXT, content_y + SCALE1(82));
 				}
 
 				renderRow("Restricted Access", NULL, 3, true);
