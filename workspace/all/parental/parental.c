@@ -362,6 +362,7 @@ static int modeWatch(void)
 	putInt(PARENTAL_PID_PATH, (int)getpid());
 
 	int warned = 0;
+	int warned_final_minute = 0;
 	while (1) {
 		sleep(WATCH_INTERVAL_SEC);
 
@@ -386,6 +387,14 @@ static int modeWatch(void)
 			putFile(NOTIFY_PATH, msg);
 			system("killall -USR2 minarch.elf");
 			warned = 1;
+		}
+
+		// last-minute heads up: same notify path, plus the led=1 directive so
+		// minarch also blinks (LIGHT_PROFILE_APP_WARNING) for the final stretch
+		if (!warned_final_minute && remaining <= 60) {
+			putFile(NOTIFY_PATH, "1 minute left\nled=1");
+			system("killall -USR2 minarch.elf");
+			warned_final_minute = 1;
 		}
 	}
 
