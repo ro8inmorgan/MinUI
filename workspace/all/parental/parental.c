@@ -520,19 +520,18 @@ static void renderRow(const char *label, const char *value, int row, bool select
 	}
 }
 
-// A track + fill bar, same width as renderRow. fraction is clamped to [0,1];
-// the fill never drops below a full circle so it stays visible near empty.
+// A track + fill bar: a plain rectangular 1px stroke (outer white rect,
+// black rect inset 1px punched back on top of it) with the fill inset 2px
+// further inside that stroke. fraction is clamped to [0,1].
 //
-// GFX_blitPill always draws a complete rounded pill (both ends), it doesn't
-// clip a partial one -- so the track is drawn as a 1px stroke (outer pill,
-// then a same-shaped black pill inset by 1px punched back on top of it) and
-// the fill is a separate, smaller pill inset 2px further inside that stroke,
-// rather than a fill pill drawn flush over a solid track.
+// Narrower than renderRow's full-width pills -- right up against the
+// screen edge (same margin as the rows) the stroke has no breathing room.
 static void renderProgressBar(int y, float fraction)
 {
-	int x = SCALE1(PADDING);
-	int w = screen->w - SCALE1(PADDING * 2);
-	int h = SCALE1(10);
+	int bar_margin = SCALE1(PADDING * 2);
+	int x = bar_margin;
+	int w = screen->w - bar_margin * 2;
+	int h = SCALE1(14);
 
 	if (fraction < 0) fraction = 0;
 	if (fraction > 1) fraction = 1;
@@ -540,12 +539,12 @@ static void renderProgressBar(int y, float fraction)
 	int stroke = SCALE1(1);
 	int inset = stroke + SCALE1(2); // stroke + margin, from the outer edge to the fill
 
-	GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x, y, w, h });
-	GFX_blitPill(ASSET_BLACK_PILL, screen, &(SDL_Rect){ x + stroke, y + stroke, w - stroke * 2, h - stroke * 2 });
+	SDL_FillRect(screen, &(SDL_Rect){ x, y, w, h }, RGB_WHITE);
+	SDL_FillRect(screen, &(SDL_Rect){ x + stroke, y + stroke, w - stroke * 2, h - stroke * 2 }, RGB_BLACK);
 
 	int fill_max_w = w - inset * 2;
 	int fill_w = (int)(fill_max_w * fraction);
-	if (fill_w > 0) GFX_blitPill(ASSET_WHITE_PILL, screen, &(SDL_Rect){ x + inset, y + inset, fill_w, h - inset * 2 });
+	if (fill_w > 0) SDL_FillRect(screen, &(SDL_Rect){ x + inset, y + inset, fill_w, h - inset * 2 }, RGB_WHITE);
 }
 
 // How many rows fit between the title and the button hints.
@@ -651,6 +650,14 @@ int main(int argc, char *argv[])
 	int emu_count = 0;
 	int emu_selected = 0;
 	int emu_top = 0;
+
+	// Only one thing runs in the foreground at a time on this device, so no
+	// game session can legitimately still be "open" while we're the ones
+	// running -- if one is, it's a row nextui.elf never got to close (that
+	// only happens when its own launcher reinitializes, not when a Tools
+	// pak like this one is opened directly). Sweep it so the total below is
+	// a real, static number instead of ticking up live from a stale row.
+	play_activity_stop_all();
 
 	int played = secondsPlayedToday();
 	uint32_t refreshed_at = SDL_GetTicks();
