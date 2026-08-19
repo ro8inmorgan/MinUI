@@ -160,11 +160,8 @@ void PLAT_getGPUSpeed() {
 	perf.gpu_speed = getInt("/sys/class/devfreq/fde60000.gpu/cur_freq")/1000000;
 }
 
-void PLAT_getGPUUsage() {
-	// the mali node reports a bare 0-100 integer, no parsing needed
-	// (devfreq's "load" reports the same value as "NN@<freq>Hz")
-	perf.gpu_usage = getInt("/sys/devices/platform/fde60000.gpu/utilisation");
-}
+// filled in by PLAT_cpu_monitor; overridden so the weak fallback can't zero it
+void PLAT_getGPUUsage() {}
 
 static struct WIFI_connection connection = {
 	.valid = false,
@@ -344,6 +341,10 @@ void *PLAT_cpu_monitor(void *arg) {
 
         prev_real_time = curr_real_time;
         prev_cpu_time = curr_cpu_time;
+
+        // blocks ~100ms, too slow for the render thread
+        perf.gpu_usage = getInt("/sys/devices/platform/fde60000.gpu/utilisation");
+
         usleep(100000);
     }
 
