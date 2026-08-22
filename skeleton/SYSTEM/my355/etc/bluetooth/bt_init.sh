@@ -1,28 +1,9 @@
 #!/bin/sh
 # Bluetooth initialization script for NextUI
-bt_hciattach="hciattach"
 DEVICE_NAME="Miyoo Flip (NextUI)"
 
-reset_bluetooth_power() {
-	rfkill.elf block bluetooth
-	sleep 1
-	rfkill.elf unblock bluetooth
-	sleep 1
-}
-
-start_hci_attach()
-{
-	h=`ps | grep "$bt_hciattach" | grep -v grep`
-	[ -n "$h" ] && {
-		killall "$bt_hciattach"
-	}
-
-	#echo 1 > /proc/bluetooth/sleep/btwrite
-	reset_bluetooth_power
-
-	#xradio init
-	"$bt_hciattach" -n ttyS1 xradio >/dev/null 2>&1 &
-
+# hci0 shows up on its own once rtk_btusb binds the USB BT interface
+wait_hci0() {
 	wait_hci0_count=0
 	while true
 	do
@@ -45,11 +26,7 @@ start_bt() {
 	
 	rfkill.elf unblock bluetooth
 
-	if [ -d "/sys/class/bluetooth/hci0" ];then
-		echo "Bluetooth init has been completed!!"
-	else
-		start_hci_attach
-	fi      
+	wait_hci0
 
 	# Start bluetooth daemon if not running
     d=`ps | grep bluetoothd | grep -v grep`
@@ -80,33 +57,6 @@ start_bt() {
 	
 }
 
-ble_start() {
-	rfkill.elf unblock bluetooth
-
-	if [ -d "/sys/class/bluetooth/hci0" ];then
-		echo "Bluetooth init has been completed!!"
-	else
-		start_hci_attach
-	fi
-
-	hci_is_up=`hciconfig hci0 | grep RUNNING`
-	[ -z "$hci_is_up" ] && {
-		hciconfig hci0 up
-	}
-
-	MAC_STR=`hciconfig | grep "BD Address" | awk '{print $3}'`
-	LE_MAC=${MAC_STR/2/C}
-	OLD_LE_MAC_T=`cat /sys/kernel/debug/bluetooth/hci0/random_address`
-	OLD_LE_MAC=$(echo $OLD_LE_MAC_T | tr [a-z] [A-Z])
-	if [ -n "$LE_MAC" ];then
-		if [ "$LE_MAC" != "$OLD_LE_MAC" ];then
-			hciconfig hci0 lerandaddr $LE_MAC
-		else
-			echo "the ble random_address has been set."
-		fi
-	fi
-}
-
 stop_bt() {
 	# stop bluealsa
 	killall bluealsa 2>/dev/null
@@ -130,14 +80,8 @@ stop_bt() {
 		killall hcidump
 	}
 
-	h=`ps | grep "$bt_hciattach" | grep -v grep`
-	[ -n "$h" ] && {
-		killall "$bt_hciattach"
-		usleep 500000
-	}
-	#echo 0 > /proc/bluetooth/sleep/btwrite
 	rfkill.elf block bluetooth
-	echo "stop bluetoothd and hciattach"
+	echo "stop bluetoothd"
 }
 
 case "$1" in
