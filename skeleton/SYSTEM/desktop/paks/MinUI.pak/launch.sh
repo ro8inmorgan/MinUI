@@ -82,9 +82,14 @@ touch "$EXEC_PATH"  && sync
 		CMD=`cat $NEXT_PATH`
 		parse_hook_cmd "$CMD"
 		# a synchronous pre-launch hook that exits non-zero cancels the launch
-		if "$SYSTEM_PATH/bin/run_hooks.sh" pre-launch.d; then
+		if "$SYSTEM_PATH/bin/run_hooks.sh" pre-launch.d && "$SYSTEM_PATH/bin/pak-hooks.sh" pre-launch; then
+			# only start tracking once nothing vetoed the launch -- a refused
+			# rom no longer needs a compensating gametimectl stop_all
+			[ "$HOOK_TYPE" = "rom" ] && gametimectl.elf start "$HOOK_ROM_PATH"
 			eval $CMD
 			"$SYSTEM_PATH/bin/run_hooks.sh" post-launch.d
+			"$SYSTEM_PATH/bin/pak-hooks.sh" post-launch
+			[ "$HOOK_TYPE" = "rom" ] && gametimectl.elf stop "$HOOK_ROM_PATH"
 		fi
 		rm -f $NEXT_PATH
 	fi

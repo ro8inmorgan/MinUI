@@ -97,6 +97,46 @@ Two things to know when you cancel a rom launch:
   `show2.elf` is the usual way.
 
 
+## Pak-scoped hooks (self-registering, no arming step)
+
+The `.hooks/` directories above require a pak to actively install its own
+script there (usually the first time it's opened), and nothing removes that
+script when the pak is later deleted -- it's an orphan until someone opens
+the pak again to tidy up after itself.
+
+For a Tools pak that wants a **launch gate** and/or a **teardown step** every
+single time, there's a second, self-registering mechanism: drop a
+`pre-launch.sh` and/or `post-launch.sh` file right next to the pak's own
+`launch.sh`:
+
+```
+Tools/tg5040/SomePak.pak/
+    launch.sh
+    pre-launch.sh    # optional
+    post-launch.sh   # optional
+```
+
+`pak-hooks.sh` scans every installed Tools pak for these two filenames and
+runs whichever exist, in alphabetical order by pak folder name, on every ROM
+or pak launch -- same env vars as above (`HOOK_TYPE`, `HOOK_ROM_PATH`, etc.).
+No copy step, no install step: the file's presence in the pak's own folder
+*is* the registration, and removing the pak removes its hook with it.
+
+Differences from `.hooks/*.d/`:
+
+- No `*.sync.sh` naming trick: `pre-launch.sh` is always synchronous and
+  always gets a vote. A non-zero exit from **any** installed pak's
+  `pre-launch.sh` cancels the launch -- every pak that registers one is
+  assumed to need to agree before a game runs.
+- The list of paks with a registered hook is cached (`/tmp/pak_hooks_cache.txt`)
+  and rebuilt when returning to the main menu, not on every single launch --
+  see `nextui.c`. A pak installed or removed while sitting at the menu is
+  picked up on the very next visit, not stuck until reboot.
+- Because presence alone activates it, installing a pak with a
+  `pre-launch.sh` is enough to give it veto power over every launch -- there
+  is no separate "open once to arm" consent step like some paks used to
+  implement by hand via `.hooks/`.
+
 ## Example: sync after ROM exit
 
 ```sh
