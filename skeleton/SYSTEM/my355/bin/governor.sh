@@ -37,20 +37,10 @@ set_policy() {
         echo "$MAX_FREQ" > "$policy_path/scaling_max_freq"
 }
 
-# schedutil's defaults leave the CPU at 408-600 MHz under emulation
-tune_schedutil() {
-        local policy_path="$1"
-
-        [ -d "$policy_path/schedutil" ] || return 0
-        echo 45 > "$policy_path/schedutil/target_load" 2>/dev/null || true
-        echo 1000 > "$policy_path/schedutil/rate_limit_us" 2>/dev/null || true
-}
-
 case "$MODE" in
         auto)
                 # schedutil governor, min freq to one step below max (408-1800 MHz on MY355)
                 set_policy /sys/devices/system/cpu/cpufreq/policy0 "schedutil" "second_max"
-                tune_schedutil /sys/devices/system/cpu/cpufreq/policy0
                 ;;
         performance)
                 # performance governor, max freq (1992 MHz on MY355)
