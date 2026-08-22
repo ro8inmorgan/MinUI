@@ -1,8 +1,7 @@
 #!/bin/sh
-# parental-gate.sync.sh -- refuse a rom launch once the daily budget is spent.
+# pre-launch.sh -- refuse a rom launch once the daily budget is spent.
 #
-# Must stay named *.sync.sh: only synchronous pre-launch hooks get a veto,
-# and a non-zero exit is what cancels the launch.
+# Scanned and run by pak-hooks.sh: a non-zero exit here cancels the launch.
 
 [ "$HOOK_TYPE" = "rom" ] || exit 0
 
@@ -28,9 +27,9 @@ if "$PAK/parental.elf" --gate; then
 	exit 0
 fi
 
-# nextui already opened a play_activity row before handing off to us, close it
-# so the refused launch doesn't count as time played
-gametimectl.elf stop_all
+# gametimectl.elf start only runs after every pre-launch hook (including this
+# one) succeeds, so a refused launch never opens a play_activity row -- no
+# compensating stop_all needed here anymore.
 
 # --image is mandatory, show2.elf prints its usage and draws nothing without it
 show2.elf --mode=simple --image="$SDCARD_PATH/.system/res/logo.png" --text="No play time left today" --timeout=3

@@ -1,5 +1,5 @@
 #!/bin/sh
-# parental-stop.sh -- tear down the watcher started by parental-gate.sync.sh
+# post-launch.sh -- tear down the watcher started by pre-launch.sh
 
 [ "$HOOK_TYPE" = "rom" ] || exit 0
 
