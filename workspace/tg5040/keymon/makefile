@@ -1,3 +1,4 @@
+# pi-lens-ignore: SC1073, SC1065, SC1064, SC1072
 ifeq (,$(CROSS_COMPILE))
 $(error missing CROSS_COMPILE for this toolchain)
 endif
@@ -19,4 +20,4 @@ clean:
 	rm -rf $(PRODUCT)
 
 $(PREFIX)/include/msettings.h:
-	cd /root/workspace/$(PLATFORM)/libmsettings && make
+	cd ../libmsettings && make

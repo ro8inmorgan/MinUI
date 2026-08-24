@@ -33,7 +33,7 @@ CC = $(CROSS_COMPILE)gcc
 SYSROOT     := $(shell $(CC) --print-sysroot)
 
 INCDIR = -I. -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = $(TARGET).c ../common/utils.c ../common/api.c ../../$(PLATFORM)/platform/platform.c
+SOURCE = $(TARGET).c ../common/utils.c ../common/path_helpers.c ../common/api.c ../../$(PLATFORM)/platform/platform.c
 
 CFLAGS  += $(OPT)
 CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
@@ -44,7 +44,7 @@ PRODUCT= build/$(PLATFORM)/lib$(TARGET).so
 build: 
 	mkdir -p build/$(PLATFORM)
 	$(CC) -c -Werror -fpic $(SOURCE) -Wl,--no-as-needed $(LDFLAGS) $(CFLAGS)
-	$(CC) -shared -o $(PRODUCT) "$(TARGET).o" "utils.o" $(LDFLAGS)
+	$(CC) -shared -o $(PRODUCT) "$(TARGET).o" "utils.o" "path_helpers.o" $(LDFLAGS)
 	mkdir -p "$(PREFIX_LOCAL)/include"
 	mkdir -p "$(PREFIX_LOCAL)/lib"
 	cp "$(TARGET).h" "$(PREFIX_LOCAL)/include"

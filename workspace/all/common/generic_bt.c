@@ -21,6 +21,7 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 bool PLAT_hasBluetooth() { return true; }
 bool PLAT_bluetoothEnabled() { return CFG_getBluetooth(); }
@@ -114,7 +115,7 @@ static int bt_run_cmd(const char *cmd, char *output, size_t output_len) {
 	}
 	
 	int status = pclose(fp);
-	return WEXITSTATUS(status);
+	return status != -1 && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
 // Helper to add device to discovered list
@@ -595,6 +596,8 @@ static volatile int running = 0;
 static void (*callback_fn)(int device, int watch_event) = NULL;
 static char watched_dir[MAX_PATH];
 static char watched_file_path[MAX_PATH];
+static pthread_mutex_t watcher_state_mtx = PTHREAD_MUTEX_INITIALIZER;
+static bool watcher_started = false;
 
 // Function to detect audio device type from .asoundrc content
 static int detect_audio_device_type() {
@@ -655,121 +658,82 @@ static void remove_file_watch() {
 
 static void *watcher_thread_func(void *arg) {
     char buffer[EVENT_BUF_LEN];
-
-    // At start try to watch file if exists
+    (void)arg;
     add_file_watch();
-
-    while (running) {
-        int length = read(inotify_fd, buffer, EVENT_BUF_LEN);
+    for (;;) {
+        pthread_mutex_lock(&watcher_state_mtx);
+        bool active = running;
+        int fd = inotify_fd;
+        pthread_mutex_unlock(&watcher_state_mtx);
+        if (!active || fd < 0) break;
+        int length = read(fd, buffer, sizeof(buffer));
         if (length < 0) {
-            if (errno == EAGAIN || errno == EINTR) {
-                sleep(1);
-                continue;
-            }
+            if (errno == EAGAIN || errno == EINTR) { usleep(100000); continue; }
             LOG_error("inotify read error: %s\n", strerror(errno));
-            break;
+            usleep(100000);
+            continue;
         }
-
         for (int i = 0; i < length;) {
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
-
-            if (event->wd == dir_watch_fd) {
-                if (event->len > 0 && strcmp(event->name, WATCHED_FILE) == 0) {
-                    if (event->mask & IN_CREATE) {
-                        add_file_watch();
-                        int device_type = detect_audio_device_type();
-                        if (callback_fn) callback_fn(device_type, DIRWATCH_CREATE);
-                    }
-					// No need to react to this, we handle it via file watch
-                    //else if (event->mask & IN_DELETE) {
-                    //    remove_file_watch();
-                    //    if (callback_fn) callback_fn(AUDIO_SINK_DEFAULT, DIRWATCH_DELETE);
-                    //}
-                }
+            int device = AUDIO_SINK_DEFAULT, watch_event = 0;
+            if (event->wd == dir_watch_fd && event->len && strcmp(event->name, WATCHED_FILE) == 0 && (event->mask & IN_CREATE)) {
+                add_file_watch(); device = detect_audio_device_type(); watch_event = DIRWATCH_CREATE;
+            } else if (event->wd == file_watch_fd && (event->mask & (IN_MODIFY | IN_CLOSE_WRITE | IN_DELETE_SELF))) {
+                if (event->mask & IN_DELETE_SELF) { remove_file_watch(); watch_event = FILEWATCH_DELETE; }
+                else if (event->mask & IN_MODIFY) { device = detect_audio_device_type(); watch_event = FILEWATCH_MODIFY; }
             }
-            else if (event->wd == file_watch_fd) {
-                if (event->mask & (IN_MODIFY | IN_CLOSE_WRITE | IN_DELETE_SELF)) {
-                    if (event->mask & IN_DELETE_SELF) {
-                        remove_file_watch();
-						if (callback_fn) callback_fn(AUDIO_SINK_DEFAULT, FILEWATCH_DELETE);
-                    }
-					// No need to react to this, it usually comes paired with FILEWATCH_MODIFY
-					//else if (event->mask & IN_CLOSE_WRITE) {
-					//	if (callback_fn) callback_fn(AUDIO_SINK_BLUETOOTH, FILEWATCH_CLOSE_WRITE);
-					//}
-					else if (event->mask & IN_MODIFY) {
-						int device_type = detect_audio_device_type();
-						if (callback_fn) callback_fn(device_type, FILEWATCH_MODIFY);
-					}
-                }
+            if (watch_event) {
+                pthread_mutex_lock(&watcher_state_mtx);
+                void (*callback)(int, int) = running ? callback_fn : NULL;
+                pthread_mutex_unlock(&watcher_state_mtx);
+                if (callback) callback(device, watch_event);
             }
-
-            i += sizeof(struct inotify_event) + event->len;
+            i += sizeof(*event) + event->len;
         }
     }
-
     return NULL;
 }
 
 void PLAT_audioDeviceWatchRegister(void (*cb)(int device, int event)) {
-    if (running) return; // Already running
-
-    callback_fn = cb;
-
+    pthread_mutex_lock(&watcher_state_mtx);
+    if (running || watcher_started) { pthread_mutex_unlock(&watcher_state_mtx); return; }
     const char *home = getenv("HOME");
-    if (!home) {
-        LOG_error("PLAT_audioDeviceWatchRegister: HOME environment variable not set\n");
-        return;
+    if (!home || snprintf(watched_dir, sizeof(watched_dir), WATCHED_DIR_FMT, home) >= (int)sizeof(watched_dir) ||
+        snprintf(watched_file_path, sizeof(watched_file_path), "%s/%s", watched_dir, WATCHED_FILE) >= (int)sizeof(watched_file_path)) {
+        pthread_mutex_unlock(&watcher_state_mtx); LOG_error("PLAT_audioDeviceWatchRegister: invalid HOME\n"); return;
     }
-
-    snprintf(watched_dir, MAX_PATH, WATCHED_DIR_FMT, home);
-    snprintf(watched_file_path, MAX_PATH, "%s/%s", watched_dir, WATCHED_FILE);
-
-    LOG_info("PLAT_audioDeviceWatchRegister: Watching directory %s\n", watched_dir);
-    LOG_info("PLAT_audioDeviceWatchRegister: Watching file %s\n", watched_file_path);
-
     inotify_fd = inotify_init1(IN_NONBLOCK);
-    if (inotify_fd < 0) {
-        LOG_error("PLAT_audioDeviceWatchRegister: failed to initialize inotify\n");
-        return;
-    }
-
+    if (inotify_fd < 0) { pthread_mutex_unlock(&watcher_state_mtx); LOG_error("PLAT_audioDeviceWatchRegister: failed to initialize inotify\n"); return; }
     dir_watch_fd = inotify_add_watch(inotify_fd, watched_dir, IN_CREATE | IN_DELETE);
-    if (dir_watch_fd < 0) {
-        LOG_error("PLAT_audioDeviceWatchRegister: failed to add directory watch\n");
-        close(inotify_fd);
-        inotify_fd = -1;
-        return;
-    }
-
+    if (dir_watch_fd < 0) { close(inotify_fd); inotify_fd = -1; pthread_mutex_unlock(&watcher_state_mtx); LOG_error("PLAT_audioDeviceWatchRegister: failed to add directory watch\n"); return; }
     file_watch_fd = -1;
-
-    running = 1;
+    callback_fn = cb;
+    running = true;
     if (pthread_create(&watcher_thread, NULL, watcher_thread_func, NULL) != 0) {
-        LOG_error("PLAT_audioDeviceWatchRegister: failed to create thread\n");
-        inotify_rm_watch(inotify_fd, dir_watch_fd);
-        close(inotify_fd);
-        inotify_fd = -1;
-        dir_watch_fd = -1;
-        running = 0;
+        running = false; callback_fn = NULL; inotify_rm_watch(inotify_fd, dir_watch_fd); close(inotify_fd); inotify_fd = dir_watch_fd = -1;
+        pthread_mutex_unlock(&watcher_state_mtx); LOG_error("PLAT_audioDeviceWatchRegister: failed to create thread\n"); return;
     }
+    watcher_started = true;
+    pthread_mutex_unlock(&watcher_state_mtx);
 }
 
 void PLAT_audioDeviceWatchUnregister(void) {
-    if (!running) return;
+    pthread_mutex_lock(&watcher_state_mtx);
+    if (!watcher_started) { pthread_mutex_unlock(&watcher_state_mtx); return; }
+    running = false;
+    pthread_mutex_unlock(&watcher_state_mtx);
 
-    running = 0;
     pthread_join(watcher_thread, NULL);
 
-    if (file_watch_fd >= 0)
-        inotify_rm_watch(inotify_fd, file_watch_fd);
-    if (dir_watch_fd >= 0)
-        inotify_rm_watch(inotify_fd, dir_watch_fd);
-    if (inotify_fd >= 0)
-        close(inotify_fd);
-
-    inotify_fd = -1;
-    dir_watch_fd = -1;
-    file_watch_fd = -1;
+    pthread_mutex_lock(&watcher_state_mtx);
+    int fd = inotify_fd;
+    if (fd >= 0) {
+        if (file_watch_fd >= 0) inotify_rm_watch(fd, file_watch_fd);
+        if (dir_watch_fd >= 0) inotify_rm_watch(fd, dir_watch_fd);
+    }
+    inotify_fd = file_watch_fd = dir_watch_fd = -1;
     callback_fn = NULL;
+    watcher_started = false;
+    pthread_mutex_unlock(&watcher_state_mtx);
+    if (fd >= 0) close(fd);
 }

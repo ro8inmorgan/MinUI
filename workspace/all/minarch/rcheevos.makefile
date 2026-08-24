@@ -73,20 +73,17 @@ CFLAGS += -DRC_CLIENT_SUPPORTS_HASH
 CFLAGS += -fPIC
 
 PRODUCT = build/$(PLATFORM)/lib$(TARGET).a
+LOCK_STAMP=src/.locked-$(shell python3 ../../../../scripts/lock.py build rcheevos sha)
 
-# rcheevos version to use (can be overridden)
-RCHEEVOS_VERSION ?= 40d916de00fe757bab40fb4db41a7912193a48e3
+.PHONY: build clean install clone LOCK_FORCE
+LOCK_FORCE:
 
-.PHONY: build clean install clone
+clone: $(LOCK_STAMP)
 
-# Clone rcheevos source if not present
-clone:
-	@if [ ! -f "src/include/rc_client.h" ]; then \
-		echo "Cloning rcheevos..."; \
-		rm -rf src; \
-		git clone https://github.com/RetroAchievements/rcheevos.git src; \
-		cd src && git checkout $(RCHEEVOS_VERSION); \
-	fi
+$(LOCK_STAMP): ../../../../dependencies.lock.json LOCK_FORCE
+	python3 ../../../../scripts/checkout_locked.py build rcheevos src
+	rm -f src/.locked-*
+	touch $@
 
 # Build target: first clone, then compile (recursive make ensures sources exist)
 build: clone

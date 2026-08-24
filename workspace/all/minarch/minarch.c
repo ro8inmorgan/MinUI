@@ -5,6 +5,7 @@
 
 #include "notification.h"
 #include "ra_integration.h"
+#include "path_helpers.h"
 
 #include "ma_internal.h"
 #include "ma_cheats.h"
@@ -136,15 +137,14 @@ int main(int argc , char* argv[]) {
 	//else 
 	//	LOG_info("asoundrc does not exist at %s\n", asoundpath);
 
-	if(argc < 2)
+	char core_path[MAX_PATH];
+	char rom_path[MAX_PATH];
+	char tag_name[MAX_PATH];
+	if (!path_arguments_fit(argc, argv, sizeof(core_path)))
 		return EXIT_FAILURE;
 
 	PWR_setCPUSpeed(CPU_SPEED_PERFORMANCE); // start in performance mode for fast loading
 	PWR_pinToCores(CPU_CORE_PERFORMANCE); // thread affinity
-
-	char core_path[MAX_PATH];
-	char rom_path[MAX_PATH];
-	char tag_name[MAX_PATH];
 
 	strcpy(core_path, argv[1]);
 	strcpy(rom_path, argv[2]);

@@ -7,9 +7,9 @@ MODE="$1"
 [ -z "$MODE" ] && MODE="auto"
 
 set_policy() {
-	local policy_path="$1"
-	local governor="$2"
-	local max_type="$3"  # "second_max", "max", or "mid"
+	policy_path="$1"
+	governor="$2"
+	max_type="$3"  # "second_max", "max", or "mid"
 	
 	[ -f "$policy_path/scaling_available_frequencies" ] || return 0
 	FREQS=$(cat "$policy_path/scaling_available_frequencies" | tr ' ' '\n' | grep -v '^$' | sort -n)

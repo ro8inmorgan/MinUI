@@ -241,7 +241,7 @@ void PLAT_setCurrentTimezone(const char* tz) {
 	strcpy(connection_info->ssid, "Network1");
 	return 0;
  }
- bool PLAT_wifiHasCredentials(char *ssid, WifiSecurityType sec) { return false; }
+ bool PLAT_wifiHasCredentials(const char *ssid, WifiSecurityType sec) { return false; }
  void PLAT_wifiForget(char *ssid, WifiSecurityType sec) {}
  void PLAT_wifiConnect(char *ssid, WifiSecurityType sec) {}
  void PLAT_wifiConnectPass(const char *ssid, WifiSecurityType sec, const char* pass) {}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include "menu.hpp"
 
 // based on https://github.com/josegonzalez/minui-keyboard/blob/main/minui-keyboard.c
@@ -45,6 +46,8 @@ struct KeyboardState
     int col;                  // the current keyboard column
     int layout;               // the current keyboard layout
     std::string current_text; // the text to display in the keyboard
+    bool secure_entry;         // mask sensitive input unless explicitly revealed
+    bool reveal;               // deliberate temporary reveal
     std::string initial_text; // the initial value of the text on keyboard entry
     std::string final_text;   // the final value of the text on keyboard exit
     std::string title;        // the title of the keyboard
@@ -66,7 +69,7 @@ class KeyboardPrompt : public MenuList
     AppState state{};
 
 public:
-    KeyboardPrompt(const std::string &title, MenuListCallback on_confirm = nullptr);
+    KeyboardPrompt(const std::string &title, MenuListCallback on_confirm = nullptr, bool secure_entry = false);
     ~KeyboardPrompt();
 
     void drawCustom(SDL_Surface *surface, const SDL_Rect &dst, const SDL_Rect &dstTitle) override;
@@ -80,7 +83,18 @@ public:
         state.exit_code = ExitCode::Uninitialized;
         state.keyboard.initial_text = text;
         state.keyboard.current_text = text;
+        state.keyboard.reveal = false;
         state.redraw = true;
+    }
+
+    void clearSensitiveText() {
+        if (!state.keyboard.secure_entry) return;
+        std::fill(state.keyboard.current_text.begin(), state.keyboard.current_text.end(), '\0');
+        std::fill(state.keyboard.initial_text.begin(), state.keyboard.initial_text.end(), '\0');
+        std::fill(state.keyboard.final_text.begin(), state.keyboard.final_text.end(), '\0');
+        state.keyboard.current_text.clear();
+        state.keyboard.initial_text.clear();
+        state.keyboard.final_text.clear();
     }
 
 private:

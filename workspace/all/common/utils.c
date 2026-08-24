@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include "defines.h"
 #include "utils.h"
+#include "path_helpers.h"
 
 ///////////////////////////////////////
 
@@ -26,7 +27,7 @@ int suffixMatch(char* suf, const char* str) {
 }
 int exactMatch(const char* str1, const char* str2) {
 	if (!str1 || !str2) return 0; // NULL isn't safe here
-	int len1 = strlen(str1);
+	size_t len1 = strlen(str1);
 	if (len1!=strlen(str2)) return 0;
 	return (strncmp(str1,str2,len1)==0);
 }
@@ -93,8 +94,8 @@ char *replaceString2(const char *orig, char *rep, char *with)
 
     // count the number of replacements needed
     ins = orig;
-    for (count = 0; (tmp = strstr(ins, rep)); ++count)
-        ins = tmp + len_rep;
+    for (count = 0; (ins = strstr(ins, rep)); ++count)
+        ins += len_rep;
 
     char *result =
         (char *)malloc(strlen(orig) + (len_with - len_rep) * count + 1);
@@ -165,7 +166,8 @@ size_t trimString(char *out, size_t len, const char *str, bool first)
 
     // Set output size to minimum of trimmed string length and buffer size minus
     // 1
-    out_size = (end - str) < len - 1 ? (end - str) : len - 1;
+    size_t trimmed_size = (size_t)(end - str);
+    out_size = trimmed_size < len - 1 ? trimmed_size : len - 1;
 
     // Copy trimmed string and add null terminator
     memcpy(out, str, out_size);
@@ -218,7 +220,8 @@ void serializeTime(char *dest_str, int nTime)
 }
 int countChar(const char *str, char ch)
 {
-    int i, count = 0;
+    size_t i;
+    int count = 0;
     for (i = 0; i <= strlen(str); i++) {
         if (str[i] == ch) {
             count++;
@@ -228,34 +231,24 @@ int countChar(const char *str, char ch)
 }
 char *removeExtension(const char *myStr)
 {
-    if (myStr == NULL)
-        return NULL;
-    char *retStr = (char *)malloc(strlen(myStr) + 1);
-    char *lastExt;
-    if (retStr == NULL)
-        return NULL;
-    strcpy(retStr, myStr);
-    if ((lastExt = strrchr(retStr, '.')) != NULL && *(lastExt + 1) != ' ' && *(lastExt + 2) != '\0')
-        *lastExt = '\0';
-    return retStr;
+    return nextui_path_remove_extension(myStr);
 }
 const char *baseName(const char *filename)
 {
-    char *p = strrchr(filename, '/');
-    return p ? p + 1 : (char *)filename;
+    const char *p = strrchr(filename, '/');
+    return p ? p + 1 : filename;
 }
-void folderPath(const char *path, char *result) {
-    char pathCopy[256];  
-    strcpy(pathCopy, path);
+int folderPathSafe(const char *path, char *result, size_t result_size) {
+    if (!path || !result || !result_size) return -1;
+    const char *slash = strrchr(path, '/');
+    size_t length = slash ? (size_t)(slash - path) : 0;
+    if (length >= result_size) { result[0] = '\0'; return -1; }
+    memcpy(result, path, length);
+    result[length] = '\0';
+    return 0;
+}
 
-    char *lastSlash = strrchr(pathCopy, '/');  // Find the last slash
-    if (lastSlash != NULL) {
-        *lastSlash = '\0';  // Cut off the filename
-        strcpy(result, pathCopy);  // Copy the remaining path
-    } else {
-        strcpy(result, "");  // No folder found
-    }
-}
+void folderPath(const char *path, char *result) { folderPathSafe(path, result, MAX_PATH); }
 void cleanName(char *name_out, const char *file_name)
 {
     char *name_without_ext = removeExtension(file_name);
@@ -280,108 +273,93 @@ void cleanName(char *name_out, const char *file_name)
     free(name_without_ext);
     free(no_underscores);
 }
-bool pathRelativeTo(char *path_out, const char *dir_from, const char *file_to)
+int pathRelativeToSafe(char *path_out, size_t path_out_size, const char *dir_from, const char *file_to)
 {
+    char *abs_from;
+    char *abs_to;
+    char *p1;
+    char *p2;
+    size_t parents;
+    size_t suffix_length;
+
+    if (!path_out || !path_out_size) return -1;
     path_out[0] = '\0';
-
-    char abs_from[MAX_PATH];
-    char abs_to[MAX_PATH];
-    if (realpath(dir_from, abs_from) == NULL || realpath(file_to, abs_to) == NULL) {
-        return false;
+    abs_from = realpath(dir_from, NULL);
+    abs_to = realpath(file_to, NULL);
+    if (!abs_from || !abs_to) {
+        free(abs_from);
+        free(abs_to);
+        return -1;
     }
 
-    char *p1 = abs_from;
-    char *p2 = abs_to;
-    while (*p1 && (*p1 == *p2)) {
-        ++p1, ++p2;
+    p1 = abs_from;
+    p2 = abs_to;
+    while (*p1 && *p1 == *p2) ++p1, ++p2;
+    if ((*p1 || *p2) && *p2 != '/') {
+        while (p1 > abs_from && p1[-1] != '/') --p1, --p2;
     }
-
-    if (*p2 == '/') {
-        ++p2;
+    if (*p2 == '/') ++p2;
+    parents = *p1 ? (size_t)countChar(p1, '/') + 1 : 0;
+    suffix_length = strlen(p2);
+    if (parents > (SIZE_MAX - suffix_length) / 3 || parents * 3 + suffix_length >= path_out_size) {
+        free(abs_from);
+        free(abs_to);
+        return -1;
     }
-
-    if (strlen(p1) > 0) {
-        int num_parens = countChar(p1, '/') + 1;
-        for (int i = 0; i < num_parens; i++) {
-            strcat(path_out, "../");
-        }
-    }
-    strcat(path_out, p2);
-
-    return true;
+    char *out = path_out;
+    for (size_t i = 0; i < parents; i++) { memcpy(out, "../", 3); out += 3; }
+    memcpy(out, p2, suffix_length + 1);
+    free(abs_from);
+    free(abs_to);
+    return 0;
 }
 
-void getDisplayName(const char* in_name, char* out_name) {
-	char* tmp;
-	char work_name[256];
-	strcpy(work_name, in_name);
-	strcpy(out_name, in_name);
-	
-	if (suffixMatch("/" PLATFORM, work_name)) { // hide platform from Tools path...
-		tmp = strrchr(work_name, '/');
-		tmp[0] = '\0';
-	}
-	
-	// extract just the filename if necessary
-	tmp = strrchr(work_name, '/');
-	if (tmp) strcpy(out_name, tmp+1);
-	
-	// remove extension(s), eg. .p8.png
-	while ((tmp = strrchr(out_name, '.'))!=NULL) {
-		int len = strlen(tmp);
-		if (len>2 && len<=5) tmp[0] = '\0'; // 1-4 letter extension plus dot (was 1-3, extended for .doom files)
-		else break;
-	}
-	
-	// remove trailing parens (round and square)
-	strcpy(work_name, out_name);
-	while ((tmp=strrchr(out_name, '('))!=NULL || (tmp=strrchr(out_name, '['))!=NULL) {
-		if (tmp==out_name) break;
-		tmp[0] = '\0';
-		tmp = out_name;
-	}
-	
-	// make sure we haven't nuked the entire name
-	if (out_name[0]=='\0') strcpy(out_name, work_name);
-	
-	// remove trailing whitespace
-	tmp = out_name + strlen(out_name) - 1;
-    while(tmp>out_name && isspace((unsigned char)*tmp)) tmp--;
-    tmp[1] = '\0';
+bool pathRelativeTo(char *path_out, const char *dir_from, const char *file_to) {
+    return pathRelativeToSafe(path_out, MAX_PATH, dir_from, file_to) == 0;
 }
-void getEmuName(const char* in_name, char* out_name) { // NOTE: both char arrays need to be MAX_PATH length!
-	char* tmp;
-	strcpy(out_name, in_name);
-	tmp = out_name;
-	
-	// printf("--------\n  in_name: %s\n",in_name); fflush(stdout);
-	
-	// extract just the Roms folder name if necessary
-	if (prefixMatch(ROMS_PATH, tmp)) {
-		tmp += strlen(ROMS_PATH) + 1;
-		char* tmp2 = strchr(tmp, '/');
-		if (tmp2) tmp2[0] = '\0';
-		// printf("    tmp1: %s\n", tmp);
-		memmove(out_name, tmp, strlen(tmp) + 1);
-		tmp = out_name;
-	}
 
-	// finally extract pak name from parenths if present
-	tmp = strrchr(tmp, '(');
-	if (tmp) {
-		tmp += 1;
-		// printf("    tmp2: %s\n", tmp);
-		memmove(out_name, tmp, strlen(tmp) + 1);
-		tmp = strchr(out_name,')');
-		tmp[0] = '\0';
-	}
-	
-	// printf(" out_name: %s\n", out_name); fflush(stdout);
+int getDisplayNameSafe(const char* in_name, char* out_name, size_t out_name_size) {
+    char work_name[MAX_PATH], original[MAX_PATH];
+    if (!out_name || !out_name_size) return -1;
+    out_name[0] = '\0';
+    if (path_copy(work_name, sizeof(work_name), in_name) != 0) return -1;
+    if (suffixMatch("/" PLATFORM, work_name)) {
+        char *slash = strrchr(work_name, '/');
+        if (slash) *slash = '\0';
+    }
+    const char *name = strrchr(work_name, '/');
+    if (path_copy(original, sizeof(original), name ? name + 1 : work_name) != 0) return -1;
+    char *tmp;
+    while ((tmp = strrchr(original, '.')) != NULL) {
+        size_t length = strlen(tmp);
+        if (length <= 2 || length > 5) break;
+        *tmp = '\0';
+    }
+    while ((tmp = strrchr(original, '(')) != NULL || (tmp = strrchr(original, '[')) != NULL) {
+        if (tmp == original) break;
+        *tmp = '\0';
+    }
+    if (!original[0] && path_copy(original, sizeof(original), name ? name + 1 : work_name) != 0) return -1;
+    size_t length = strlen(original);
+    while (length && isspace((unsigned char)original[length - 1])) original[--length] = '\0';
+    return path_copy(out_name, out_name_size, original);
+}
+
+void getDisplayName(const char* in_name, char* out_name) { getDisplayNameSafe(in_name, out_name, MAX_PATH); }
+int getEmuNameSafe(const char* in_name, char* out_name, size_t out_size) {
+	return path_get_emu_name(out_name, out_size, in_name, ROMS_PATH);
+}
+void getEmuName(const char* in_name, char* out_name) { // NOTE: output must be MAX_PATH bytes
+	getEmuNameSafe(in_name, out_name, MAX_PATH);
+}
+int getEmuPathSafe(const char* emu_name, char* pak_path, size_t pak_path_size) {
+	if (path_format(pak_path, pak_path_size, "%s/Emus/%s/%s.pak/launch.sh", SDCARD_PATH, PLATFORM, emu_name) != 0)
+		return -1;
+	if (exists(pak_path)) return 0;
+	return path_format(pak_path, pak_path_size, "%s/Emus/%s.pak/launch.sh", PAKS_PATH, emu_name);
 }
 void getEmuPath(char* emu_name, char* pak_path) {
-	sprintf(pak_path, "%s/Emus/%s/%s.pak/launch.sh", SDCARD_PATH, PLATFORM, emu_name);
-	if (exists(pak_path)) return;
-	sprintf(pak_path, "%s/Emus/%s.pak/launch.sh", PAKS_PATH, emu_name);
+	getEmuPathSafe(emu_name, pak_path, MAX_PATH);
 }
 
 void normalizeNewline(char* line) {
@@ -466,8 +444,9 @@ char* allocFile(char* path) { // caller must free!
 }
 int getInt(char* path) {
 	int i = 0;
-    if(path == NULL)
+    if (path == NULL) {
         return i;
+    }
     
 	FILE *file = fopen(path, "r");
 	if (file!=NULL) {

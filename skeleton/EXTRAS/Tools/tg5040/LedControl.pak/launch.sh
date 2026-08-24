@@ -1,5 +1,5 @@
 #!/bin/sh
-cd $(dirname "$0")
+cd "$(dirname "$0")" || exit 1
 # chmod a+w /sys/class/led_anim/* >> launch.log
 
 # remove original leddaemon
@@ -10,7 +10,7 @@ if [ -f /etc/init.d/lcservice ]; then
     rm /etc/init.d/lcservice 2> /dev/null
 fi
 
-cd $(dirname "$0")
+cd "$(dirname "$0")" || exit 1
 
 TARGET_PATH="/mnt/SDCARD/.userdata/shared/ledsettings.txt"
 if [ ! -f "$TARGET_PATH" ]; then

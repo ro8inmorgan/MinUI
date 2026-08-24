@@ -27,7 +27,7 @@ start_hci_attach() {
 	do
 		[ -d /sys/class/bluetooth/hci0 ] && break
 		usleep 100000
-		let wait_hci0_count++
+		wait_hci0_count=$((wait_hci0_count + 1))
 		[ $wait_hci0_count -eq 70 ] && {
 			echo "bring up hci0 failed"
 			exit 1
@@ -88,9 +88,9 @@ ble_start() {
 	}
 
 	MAC_STR=`hciconfig | grep "BD Address" | awk '{print $3}'`
-	LE_MAC=${MAC_STR/2/C}
+	LE_MAC=$(printf '%s\n' "$MAC_STR" | sed 's/2/C/')
 	OLD_LE_MAC_T=`cat /sys/kernel/debug/bluetooth/hci0/random_address`
-	OLD_LE_MAC=$(echo $OLD_LE_MAC_T | tr [a-z] [A-Z])
+	OLD_LE_MAC=$(printf '%s\n' "$OLD_LE_MAC_T" | tr '[:lower:]' '[:upper:]')
 	if [ -n "$LE_MAC" ];then
 		if [ "$LE_MAC" != "$OLD_LE_MAC" ];then
 			hciconfig hci0 lerandaddr $LE_MAC

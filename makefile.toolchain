@@ -6,12 +6,15 @@ ifeq (,$(PLATFORM))
 $(error please specify PLATFORM, eg. make PLATFORM=trimui)
 endif
 
-HOST_WORKSPACE=$(shell pwd)/workspace
-GUEST_WORKSPACE=/root/workspace
+HOST_ROOT=$(shell pwd)
+GUEST_ROOT=/root/nextui
+HOST_WORKSPACE=$(HOST_ROOT)/workspace
+GUEST_WORKSPACE=$(GUEST_ROOT)/workspace
+TOOLCHAIN_SHA=$(shell python3 scripts/lock.py build $(PLATFORM)-toolchain sha)
 
-GIT_IF_NECESSARY=toolchains/$(PLATFORM)-toolchain
+GIT_IF_NECESSARY=toolchains/$(PLATFORM)-toolchain/.locked-$(TOOLCHAIN_SHA)
 INIT_IF_NECESSARY=toolchains/$(PLATFORM)-toolchain/.build
-IMAGE_NAME=ghcr.io/loveretro/$(PLATFORM)-toolchain:latest
+IMAGE_NAME=$(shell python3 scripts/lock.py toolchain $(PLATFORM))
 
 CONTAINER_RUNTIME ?= $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
 ifeq (,$(CONTAINER_RUNTIME))
@@ -28,14 +31,18 @@ LAST_RUNTIME := $(shell cat $(RUNTIME_MARKER) 2>/dev/null)
 CURRENT_RUNTIME := $(notdir $(CONTAINER_RUNTIME))
 
 all: $(INIT_IF_NECESSARY)
-	$(CONTAINER_RUNTIME) run -it --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_WORKSPACE):$(GUEST_WORKSPACE) $(IMAGE_NAME) /bin/bash
+	$(CONTAINER_RUNTIME) run -it --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_ROOT):$(GUEST_ROOT) $(IMAGE_NAME) /bin/bash
 
 $(INIT_IF_NECESSARY): $(GIT_IF_NECESSARY)
 	cd toolchains/$(PLATFORM)-toolchain && make .build
 
-$(GIT_IF_NECESSARY):
-	mkdir -p toolchains
-	git clone https://github.com/LoveRetro/$(PLATFORM)-toolchain/ toolchains/$(PLATFORM)-toolchain
+.PHONY: FORCE
+FORCE:
+
+$(GIT_IF_NECESSARY): dependencies.lock.json FORCE
+	python3 scripts/checkout_locked.py build $(PLATFORM)-toolchain toolchains/$(PLATFORM)-toolchain
+	rm -f toolchains/$(PLATFORM)-toolchain/.locked-*
+	touch $@
 	$(CONTAINER_RUNTIME) pull $(IMAGE_NAME) && touch toolchains/$(PLATFORM)-toolchain/.build
 
 clean:
@@ -46,7 +53,7 @@ _runtime_check:
 		echo "Container runtime changed ($(LAST_RUNTIME) -> $(CURRENT_RUNTIME)), cleaning workspace build artifacts..."; \
 		PREV=$$(command -v $(LAST_RUNTIME) 2>/dev/null); \
 		if [ -n "$$PREV" ]; then \
-			$$PREV run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_WORKSPACE):$(GUEST_WORKSPACE) $(IMAGE_NAME) /bin/bash -c \
+			$$PREV run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_ROOT):$(GUEST_ROOT) $(IMAGE_NAME) /bin/bash -c \
 				'find $(GUEST_WORKSPACE) -depth -user root -delete 2>/dev/null; true'; \
 		else \
 			echo "Error: previous runtime $(LAST_RUNTIME) not available to clean root-owned artifacts."; \
@@ -56,16 +63,16 @@ _runtime_check:
 	fi
 
 build: $(INIT_IF_NECESSARY) _runtime_check
-	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_WORKSPACE):$(GUEST_WORKSPACE) -e COMPILE_CORES=$(COMPILE_CORES) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd /root/workspace && make'
+	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_ROOT):$(GUEST_ROOT) -e COMPILE_CORES=$(COMPILE_CORES) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd $(GUEST_WORKSPACE) && make'
 	@echo "$(CURRENT_RUNTIME)" > $(RUNTIME_MARKER)
 
 build-cores: $(INIT_IF_NECESSARY) _runtime_check
-	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_WORKSPACE):$(GUEST_WORKSPACE) -e COMPILE_CORES=$(COMPILE_CORES) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd /root/workspace && make cores'
+	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_ROOT):$(GUEST_ROOT) -e COMPILE_CORES=$(COMPILE_CORES) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd $(GUEST_WORKSPACE) && make cores'
 	@echo "$(CURRENT_RUNTIME)" > $(RUNTIME_MARKER)
 
 build-core: $(INIT_IF_NECESSARY) _runtime_check
 ifndef CORE
 	$(error CORE is not set)
 endif
-	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_WORKSPACE):$(GUEST_WORKSPACE) -e COMPILE_CORES=$(COMPILE_CORES) -e CORE=$(CORE) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd /root/workspace && make core'
+	$(CONTAINER_RUNTIME) run --rm $(CONTAINER_MOUNT_OPTS) -v $(HOST_ROOT):$(GUEST_ROOT) -e COMPILE_CORES=$(COMPILE_CORES) -e CORE=$(CORE) $(IMAGE_NAME) /bin/bash -c '. ~/.bashrc && cd $(GUEST_WORKSPACE) && make core'
 	@echo "$(CURRENT_RUNTIME)" > $(RUNTIME_MARKER)

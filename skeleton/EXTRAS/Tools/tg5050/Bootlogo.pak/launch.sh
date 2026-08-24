@@ -1,4 +1,4 @@
 #!/bin/sh
 
-cd $(dirname "$0")
-./bootlogo.elf # &> ./log.txt
+cd "$(dirname "$0")" || exit 1
+./bootlogo.elf # output is intentionally not redirected

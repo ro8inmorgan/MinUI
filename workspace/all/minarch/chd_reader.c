@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <limits.h>
 
 #include <libchdr/chd.h>
 #include <libchdr/cdrom.h>
@@ -112,6 +113,7 @@ static int parse_chd_tracks(chd_file* chd, chd_track_info_t* tracks, int* num_tr
             }
         }
         
+        if (metadata_size >= sizeof(metadata)) continue;
         metadata[metadata_size] = '\0';
         
         // Parse the metadata string
@@ -122,17 +124,19 @@ static int parse_chd_tracks(chd_file* chd, chd_track_info_t* tracks, int* num_tr
         char pgsub_str[32] = {0};
         
         // Full format 2: "TRACK:%d TYPE:%s SUBTYPE:%s FRAMES:%d PREGAP:%d PGTYPE:%s PGSUB:%s POSTGAP:%d"
-        int parsed = sscanf(metadata, "TRACK:%d TYPE:%s SUBTYPE:%s FRAMES:%d PREGAP:%d PGTYPE:%s PGSUB:%s POSTGAP:%d",
+        int parsed = sscanf(metadata, "TRACK:%d TYPE:%31s SUBTYPE:%31s FRAMES:%d PREGAP:%d PGTYPE:%31s PGSUB:%31s POSTGAP:%d",
                            &track_num, type_str, subtype_str, &frames, &pregap, pgtype_str, pgsub_str, &postgap);
         
         if (parsed < 4) {
             // Try format 1 (no pregap info)
-            parsed = sscanf(metadata, "TRACK:%d TYPE:%s SUBTYPE:%s FRAMES:%d",
+            parsed = sscanf(metadata, "TRACK:%d TYPE:%31s SUBTYPE:%31s FRAMES:%d",
                            &track_num, type_str, subtype_str, &frames);
             pregap = 0;
         }
         
-        if (parsed >= 4) {
+        if (parsed >= 4 && track_num > 0 && track_num <= CD_MAX_TRACKS &&
+            frames > 0 && frames <= INT_MAX - 3 && pregap >= 0 && postgap >= 0 &&
+            cumulative_frames <= INT_MAX - (((frames + 3) & ~3))) {
             tracks[track_idx].type = parse_track_type(type_str);
             tracks[track_idx].frames = frames;
             tracks[track_idx].pregap_frames = pregap;
@@ -309,6 +313,11 @@ void* chd_open_track_iterator(const char* path, uint32_t track, const void* iter
     // CD frames are typically 2448 bytes (2352 sector + 96 subcode) or 2352 bytes
     // Check unit bytes if available, otherwise assume CD_FRAME_SIZE
     handle->frame_size = header->unitbytes ? header->unitbytes : CD_FRAME_SIZE;
+    if (!handle->hunk_bytes || !handle->frame_size || handle->hunk_bytes < handle->frame_size) {
+        chd_close(chd);
+        free(handle);
+        return NULL;
+    }
     handle->frames_per_hunk = handle->hunk_bytes / handle->frame_size;
     
     // Allocate hunk buffer
@@ -354,6 +363,9 @@ size_t chd_read_sector(void* track_handle, uint32_t sector, void* buffer, size_t
     if (!handle || !handle->chd)
         return 0;
     
+    if (sector >= (uint32_t)handle->track_frames || !handle->frames_per_hunk)
+        return 0;
+
     // Convert relative sector number to CHD frame number
     // rcheevos calls: read_sector(first_track_sector() + offset)
     // Since first_track_sector() returns 0, sector IS the relative offset
@@ -363,17 +375,18 @@ size_t chd_read_sector(void* track_handle, uint32_t sector, void* buffer, size_t
     // Even if PGTYPE='V' (virtual/silence), the frames are still allocated.
     // The FRAMES metadata field is the actual data frames AFTER pregap.
     // So we must always skip over pregap frames to reach the actual data.
-    uint32_t frame = handle->track_start_frame + sector;
+    uint64_t frame = (uint32_t)handle->track_start_frame + sector;
     
     // Always skip pregap for data tracks - the pregap frames are allocated
     // in the CHD regardless of whether they contain real data or silence.
     if (is_data_track(handle->track_type) && handle->track_pregap > 0) {
-        frame += handle->track_pregap;
+        frame += (uint32_t)handle->track_pregap;
     }
+    if (frame > UINT32_MAX) return 0;
     
     // Calculate which hunk contains this frame
-    uint32_t hunk_num = frame / handle->frames_per_hunk;
-    uint32_t frame_in_hunk = frame % handle->frames_per_hunk;
+    uint32_t hunk_num = (uint32_t)frame / handle->frames_per_hunk;
+    uint32_t frame_in_hunk = (uint32_t)frame % handle->frames_per_hunk;
     
     // Read hunk if not cached
     if (hunk_num != handle->cached_hunk) {
@@ -385,7 +398,8 @@ size_t chd_read_sector(void* track_handle, uint32_t sector, void* buffer, size_t
     }
     
     // Calculate offset into hunk
-    uint32_t offset = frame_in_hunk * handle->frame_size;
+    uint64_t offset = (uint64_t)frame_in_hunk * handle->frame_size;
+    if (offset + handle->frame_size > handle->hunk_bytes) return 0;
     uint8_t* src = handle->hunk_buffer + offset;
     
     // Use pre-calculated sector format from track type
@@ -423,6 +437,8 @@ size_t chd_read_sector(void* track_handle, uint32_t sector, void* buffer, size_t
     }
     
     // Copy the data
+    if (!buffer || header_skip > handle->frame_size || data_size > handle->frame_size - header_skip)
+        return 0;
     size_t to_copy = requested_bytes;
     if (to_copy > data_size)
         to_copy = data_size;

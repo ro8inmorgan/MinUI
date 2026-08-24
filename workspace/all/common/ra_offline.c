@@ -719,17 +719,23 @@ static int ledger_writer_thread(void* userdata) {
 /**
  * Start the ledger background writer thread.
  */
-static void ledger_writer_start(void) {
+static bool ledger_writer_start(void) {
 	LedgerWriteQueue* wq = &ra_ledger_wq;
 	memset(wq, 0, sizeof(*wq));
-	wq->mutex         = SDL_CreateMutex();
+	wq->mutex = SDL_CreateMutex();
 	wq->cond_nonempty = SDL_CreateCond();
-	wq->cond_empty    = SDL_CreateCond();
-	wq->running       = true;
-	wq->thread        = SDL_CreateThread(ledger_writer_thread, "ra_ledger_writer", NULL);
-	if (!wq->thread) {
-		RA_LOG_ERROR("Failed to create ledger writer thread: %s\n", SDL_GetError());
-	}
+	wq->cond_empty = SDL_CreateCond();
+	if (!wq->mutex || !wq->cond_nonempty || !wq->cond_empty) goto failed;
+	wq->running = true;
+	wq->thread = SDL_CreateThread(ledger_writer_thread, "ra_ledger_writer", NULL);
+	if (wq->thread) return true;
+	RA_LOG_ERROR("Failed to create ledger writer thread: %s\n", SDL_GetError());
+failed:
+	if (wq->cond_empty) SDL_DestroyCond(wq->cond_empty);
+	if (wq->cond_nonempty) SDL_DestroyCond(wq->cond_nonempty);
+	if (wq->mutex) SDL_DestroyMutex(wq->mutex);
+	memset(wq, 0, sizeof(*wq));
+	return false;
 }
 
 /**
@@ -1297,20 +1303,15 @@ void RA_Offline_init(const char* data_dir) {
 	/* Validate and load ledger */
 	ledger_validate_and_load();
 
-	/* Create ledger mutex for thread-safe access */
+	/* Create synchronization before publishing the subsystem as initialized. */
 	ra_ledger_mutex = SDL_CreateMutex();
-	if (!ra_ledger_mutex) {
-		RA_LOG_ERROR("Failed to create ledger mutex: %s\n", SDL_GetError());
-	}
-
-	/* Create cache mutex for serializing cache file read-modify-write */
 	ra_cache_mutex = SDL_CreateMutex();
-	if (!ra_cache_mutex) {
-		RA_LOG_ERROR("Failed to create cache mutex: %s\n", SDL_GetError());
+	if (!ra_ledger_mutex || !ra_cache_mutex || !ledger_writer_start()) {
+		RA_LOG_ERROR("Offline ledger initialization failed: %s\n", SDL_GetError());
+		if (ra_ledger_mutex) { SDL_DestroyMutex(ra_ledger_mutex); ra_ledger_mutex = NULL; }
+		if (ra_cache_mutex) { SDL_DestroyMutex(ra_cache_mutex); ra_cache_mutex = NULL; }
+		return;
 	}
-
-	/* Start the background ledger writer thread */
-	ledger_writer_start();
 
 	SDL_AtomicSet(&ra_offline_initialized, 1);
 	RA_LOG_INFO("Initialized (cache: %s, ledger: %s)\n", ra_cache_dir, ra_ledger_path);

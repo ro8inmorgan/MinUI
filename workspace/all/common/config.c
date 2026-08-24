@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "defines.h"
 #include "utils.h"
 
@@ -1153,7 +1155,7 @@ void CFG_setRAPassword(const char* password)
     } else {
         settings.raPassword[0] = '\0';
     }
-    CFG_sync();
+    // Passwords are session-only; successful token authentication persists the token instead.
 }
 
 bool CFG_getRAHardcoreMode(void)
@@ -1589,10 +1591,24 @@ void CFG_sync(void)
     }
 
     snprintf(settingsPath, sizeof(settingsPath), "%s/minuisettings.txt", shared_userdata);
-    FILE *file = fopen(settingsPath, "w");
+    int fd = open(settingsPath, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd < 0 || fchmod(fd, S_IRUSR | S_IWUSR) != 0)
+    {
+        if (fd >= 0) close(fd);
+        printf("[CFG] Unable to open settings file, can't write\n");
+        return;
+    }
+    if (ftruncate(fd, 0) != 0)
+    {
+        close(fd);
+        printf("[CFG] Unable to open settings file, can't write\n");
+        return;
+    }
+    FILE *file = fdopen(fd, "w");
     if (file == NULL)
     {
-        printf("[CFG] Unable to open settings file, cant write\n");
+        close(fd);
+        printf("[CFG] Unable to open settings file, can't write\n");
         return;
     }
 
@@ -1654,7 +1670,6 @@ void CFG_sync(void)
     fprintf(file, "notifyDuration=%i\n", settings.notifyDuration);
     fprintf(file, "raEnable=%i\n", settings.raEnable);
     fprintf(file, "raUsername=%s\n", settings.raUsername);
-    fprintf(file, "raPassword=%s\n", settings.raPassword);
     fprintf(file, "raHardcoreMode=%i\n", settings.raHardcoreMode);
     fprintf(file, "raToken=%s\n", settings.raToken);
     fprintf(file, "raServerUsername=%s\n", settings.raServerUsername);

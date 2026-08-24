@@ -1,5 +1,5 @@
 #!/bin/sh
-cd $(dirname "$0")
+cd "$(dirname "$0")" || exit 1
 # chmod a+w /sys/class/led_anim/* >> launch.log
 
 TARGET_PATH="/mnt/SDCARD/.userdata/shared/ledsettings.txt"

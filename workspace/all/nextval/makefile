@@ -20,7 +20,7 @@ include ../../$(PLATFORM)/platform/makefile.env
 
 TARGET = nextval
 INCDIR = -I. -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = $(TARGET).c ../common/utils.c ../common/config.c
+SOURCE = $(TARGET).c ../common/utils.c ../common/path_helpers.c ../common/config.c
 
 CC = $(CROSS_COMPILE)gcc
 CFLAGS  += $(OPT)

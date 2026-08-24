@@ -26,7 +26,7 @@ start_hci_attach() {
 	do
 		[ -d /sys/class/bluetooth/hci0 ] && break
 		usleep 100000
-		let wait_hci0_count++
+		wait_hci0_count=$((wait_hci0_count + 1))
 		[ $wait_hci0_count -eq 70 ] && {
 			echo "bring up hci0 failed"
 			exit 1

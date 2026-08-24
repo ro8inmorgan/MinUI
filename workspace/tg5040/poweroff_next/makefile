@@ -20,7 +20,7 @@ include ../platform/makefile.env
 
 TARGET = poweroff_next
 INCDIR = -I. -I../../all/common -I../platform
-SOURCE = $(TARGET).c ../../all/common/utils.c ../../all/common/config.c
+SOURCE = $(TARGET).c ../../all/common/utils.c ../../all/common/path_helpers.c ../../all/common/config.c
 
 CC = $(CROSS_COMPILE)gcc
 # Override CFLAGS and LDFLAGS to not include SDL2 dependencies

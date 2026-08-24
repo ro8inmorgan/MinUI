@@ -1,22 +1,29 @@
 #pragma once
 
 #include "menu.hpp"
+#include <atomic>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 namespace Wifi
 {
     class Menu : public MenuList
     {
-        const int &globalQuit;
-        int &globalDirty;
-        // wifi on/off
-        MenuItem *toggleItem;
-        // diagnostics on/off
-        MenuItem *diagItem;
+        struct ScanSnapshot {
+            bool enabled = false;
+            WIFI_connection connection{};
+            std::vector<WIFI_network> networks;
+        };
 
+        MenuItem *toggleItem;
+        MenuItem *diagItem;
         std::thread worker;
-        bool quit = false;
+        std::atomic_bool quit{false};
         bool selectionDirty = false;
+        std::mutex snapshotMutex;
+        ScanSnapshot snapshot;
+        bool snapshotReady = false;
 
     public:
         Menu(const int &globalQuit, int &globalDirty);
@@ -33,6 +40,7 @@ namespace Wifi
         void setWifiDiagnosticsState(const std::any &on);
         void resetWifiDiagnosticsState();
 
+        void applySnapshot(int &dirty);
         void updater();
     };
 

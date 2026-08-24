@@ -810,7 +810,7 @@ int main(int argc, char *argv[])
         auto raPasswordPrompt = new KeyboardPrompt("Enter Password", [](AbstractMenuItem &item) -> InputReactionHint {
             CFG_setRAPassword(item.getName().c_str());
             return Exit;
-        });
+        }, true);
 
         auto retroAchievementsMenu = new MenuList(MenuItemType::Fixed, "RetroAchievements",
         {
@@ -856,6 +856,7 @@ int main(int argc, char *argv[])
                 if (result == RA_AUTH_SUCCESS) {
                     CFG_setRAToken(response.token);
                     CFG_setRAAuthenticated(true);
+                    CFG_setRAPassword("");
                     std::string desc = "Authenticated as " + std::string(response.display_name);
                     item.setDesc(desc);
                 } else {

@@ -17,6 +17,10 @@ if ! flock -n 9; then
 fi
 
 cleanup() {
+    # Conservative 60% duty avoids a stopped fan if the daemon exits unexpectedly.
+    if [ -z "${FAN_DONE:-}" ] && [ -n "${FAN_STATE:-}" ] && [ -n "${FAN_MAX:-}" ] && [ -w "$FAN_STATE" ]; then
+        printf '%s\n' "$(( (3 * FAN_MAX + 2) / 5 ))" > "$FAN_STATE" || true
+    fi
     flock -u 9 2>/dev/null || true
     exec 9>&-
 }
@@ -191,6 +195,7 @@ if [ -n "$FIXED_PERCENT" ]; then
     FIXED=$(( (FAN_MAX * FIXED_PERCENT + 50) / 100 ))
     FIXED="$(clamp "$FIXED" 0 "$FAN_MAX")"
     echo "$FIXED" > "$FAN_STATE"
+    FAN_DONE=1
     do_exit
 fi
 
@@ -208,6 +213,7 @@ pick_hottest_temp_file || TEMP_FILE=""
         performance)    FIXED="$FAN_MAX" ;;
     esac
     echo "$FIXED" > "$FAN_STATE"
+    FAN_DONE=1
     do_exit
 }
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-set -uo pipefail
+set -u
 set +e
 exec 0<&-
 
@@ -65,8 +65,11 @@ sleep_max_tries=5
 for i in $(seq 1 $sleep_max_tries); do
 	>&2 echo "Deep sleep attempt $i of $sleep_max_tries"
 
-	echo mem >/sys/power/state
-	sleep_retval=$?
+	if echo mem >/sys/power/state; then
+		sleep_retval=0
+	else
+		sleep_retval=1
+	fi
 
 	>&2 echo "Deep sleep: kernel returned $sleep_retval"
 	if [ $sleep_retval -eq 0 ]; then

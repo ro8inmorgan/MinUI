@@ -4,6 +4,7 @@
 # it has to, otherwise we'd be running a docker in a docker and oof
 
 # prevent accidentally triggering a full build with invalid calls
+# pi-lens-ignore: SC1073, SC1065, SC1064, SC1072
 ifneq (,$(PLATFORM))
 ifeq (,$(MAKECMDGOALS))
 $(error found PLATFORM arg but no target, did you mean "make PLATFORM=$(PLATFORM) shell"?)
@@ -19,7 +20,9 @@ endif
 
 BUILD_HASH:=$(shell git rev-parse --short HEAD)
 BUILD_BRANCH:=$(shell (git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD) | sed 's/\//-/g')
-RELEASE_TIME:=$(shell TZ=GMT date +%Y%m%d)
+SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct)
+export SOURCE_DATE_EPOCH
+RELEASE_TIME:=$(shell SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) python3 -c 'import datetime, os; print(datetime.datetime.fromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]), datetime.timezone.utc).strftime("%Y%m%d"))')
 ifeq ($(BUILD_BRANCH),main)
   RELEASE_BETA :=
 else
@@ -31,19 +34,14 @@ else
 	TOOLCHAIN_FILE := makefile.toolchain
 endif
 RELEASE_BASE=NextUI-$(RELEASE_TIME)$(RELEASE_BETA)
-RELEASE_DOT:=$(shell find ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l | sed 's/ //g')
+RELEASE_DOT:=$(shell if test -d ./releases; then find ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base\.zip" | wc -l; else echo 0; fi | tr -d ' ')
 RELEASE_NAME ?= $(RELEASE_BASE)-$(RELEASE_DOT)
 
-# Extra paks to ship
-VENDOR_DEST := ./build/VENDOR/Tools
-PACKAGE_URL_MAPPINGS := \
-	"https://github.com/UncleJunVIP/nextui-pak-store/releases/latest/download/Pak.Store.pakz nextui.pak_store.pakz" \
-	"https://github.com/LoveRetro/nextui-updater-pak/releases/latest/download/nextui.updater.pakz nextui.updater.pakz"
-	# add more URLs as needed
+RELEASE_VERSION ?= $(RELEASE_NAME)
 
 ###########################################################
 
-.PHONY: build
+.PHONY: build host-test
 
 export MAKEFLAGS=--no-print-directory
 
@@ -62,6 +60,9 @@ build:
 	# ----------------------------------------------------
 	make build -f $(TOOLCHAIN_FILE) PLATFORM=$(PLATFORM) COMPILE_CORES=$(COMPILE_CORES)
 	# ----------------------------------------------------
+
+host-test:
+	$(MAKE) -C tests
 
 build-cores:
 	make build-cores -f $(TOOLCHAIN_FILE) PLATFORM=$(PLATFORM) COMPILE_CORES=true
@@ -247,30 +248,23 @@ package: tidy
 	cp -R ./build/BOOT/.tmp_update ./build/PAYLOAD/
 	cp -R ./build/EXTRAS/Tools ./build/PAYLOAD/
 	
-	cd ./build/PAYLOAD && zip -r MinUI.zip .system .tmp_update Tools
+	# SHA256SUMS detects corruption; release signing/key provisioning remains external.
+	cd ./build/PAYLOAD && python3 -c 'import hashlib, pathlib; files=sorted((p for root in (".system", ".tmp_update", "Tools") for p in pathlib.Path(root).rglob("*") if p.is_file()), key=lambda p: p.as_posix()); print("".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.as_posix()}\n" for p in files), end="")' > SHA256SUMS
+	cd ./build/PAYLOAD && python3 ../../scripts/deterministic_zip.py MinUI.zip .system .tmp_update Tools SHA256SUMS
 	mv ./build/PAYLOAD/MinUI.zip ./build/BASE
 
-	# Fetch, rename, and stage vendored packages
-	mkdir -p $(VENDOR_DEST)
-	@for entry in $(PACKAGE_URL_MAPPINGS); do \
-		url=$$(echo $$entry | awk '{print $$1}'); \
-		target=$$(echo $$entry | awk '{print $$2}'); \
-		echo "Downloading $$url → $(VENDOR_DEST)/$$target"; \
-		curl -Ls -o "$(VENDOR_DEST)/$$target" "$$url"; \
-	done
-
-	# Move renamed .pakz files into base folder
-	mkdir -p ./build/BASE
-	mv $(VENDOR_DEST)/* ./build/BASE/
+	# Download only the lockfile's immutable, verified assets.
+	python3 scripts/fetch_release_assets.py ./build/BASE
 	
-	# TODO: can I just add everything in BASE to zip?
-	# cd ./build/BASE && zip -r ../../releases/$(RELEASE_NAME)-base.zip Bios Roms Saves miyoo miyoo354 trimui rg35xx rg35xxplus gkdpixel miyoo355 magicx em_ui.sh MinUI.zip README.txt
-	cd ./build/BASE && zip -r ../../releases/$(RELEASE_NAME)-base.zip Bios Roms Saves Shaders Overlays trimui em_ui.sh MinUI.zip *.pakz README.txt
-	cd ./build/EXTRAS && zip -r ../../releases/$(RELEASE_NAME)-extras.zip Bios Emus Roms Saves Shaders Overlays Tools README.txt
+	cd ./build/BASE && python3 ../../scripts/deterministic_zip.py ../../releases/$(RELEASE_NAME)-base.zip Bios Roms Saves Shaders Overlays trimui em_ui.sh MinUI.zip *.pakz README.txt
+	cd ./build/EXTRAS && python3 ../../scripts/deterministic_zip.py ../../releases/$(RELEASE_NAME)-extras.zip Bios Emus Roms Saves Shaders Overlays Tools README.txt
 	echo "$(RELEASE_VERSION)" > ./build/latest.txt
 
-	# compound zip (brew install libzip needed) 
-	cd ./releases && zipmerge $(RELEASE_NAME)-all.zip $(RELEASE_NAME)-base.zip  && zipmerge $(RELEASE_NAME)-all.zip $(RELEASE_NAME)-extras.zip
+	rm -rf ./build/ALL
+	mkdir -p ./build/ALL
+	cp -a ./build/BASE/. ./build/ALL/
+	cp -a ./build/EXTRAS/. ./build/ALL/
+	python3 scripts/deterministic_zip.py --strip-root ./releases/$(RELEASE_NAME)-all.zip ./build/ALL
 	
 ###########################################################
 

@@ -21,12 +21,17 @@ void serializeTime(char *dest_str, int nTime);
 int countChar(const char *str, char ch);
 char *removeExtension(const char *myStr);
 const char *baseName(const char *filename);
-void folderPath(const char *filePath, char *folder_path);
+int folderPathSafe(const char *filePath, char *folder_path, size_t folder_path_size);
+void folderPath(const char *filePath, char *folder_path); /* MAX_PATH output */
 void cleanName(char *name_out, const char *file_name);
-bool pathRelativeTo(char *path_out, const char *dir_from, const char *file_to);
+int pathRelativeToSafe(char *path_out, size_t path_out_size, const char *dir_from, const char *file_to);
+bool pathRelativeTo(char *path_out, const char *dir_from, const char *file_to); /* MAX_PATH output */
 
-void getDisplayName(const char* in_name, char* out_name);
+int getDisplayNameSafe(const char* in_name, char* out_name, size_t out_name_size);
+void getDisplayName(const char* in_name, char* out_name); /* MAX_PATH output */
+int getEmuNameSafe(const char* in_name, char* out_name, size_t out_size);
 void getEmuName(const char* in_name, char* out_name);
+int getEmuPathSafe(const char* emu_name, char* pak_path, size_t pak_path_size);
 void getEmuPath(char* emu_name, char* pak_path);
 
 void normalizeNewline(char* line);

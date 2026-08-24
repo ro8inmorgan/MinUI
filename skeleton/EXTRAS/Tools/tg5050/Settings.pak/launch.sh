@@ -2,7 +2,7 @@
 
 SDCARD_PATH="/mnt/SDCARD"
 USERDATA_PATH="$SDCARD_PATH/.userdata"
-SHARED_USERDATA_PATH="$USERDATA_PATH/shared"
+export SHARED_USERDATA_PATH="$USERDATA_PATH/shared"
 
-cd $(dirname "$0")
+cd "$(dirname "$0")" || exit 1
 ./settings.elf > settings.log 2>&1

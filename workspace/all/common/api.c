@@ -2444,14 +2444,14 @@ int GFX_blitButtonGroup(char **pairs, int primary, SDL_Surface *dst, int align_r
 		char *hint;
 		char *button;
 		int ow;
-	} hints[2];
+	} hints[3];
 	int w = 0; // individual button dimension
 	int h = 0; // hints index
 	ow = 0;	   // full pill width
 	ox = align_right ? dst->w - SCALE1(PADDING) : SCALE1(PADDING);
 	oy = dst->h - SCALE1(PADDING + PILL_SIZE);
 
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 3; i++)
 	{
 		if (!pairs[i * 2])
 			break;
@@ -4718,7 +4718,7 @@ FALLBACK_IMPLEMENTATION void PLAT_wifiEnable(bool on) {}
 FALLBACK_IMPLEMENTATION int PLAT_wifiScan(struct WIFI_network *networks, int max) { return 0; }
 FALLBACK_IMPLEMENTATION bool PLAT_wifiConnected() { return false; }
 FALLBACK_IMPLEMENTATION int PLAT_wifiConnection(struct WIFI_connection *connection_info) { return 0; }
-FALLBACK_IMPLEMENTATION bool PLAT_wifiHasCredentials(char *ssid, WifiSecurityType sec) { return false; }
+FALLBACK_IMPLEMENTATION bool PLAT_wifiHasCredentials(const char *ssid, WifiSecurityType sec) { return false; }
 FALLBACK_IMPLEMENTATION void PLAT_wifiForget(char *ssid, WifiSecurityType sec) {}
 FALLBACK_IMPLEMENTATION void PLAT_wifiConnect(char *ssid, WifiSecurityType sec) {}
 FALLBACK_IMPLEMENTATION void PLAT_wifiConnectPass(const char *ssid, WifiSecurityType sec, const char *pass) {}

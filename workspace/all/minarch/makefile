@@ -19,12 +19,13 @@ SDL?=SDL
 
 ###########################################################
 
+.DEFAULT_GOAL := all
 TARGET = minarch
 PRODUCT= build/$(PLATFORM)/$(TARGET).elf
 INCDIR = -I. -I./libretro-common/include/ -I../common/ -I../../$(PLATFORM)/platform/
-SOURCE = $(TARGET).c ma_cheats.c ma_rewind.c ma_audio.c ma_input.c \
+SOURCE = $(TARGET).c archive_extract.c ma_cheats.c ma_rewind.c ma_audio.c ma_input.c \
          ma_options.c ma_frontend_opts.c ma_saves.c ma_video.c ma_core.c ma_game.c ma_environment.c ma_config.c ma_menu.c ma_runframe.c \
-         ../common/scaler.c ../common/utils.c ../common/config.c ../common/api.c \
+         ../common/scaler.c ../common/utils.c ../common/path_helpers.c ../common/config.c ../common/api.c \
          ../common/notification.c ../../$(PLATFORM)/platform/platform.c
 
 # RA support
@@ -82,15 +83,20 @@ CFLAGS  += -fsanitize=thread
 LDFLAGS += -ltsan
 endif
 ifeq ($(ASAN), 1)
-CFLAGS  += -fsanitize=address -fno-common -fno-omit-frame-pointer
-LDFLAGS += -lasan
+CFLAGS  += -fsanitize=address,undefined -fno-common -fno-omit-frame-pointer
+LDFLAGS += -fsanitize=address,undefined
 endif
 endif
 
 AR=$(CROSS_COMPILE)ar
 ARFLAGS=rc
+LIBRETRO_COMMON_LOCK=libretro-common/.locked-$(shell python3 ../../../scripts/lock.py build libretro-common sha)
+LIBCHDR_LOCK=libchdr/.locked-$(shell python3 ../../../scripts/lock.py build libchdr sha)
 
-BUILD_DATE!=date +%Y.%m.%d
+.PHONY: LOCK_FORCE
+LOCK_FORCE:
+
+BUILD_DATE != SOURCE_DATE_EPOCH=$${SOURCE_DATE_EPOCH:-$$(git -C ../../.. log -1 --format=%ct)} python3 -c 'import datetime, os; print(datetime.datetime.fromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]), datetime.timezone.utc).strftime("%Y.%m.%d"))'
 BUILD_HASH!=cat ../../hash.txt
 CFLAGS += -DBUILD_DATE=\"${BUILD_DATE}\" -DBUILD_HASH=\"${BUILD_HASH}\"
 
@@ -120,24 +126,30 @@ endif
 	$(CC) $(SOURCE) -o $(PRODUCT) $(CFLAGS) $(LDFLAGS)
 endif
 
-libretro-common:
-	git clone https://github.com/libretro/libretro-common
+libretro-common: $(LIBRETRO_COMMON_LOCK)
 
 rcheevos: rcheevos/makefile $(PREFIX_LOCAL)/lib/librcheevos.a
 
 libchdr: libchdr/CMakeLists.txt $(PREFIX_LOCAL)/lib/libchdr.so
 
-rcheevos/makefile:
-	rm -rf rcheevos
+$(LIBRETRO_COMMON_LOCK): ../../../dependencies.lock.json LOCK_FORCE
+	python3 ../../../scripts/checkout_locked.py build libretro-common libretro-common
+	rm -f libretro-common/.locked-*
+	touch $@
+
+rcheevos/makefile: rcheevos.makefile
 	mkdir -p rcheevos
 	cp rcheevos.makefile rcheevos/makefile
 
 $(PREFIX_LOCAL)/lib/librcheevos.a:
 	cd rcheevos && make build install PLATFORM=$(PLATFORM)
 
-libchdr/CMakeLists.txt:
-	rm -rf libchdr
-	git clone https://github.com/rtissera/libchdr
+$(LIBCHDR_LOCK): ../../../dependencies.lock.json LOCK_FORCE
+	python3 ../../../scripts/checkout_locked.py build libchdr libchdr
+	rm -f libchdr/.locked-*
+	touch $@
+
+libchdr/CMakeLists.txt: $(LIBCHDR_LOCK)
 	cp libchdr.makefile libchdr/makefile
 
 $(PREFIX_LOCAL)/lib/libchdr.so:

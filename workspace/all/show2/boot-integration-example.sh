@@ -49,11 +49,11 @@ install_with_progress() {
     ./show2.elf --mode=daemon --image=./$DEVICE/logo.png --bgcolor=0x000000 --text="Starting installation..." &
     sleep 0.5
     
-    local progress=0
-    local step_size=0
+    progress=0
+    step_size=0
     
     # Count pakz files
-    local pakz_count=0
+    pakz_count=0
     for pakz in $PAKZ_PATH; do
         if [ -e "$pakz" ]; then
             pakz_count=$((pakz_count + 1))
@@ -68,7 +68,7 @@ install_with_progress() {
     for pakz in $PAKZ_PATH; do
         if [ ! -e "$pakz" ]; then continue; fi
         
-        local pakz_name=$(basename "$pakz")
+        pakz_name=$(basename "$pakz")
         echo "TEXT:Installing $pakz_name..." > /tmp/show2.fifo
         echo "PROGRESS:$progress" > /tmp/show2.fifo
         
@@ -104,10 +104,10 @@ install_with_progress() {
 
 install_update_with_progress() {
     if [ -f "$UPDATE_PATH" ]; then
-        cd $(dirname "$0")/$PLATFORM
+        cd "$(dirname "$0")/$PLATFORM" || return 1
         
         # Determine message
-        local message="Installing NextUI..."
+        message="Installing NextUI..."
         if [ -d "$SYSTEM_PATH" ]; then
             message="Updating NextUI..."
         fi
@@ -119,9 +119,9 @@ install_update_with_progress() {
         # Clean replacement
         echo "TEXT:Cleaning old files..." > /tmp/show2.fifo
         echo "PROGRESS:10" > /tmp/show2.fifo
-        rm -rf $SYSTEM_PATH/$PLATFORM/bin
-        rm -rf $SYSTEM_PATH/$PLATFORM/lib
-        rm -rf $SYSTEM_PATH/$PLATFORM/paks/MinUI.pak
+        rm -rf "${SYSTEM_PATH:?}/${PLATFORM:?}/bin"
+        rm -rf "${SYSTEM_PATH:?}/${PLATFORM:?}/lib"
+        rm -rf "${SYSTEM_PATH:?}/${PLATFORM:?}/paks/MinUI.pak"
         
         # Extract
         echo "TEXT:Extracting update..." > /tmp/show2.fifo

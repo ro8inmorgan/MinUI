@@ -1,5 +1,6 @@
 #include "http.h"
 #include "defines.h"
+#include "path_helpers.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,39 +70,8 @@ static void HTTPBuffer_free(HTTPBuffer* buf) {
 	buf->capacity = 0;
 }
 
-// Escape a string for shell use (single quotes)
-static char* shell_escape(const char* str) {
-	if (!str) return strdup("");
-	
-	// Count how many single quotes we need to escape
-	size_t len = strlen(str);
-	size_t quotes = 0;
-	for (size_t i = 0; i < len; i++) {
-		if (str[i] == '\'') quotes++;
-	}
-	
-	// Allocate: original + 3 chars per quote ('"'"') + 2 for surrounding quotes + 1 for null
-	char* escaped = malloc(len + quotes * 3 + 3);
-	if (!escaped) return NULL;
-	
-	char* p = escaped;
-	*p++ = '\'';
-	for (size_t i = 0; i < len; i++) {
-		if (str[i] == '\'') {
-			// End quote, escaped quote, start quote
-			*p++ = '\'';
-			*p++ = '"';
-			*p++ = '\'';
-			*p++ = '"';
-			*p++ = '\'';
-		} else {
-			*p++ = str[i];
-		}
-	}
-	*p++ = '\'';
-	*p = '\0';
-	
-	return escaped;
+char* HTTP_shellEscape(const char* str) {
+	return shell_quote_alloc(str);
 }
 
 // Execute curl and capture output
@@ -114,18 +84,18 @@ static HTTP_Response* execute_curl(const char* url, const char* post_data, const
 	// Build curl command
 	// -s: silent (no progress)
 	// -S: show errors
-	// -k: insecure (skip SSL cert verification - needed on embedded devices without CA bundle)
+	// --cacert: require peer and hostname verification against the target CA bundle
 	// -w '%{http_code}': write HTTP status at end
 	// -o -: output to stdout
 	// --connect-timeout: connection timeout
 	// -m: max time
 	// -L: follow redirects
-	char cmd[4096];
 	char user_agent[256];
 	HTTP_getUserAgent(user_agent, sizeof(user_agent));
 	
-	char* escaped_url = shell_escape(url);
-	char* escaped_ua = shell_escape(user_agent);
+	char* escaped_url = HTTP_shellEscape(url);
+	char* escaped_ua = HTTP_shellEscape(user_agent);
+	char* cmd = NULL;
 	
 	if (!escaped_url || !escaped_ua) {
 		free(escaped_url);
@@ -135,50 +105,47 @@ static HTTP_Response* execute_curl(const char* url, const char* post_data, const
 	}
 	
 	if (post_data) {
-		char* escaped_data = shell_escape(post_data);
+		char* escaped_data = HTTP_shellEscape(post_data);
 		const char* ct = content_type ? content_type : "application/x-www-form-urlencoded";
-		char* escaped_ct = shell_escape(ct);
+		char* header = path_format_alloc("Content-Type: %s", ct);
+		char* escaped_header = HTTP_shellEscape(header);
 		
-		if (!escaped_data || !escaped_ct) {
+		if (!escaped_data || !header || !escaped_header) {
 			free(escaped_url);
 			free(escaped_ua);
 			free(escaped_data);
-			free(escaped_ct);
+			free(header);
+			free(escaped_header);
 			response->error = strdup("Memory allocation failed");
 			return response;
 		}
 		
-		snprintf(cmd, sizeof(cmd),
-			"curl -s -S -k -L --connect-timeout %d -m %d "
-			"-A %s "
-			"-H 'Content-Type: %s' "
-			"-d %s "
-			"-w '\\n%%{http_code}' "
-			"%s 2>&1",
-			HTTP_TIMEOUT_SECS, HTTP_TIMEOUT_SECS * 2,
-			escaped_ua,
-			ct,
-			escaped_data,
-			escaped_url);
-		
+		cmd = path_format_alloc(
+			"curl -s -S -L %s --connect-timeout %d -m %d "
+			"-A %s -H %s -d %s -w '\\n%%{http_code}' %s 2>&1",
+			HTTP_CA_OPTION, HTTP_TIMEOUT_SECS, HTTP_TIMEOUT_SECS * 2,
+			escaped_ua, escaped_header, escaped_data, escaped_url);
 		free(escaped_data);
-		free(escaped_ct);
+		free(header);
+		free(escaped_header);
 	} else {
-		snprintf(cmd, sizeof(cmd),
-			"curl -s -S -k -L --connect-timeout %d -m %d "
-			"-A %s "
-			"-w '\\n%%{http_code}' "
-			"%s 2>&1",
-			HTTP_TIMEOUT_SECS, HTTP_TIMEOUT_SECS * 2,
-			escaped_ua,
-			escaped_url);
+		cmd = path_format_alloc(
+			"curl -s -S -L %s --connect-timeout %d -m %d "
+			"-A %s -w '\\n%%{http_code}' %s 2>&1",
+			HTTP_CA_OPTION, HTTP_TIMEOUT_SECS, HTTP_TIMEOUT_SECS * 2,
+			escaped_ua, escaped_url);
 	}
 	
 	free(escaped_url);
 	free(escaped_ua);
+	if (!cmd) {
+		response->error = strdup("Memory allocation failed");
+		return response;
+	}
 	
 	// Execute curl
 	FILE* pipe = popen(cmd, "r");
+	free(cmd);
 	if (!pipe) {
 		response->error = strdup("Failed to execute curl");
 		return response;

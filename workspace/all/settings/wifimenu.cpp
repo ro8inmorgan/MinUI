@@ -13,7 +13,7 @@ typedef std::shared_lock<Lock> ReadLock;
 using namespace Wifi;
 using namespace std::placeholders;
 
-Menu::Menu(const int &globalQuit, int &globalDirty) : MenuList(MenuItemType::Fixed, "Network", {}), globalQuit(globalQuit), globalDirty(globalDirty)
+Menu::Menu(const int &, int &) : MenuList(MenuItemType::Fixed, "Network", {})
 {
     toggleItem = new MenuItem(ListItemType::Generic, "WiFi", "Enable/disable WiFi", {false, true}, {"Off", "On"},
                               std::bind(&Menu::getWifToggleState, this),
@@ -42,12 +42,11 @@ Menu::~Menu()
 
 InputReactionHint Menu::handleInput(int &dirty, int &quit)
 {
+    applySnapshot(dirty);
     auto ret = MenuList::handleInput(dirty, quit);
-    if (selectionDirty)
-    {
+    if (selectionDirty) {
+        selectionDirty = false;
         dirty = true;
-        selectionDirty = false; // handled
-        //LOG_info("collected workerDirty\n");
     }
     return ret;
 }
@@ -84,123 +83,75 @@ void Menu::resetWifiDiagnosticsState()
     //
 }
 
-template <typename Map>
-bool key_compare(Map const &lhs, Map const &rhs)
+void Menu::applySnapshot(int &dirty)
 {
-    return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                                                  [](auto a, auto b)
-                                                  { return a.first == b.first; });
+    for (auto item : items)
+        if (item->isDeferred()) return;
+
+    ScanSnapshot latest;
+    {
+        std::lock_guard<std::mutex> lock(snapshotMutex);
+        if (!snapshotReady) return;
+        latest = std::move(snapshot);
+        snapshotReady = false;
+    }
+
+    const std::string selectedName = getSelectedItemName();
+    clearDynamicItems(2);
+    if (latest.enabled) {
+        for (const auto &network : latest.networks) {
+            const bool connected = strcmp(latest.connection.ssid, network.ssid) == 0;
+            MenuList *options = connected
+                ? new MenuList(MenuItemType::List, "Options", {new MenuItem{ListItemType::Button, "Disconnect", "Disconnect from this network.", [&](AbstractMenuItem &) { WIFI_disconnect(); selectionDirty = true; return Exit; }}, new ForgetItem(network, selectionDirty)})
+                : WIFI_isKnown(network.ssid, network.security)
+                    ? new MenuList(MenuItemType::List, "Options", {new ConnectKnownItem(network, selectionDirty), new ForgetItem(network, selectionDirty)})
+                    : new MenuList(MenuItemType::List, "Options", {new ConnectNewItem(network, selectionDirty)});
+            auto item = new NetworkItem{network, connected, options};
+            if (connected && latest.connection.ip[0]) item->setDesc(std::string(network.bssid) + " | " + latest.connection.ip);
+            items.push_back(item);
+        }
+    }
+    layout_called = false;
+    MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
+    selectByName(selectedName);
+    dirty = true;
 }
 
 void Menu::updater()
 {
-    int pollSecs = 15;
-
-    while (!quit && !globalQuit)
-    {
-        // TODO: pause when menu is not rendered
-        if (WIFI_enabled())
-        {
-            // scan for available networks and add a menu item for each
-            WIFI_connection connection;
-            if(WIFI_connectionInfo(&connection) < 0)
-                continue; // try again in a bit
-
-            // grab list and compare it to previous result
-            // only relayout the menu if changes happended
-            std::vector<WIFI_network> scanResults(SCAN_MAX_RESULTS);
-            int cnt = WIFI_scan(scanResults.data(), SCAN_MAX_RESULTS);
-            if(cnt < 0)
-                continue; // try again in a bit
-
-            std::map<std::string, WIFI_network> scanSsids;
-            for (int i = 0; i < cnt; i++)
-                scanSsids.emplace(scanResults[i].ssid, scanResults[i]);
-
-            // dont repopulate if any submenu is open
-            bool menuOpen = false;
-            for(auto i : items)
-            {
-                if(i->isDeferred())
-                {
-                    menuOpen = true;
-                    break;
-                }
+    ScanSnapshot previous;
+    bool havePrevious = false;
+    while (!quit) {
+        ScanSnapshot latest;
+        bool success = true;
+        latest.enabled = WIFI_enabled();
+        if (latest.enabled) {
+            if (WIFI_connectionInfo(&latest.connection) < 0) success = false;
+            std::vector<WIFI_network> results(SCAN_MAX_RESULTS);
+            int count = success ? WIFI_scan(results.data(), SCAN_MAX_RESULTS) : -1;
+            if (count < 0) success = false;
+            else {
+                std::map<std::string, WIFI_network> unique;
+                for (int i = 0; i < count; i++) unique.emplace(results[i].ssid, results[i]);
+                for (const auto &entry : unique) latest.networks.push_back(entry.second);
             }
-
-            // something changed?
-            if (!menuOpen)
-            {
-                // remember selection and restore
-                std::string selectedName;
-                bool selectionApplied = false;
-
-                {
-                    WriteLock w(itemLock);
-                    selectedName = getSelectedItemName();
-                    items.clear();
-                    items.push_back(toggleItem);
-                    items.push_back(diagItem);
-                    layout_called = false;
-
-                    for (auto &[s, r] : scanSsids)
-                    {
-                        bool connected = false;
-                        bool hasCredentials = WIFI_isKnown(r.ssid, r.security);
-
-                        if (strcmp(connection.ssid, r.ssid) == 0)
-                            connected = true;
-
-                        MenuList *options;
-                        if (connected)
-                            options = new MenuList(MenuItemType::List, "Options",
-                                                {
-                                                    new MenuItem{ListItemType::Button, "Disconnect", "Disconnect from this network.",
-                                                                    [&](AbstractMenuItem &item) -> InputReactionHint
-                                                                    { WIFI_disconnect(); selectionDirty = true; return Exit; }},
-                                                    new ForgetItem(r, selectionDirty)
-                                                });
-                        else 
-                        if (hasCredentials)
-                            options = new MenuList(MenuItemType::List, "Options", { new ConnectKnownItem(r, selectionDirty), new ForgetItem(r, selectionDirty) });
-                        else
-                            options = new MenuList(MenuItemType::List, "Options", { new ConnectNewItem(r, selectionDirty) });
-
-                        auto itm = new NetworkItem{r, connected, options};
-                        if(connected && !std::string(connection.ip).empty())
-                            itm->setDesc(std::string(r.bssid) + " | " + std::string(connection.ip));
-                        items.push_back(itm);
-                    }
-                }
-                MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
-
-                // Attempt to restore prev selection
-                selectionApplied = selectByName(selectedName);
-                globalDirty |= selectionApplied;
-                // If selection was restored, we already called performLayout internally
-                selectionDirty |= !selectionApplied;
-            }
-            pollSecs = 2;
         }
-        else
-        {
-            WriteLock w(itemLock);
-            items.clear();
-            items.push_back(toggleItem);
-            items.push_back(diagItem);
-            layout_called = false;
-            selectionDirty = true;
-            pollSecs = 15;
+        if (success && (!havePrevious || latest.enabled != previous.enabled ||
+            latest.connection.valid != previous.connection.valid || strcmp(latest.connection.ssid, previous.connection.ssid) != 0 ||
+            strcmp(latest.connection.ip, previous.connection.ip) != 0 || latest.connection.freq != previous.connection.freq ||
+            latest.connection.rssi != previous.connection.rssi || latest.connection.link_speed != previous.connection.link_speed ||
+            latest.connection.noise != previous.connection.noise ||
+            latest.networks.size() != previous.networks.size() ||
+            !std::equal(latest.networks.begin(), latest.networks.end(), previous.networks.begin(), [](const WIFI_network &a, const WIFI_network &b) {
+                return strcmp(a.bssid, b.bssid) == 0 && strcmp(a.ssid, b.ssid) == 0 && a.freq == b.freq && a.rssi == b.rssi && a.security == b.security && a.wps == b.wps;
+            }))) {
+            std::lock_guard<std::mutex> lock(snapshotMutex);
+            snapshot = latest;
+            snapshotReady = true;
+            previous = std::move(latest);
+            havePrevious = true;
         }
-
-        // reset selection scope (locks internally)
-        if (selectionDirty)
-        {
-            MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
-            selectionDirty = false;        
-        }
-
-        std::this_thread::sleep_for(std::chrono::seconds(pollSecs));
+        for (int i = 0; i < (success ? 20 : 150) && !quit; i++) std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -220,7 +171,7 @@ ConnectNewItem::ConnectNewItem(WIFI_network n, bool& dirty)
             WIFI_connectPass(net.ssid, net.security, item.getName().c_str()); 
             dirty = true;
             return Exit; 
-        })), net(n)
+        }, true)), net(n)
 {}
 
 ForgetItem::ForgetItem(WIFI_network n, bool& dirty)

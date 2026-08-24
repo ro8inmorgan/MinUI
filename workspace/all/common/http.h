@@ -16,6 +16,13 @@
 // HTTP timeout in seconds
 #define HTTP_TIMEOUT_SECS 30
 
+#ifdef HTTP_USE_SYSTEM_CA
+#define HTTP_CA_OPTION ""
+#else
+#define HTTP_CA_BUNDLE SDCARD_PATH "/.system/" PLATFORM "/etc/ssl/certs/ca-certificates.crt"
+#define HTTP_CA_OPTION "--cacert " HTTP_CA_BUNDLE
+#endif
+
 // HTTP response structure
 typedef struct HTTP_Response {
 	char* data;           // Response body (caller must free)
@@ -73,6 +80,9 @@ void HTTP_postAsync(const char* url, const char* post_data, const char* content_
  * @param response The response to free
  */
 void HTTP_freeResponse(HTTP_Response* response);
+
+/** Escape a value as one POSIX-shell argument. Caller must free the result. */
+char* HTTP_shellEscape(const char* str);
 
 /**
  * URL-encode a string for use in query parameters.

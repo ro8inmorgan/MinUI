@@ -68,7 +68,7 @@ tar czf $backupfile /mnt/SDCARD/btmgr_backup/
 rm -rf /mnt/SDCARD/btmgr_backup
 
 # deploy update
-cd $BLUEZ_PATH
+cd "$BLUEZ_PATH" || exit 1
 
 # copy relative to root
 #bluez

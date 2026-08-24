@@ -2,43 +2,36 @@
 
 # NOTE: becomes .tmp_update/updater
 
-INFO=`cat /proc/cpuinfo 2> /dev/null`
-case $INFO in
+INFO=$(cat /proc/cpuinfo 2>/dev/null)
+PLATFORM=""
+case "$INFO" in
 *"sun8i"*)
-	if [ -d /usr/miyoo ]; then
-		PLATFORM="my282" # Miyoo A30
-	else
-		PLATFORM="trimuismart"
-	fi
+	if [ -d /usr/miyoo ]; then PLATFORM="my282"; else PLATFORM="trimuismart"; fi
 	;;
-*"SStar"*)
-	PLATFORM="miyoomini"
-	;;
-*"TG5040"*|*"TG3040"*|*"TG4040"*)
-	PLATFORM="tg5040" # Trimui Smart Pro, Brick, Brick Pro
-	;;
-*"TG5050"*)
-	PLATFORM="tg5050" # Trimui Smart Pro S
-	;;
-*"0xd03"*)
-	PLATFORM="zero28" # MagicX Mini Zero 28
-	;;
-*"0xd05"*)
-	PLATFORM="my355" # Miyoo Flip
-	;;
+*"SStar"*) PLATFORM="miyoomini" ;;
+*"TG5040"*|*"TG3040"*|*"TG4040"*) PLATFORM="tg5040" ;;
+*"TG5050"*) PLATFORM="tg5050" ;;
+*"0xd03"*) PLATFORM="zero28" ;;
+*"0xd05"*) PLATFORM="my355" ;;
 esac
 
 # fallback for tg5040 20240413 recovery firmware
-# TODO: doublecheck interaction with tg3040
-# might need/want to strings /usr/trimui/bin/MainUI during install/update
-# and store platform in a text file
 if [ -z "$PLATFORM" ] && [ -f /usr/trimui/bin/runtrimui.sh ]; then
 	PLATFORM="tg5040"
 fi
 
-/mnt/SDCARD/.tmp_update/$PLATFORM.sh # &> /mnt/SDCARD/boot.txt
+case "$PLATFORM" in
+tg5040|tg5050|my282|trimuismart|miyoomini|zero28|my355) ;;
+*) printf '%s\n' "NextUI updater: unsupported platform" >&2; exit 1 ;;
+esac
 
-# force shutdown so nothing can modify the SD card
+UPDATER="/mnt/SDCARD/.tmp_update/$PLATFORM.sh"
+[ -x "$UPDATER" ] || { printf '%s\n' "NextUI updater: missing executable $UPDATER" >&2; exit 1; }
+"$UPDATER"
+status=$?
+[ "$status" -eq 0 ] || { printf '%s\n' "NextUI updater: $PLATFORM failed ($status)" >&2; exit "$status"; }
+
+# Only a successful platform updater may request shutdown.
 echo s > /proc/sysrq-trigger
 echo u > /proc/sysrq-trigger
 echo o > /proc/sysrq-trigger

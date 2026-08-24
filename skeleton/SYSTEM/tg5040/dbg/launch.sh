@@ -13,7 +13,8 @@ export SHARED_USERDATA_PATH="$SDCARD_PATH/.userdata/shared"
 export LOGS_PATH="$USERDATA_PATH/logs"
 export DATETIME_PATH="$SHARED_USERDATA_PATH/datetime.txt"
 
-export TRIMUI_MODEL=`strings /usr/trimui/bin/MainUI | grep ^Trimui`
+TRIMUI_MODEL=$(strings /usr/trimui/bin/MainUI | grep ^Trimui)
+export TRIMUI_MODEL
 if [ "$TRIMUI_MODEL" = "Trimui Brick" ]; then
 	export DEVICE="brick"
 elif [ "$TRIMUI_MODEL" = "Trimui Brick Pro" ]; then
@@ -27,6 +28,6 @@ export PATH=$SYSTEM_PATH/bin:/usr/trimui/bin:$PATH
 
 export HOME=$USERDATA_PATH
 
-cd $SYSTEM_PATH/dbg
+cd "$SYSTEM_PATH/dbg" || exit 1
 killall gdbserver
 ./gdbserver "$@"

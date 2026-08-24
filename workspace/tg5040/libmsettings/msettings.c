@@ -13,6 +13,7 @@
 #include <tinyalsa/mixer.h>
 
 #include "displaycal.h"
+#include "atomic_settings.h"
 #include "msettings.h"
 
 ///////////////////////////////////////
@@ -253,6 +254,9 @@ static char SettingsPath[256];
 static int shm_fd = -1;
 static int is_host = 0;
 static int shm_size = sizeof(Settings);
+static struct timespec last_save;
+
+static inline void SaveSettings(int force);
 
 int scaleBrightness(int);
 int scaleColortemp(int);
@@ -339,6 +343,7 @@ void InitSettings(void) {
 	applyDisplayCalDefaultsForDevice(&DefaultSettings);
 	
 	sprintf(SettingsPath, "%s/msettings.bin", getenv("USERDATA_PATH"));
+	chmod(SettingsPath, S_IRUSR | S_IWUSR);
 	
 	shm_fd = shm_open(SHM_KEY, O_RDWR | O_CREAT | O_EXCL, 0644); // see if it exists
 	if (shm_fd==-1 && errno==EEXIST) { // already exists
@@ -552,16 +557,13 @@ int InitializedSettings(void) {
 	return (settings != NULL);
 }
 void QuitSettings(void) {
+	SaveSettings(1);
 	munmap(settings, shm_size);
 	if (is_host) shm_unlink(SHM_KEY);
 }
-static inline void SaveSettings(void) {
-	int fd = open(SettingsPath, O_CREAT|O_WRONLY, 0644);
-	if (fd>=0) {
-		write(fd, settings, shm_size);
-		close(fd);
-		sync();
-	}
+static inline void SaveSettings(int force) {
+	if (!atomic_settings_save_due(&last_save, force)) return;
+	atomic_settings_write(SettingsPath, settings, shm_size);
 }
 
 static inline void applyDisplayCalSettings(void) {
@@ -718,7 +720,7 @@ void SetBrightness(int value) {
 
 	SetRawBrightness(scaleBrightness(value));
 	settings->brightness = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetColortemp(int value) {
 	if (settings->mute && GetMutedColortemp() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
@@ -726,7 +728,7 @@ void SetColortemp(int value) {
 
 	SetRawColortemp(scaleColortemp(value));
 	settings->colortemperature = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetContrast(int value) {
 	if (settings->mute && GetMutedContrast() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
@@ -734,7 +736,7 @@ void SetContrast(int value) {
 
 	SetRawContrast(scaleContrast(value));
 	settings->contrast = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetSaturation(int value) {
 	if (settings->mute && GetMutedSaturation() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
@@ -742,7 +744,7 @@ void SetSaturation(int value) {
 
 	SetRawSaturation(scaleSaturation(value));
 	settings->saturation = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetExposure(int value){
 	if (settings->mute && GetMutedExposure() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
@@ -750,7 +752,7 @@ void SetExposure(int value){
 
 	SetRawExposure(scaleExposure(value));
 	settings->exposure = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetDisplayCalEnabled(int is_enabled) {
 	int was_enabled = settings->displaycal_enabled;
@@ -762,25 +764,25 @@ void SetDisplayCalEnabled(int is_enabled) {
 		applyDisplayCalSettings();
 	else if (was_enabled)
 		SetRawDisplayCal(0, settings->displaycal_red_gain, settings->displaycal_green_gain, settings->displaycal_blue_gain);
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetDisplayCalRedGain(int value) {
 	value = DisplayCal_clampGainValue(value);
 	settings->displaycal_red_gain = value;
 	applyDisplayCalSettings();
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetDisplayCalGreenGain(int value) {
 	value = DisplayCal_clampGainValue(value);
 	settings->displaycal_green_gain = value;
 	applyDisplayCalSettings();
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetDisplayCalBlueGain(int value) {
 	value = DisplayCal_clampGainValue(value);
 	settings->displaycal_blue_gain = value;
 	applyDisplayCalSettings();
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetVolume(int value) // 0-20
 {
@@ -792,7 +794,7 @@ void SetVolume(int value) // 0-20
 		settings->headphones = value;
 	else
 		settings->speaker = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 // monitored and set by thread in keymon
 void SetJack(int value) {
@@ -847,96 +849,96 @@ void SetMute(int value) {
 void SetMutedBrightness(int value)
 {
 	settings->toggled_brightness = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMutedColortemp(int value)
 {
 	settings->toggled_colortemperature = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMutedContrast(int value)
 {
 	settings->toggled_contrast = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMutedSaturation(int value)
 {
 	settings->toggled_saturation = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMutedExposure(int value)
 {
 	settings->toggled_exposure = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMutedVolume(int value)
 {
 	settings->toggled_volume = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteDisablesDpad(int value)
 {
 	settings->disable_dpad_on_mute = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 void SetMuteEmulatesJoystick(int value)
 {
 	settings->emulate_joystick_on_mute = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboA(int value)
 {
 	settings->turbo_a = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboB(int value)
 {
 	settings->turbo_b = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboX(int value)
 {
 	settings->turbo_x = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboY(int value)
 {
 	settings->turbo_y = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboL1(int value)
 {
 	settings->turbo_l1 = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboL2(int value)
 {
 	settings->turbo_l2 = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboR1(int value)
 {
 	settings->turbo_r1 = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 void SetMuteTurboR2(int value)
 {
 	settings->turbo_r2 = value;
-	SaveSettings();
+	SaveSettings(0);
 }
 
 ///////// trimui_inputd modifiers

@@ -10,11 +10,15 @@
 #include "defines.h"
 #include "api.h"
 #include "utils.h"
+#include "path_helpers.h"
 #include "config.h"
 #include <sys/resource.h>
 #include <pthread.h>
 #include <assert.h>
 #include <limits.h>
+
+#include <errno.h>
+#include <sys/stat.h>
 
 ///////////////////////////////////////
 
@@ -138,7 +142,7 @@ typedef struct Entry {
 
 static Entry* Entry_new(char* path, int type) {
 	char display_name[256];
-	getDisplayName(path, display_name);
+	if (getDisplayNameSafe(path, display_name, sizeof(display_name)) != 0) return NULL;
 	Entry* self = malloc(sizeof(Entry));
 	self->path = strdup(path);
 	self->name = strdup(display_name);
@@ -359,7 +363,7 @@ static Array* getEntries(char* path);
 
 static Directory* Directory_new(char* path, int selected) {
 	char display_name[256];
-	getDisplayName(path, display_name);
+	if (getDisplayNameSafe(path, display_name, sizeof(display_name)) != 0) return NULL;
 
 	Directory* self = malloc(sizeof(Directory));
 	self->path = strdup(path);
@@ -1083,45 +1087,106 @@ static Array* getEntries(char* path){
 
 ///////////////////////////////////////
 
-static void queueNext(char* cmd) {
-	LOG_info("cmd: %s\n", cmd);
-	putFile("/tmp/next", cmd);
-	quit = 1;
+#define LAUNCH_RECORD_MAGIC "NEXTUI_ARGV_V1\n"
+#define LAUNCH_RECORD_MAX 8192
+
+static int write_all(int fd, const char *data, size_t size) {
+	while (size > 0) {
+		ssize_t written = write(fd, data, size);
+		if (written < 0) {
+			if (errno == EINTR) continue;
+			return -1;
+		}
+		if (written == 0) return -1;
+		data += written;
+		size -= (size_t)written;
+	}
+	return 0;
 }
 
-// based on https://stackoverflow.com/a/31775567/145965
-static int replaceString(char *line, const char *search, const char *replace) {
-   char *sp; // start of pattern
-   if ((sp = strstr(line, search)) == NULL) {
-      return 0;
-   }
-   int count = 1;
-   int sLen = strlen(search);
-   int rLen = strlen(replace);
-   if (sLen > rLen) {
-      // move from right to left
-      char *src = sp + sLen;
-      char *dst = sp + rLen;
-      while((*dst = *src) != '\0') { dst++; src++; }
-   } else if (sLen < rLen) {
-      // move from left to right
-      int tLen = strlen(sp) - sLen;
-      char *stop = sp + rLen;
-      char *src = sp + sLen + tLen;
-      char *dst = sp + rLen + tLen;
-      while(dst >= stop) { *dst = *src; dst--; src--; }
-   }
-   memcpy(sp, replace, rLen);
-   count += replaceString(sp + rLen, search, replace);
-   return count;
+static int write_launch_record(const char *program, const char *argument) {
+	const char *runtime_path = getenv("NEXTUI_RUNTIME_PATH");
+	const char *args[2] = {program, argument};
+	char record_path[PATH_MAX];
+	char temp_path[PATH_MAX];
+	struct stat st;
+	int fd = -1;
+	int dir_fd = -1;
+	int argc = argument ? 2 : 1;
+	size_t record_size = strlen(LAUNCH_RECORD_MAGIC) + 2;
+
+	if (!runtime_path || !program || !program[0] ||
+		snprintf(record_path, sizeof(record_path), "%s/launch.argv", runtime_path) >= (int)sizeof(record_path)) return -1;
+
+	for (int i = 0; i < argc; i++) {
+		size_t length = strlen(args[i]);
+		if (length == 0 || length >= PATH_MAX || strpbrk(args[i], "\r\n")) return -1;
+		record_size += length + 16;
+	}
+	if (record_size > LAUNCH_RECORD_MAX) return -1;
+
+	if (lstat(runtime_path, &st) != 0 || !S_ISDIR(st.st_mode) || st.st_uid != geteuid() || (st.st_mode & 077) != 0) return -1;
+
+	for (unsigned int attempt = 0; attempt < 10; attempt++) {
+		if (snprintf(temp_path, sizeof(temp_path), "%s/.launch.%ld.%u", runtime_path, (long)getpid(), attempt) >= (int)sizeof(temp_path)) return -1;
+		fd = open(temp_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+		if (fd >= 0 || errno != EEXIST) break;
+	}
+	if (fd < 0) return -1;
+
+	char count[16];
+	int count_length = snprintf(count, sizeof(count), "%d\n", argc);
+	if (count_length < 0 || write_all(fd, LAUNCH_RECORD_MAGIC, strlen(LAUNCH_RECORD_MAGIC)) != 0 ||
+		write_all(fd, count, (size_t)count_length) != 0) goto failed;
+	for (int i = 0; i < argc; i++) {
+		char length[16];
+		size_t arg_length = strlen(args[i]);
+		int length_length = snprintf(length, sizeof(length), "%zu\n", arg_length);
+		if (length_length < 0 || write_all(fd, length, (size_t)length_length) != 0 ||
+			write_all(fd, args[i], arg_length) != 0 || write_all(fd, "\n", 1) != 0) goto failed;
+	}
+	if (fdatasync(fd) != 0) goto failed;
+	if (close(fd) != 0) {
+		fd = -1;
+		goto failed_unlinked;
+	}
+	fd = -1;
+	if (rename(temp_path, record_path) != 0) goto failed_unlinked;
+	dir_fd = open(runtime_path, O_RDONLY);
+	if (dir_fd >= 0) {
+		if (fsync(dir_fd) != 0) {
+			close(dir_fd);
+			return -1;
+		}
+		close(dir_fd);
+	}
+	return 0;
+
+failed:
+	close(fd);
+failed_unlinked:
+	unlink(temp_path);
+	return -1;
 }
-static char* escapeSingleQuotes(char* str) {
-	// why not call replaceString directly?
-	// call points require the modified string be returned
-	// but replaceString is recursive and depends on its
-	// own return value (but does it need to?)
-	replaceString(str, "'", "'\\''");
-	return str;
+
+static int queueNext(const char *program, const char *argument) {
+	if (write_launch_record(program, argument) != 0) return -1;
+	LOG_info("launch: %s%s%s\n", program, argument ? " " : "", argument ? argument : "");
+	quit = 1;
+	return 0;
+}
+
+static int queueRomLaunch(const char *emu_path, const char *rom_path) {
+	return queueNext(emu_path, rom_path);
+}
+
+static int queuePakLaunch(const char *pak_path) {
+	char *launch_path = path_format_alloc("%s/launch.sh", pak_path);
+	int result;
+	if (!launch_path) return -1;
+	result = queueNext(launch_path, NULL);
+	free(launch_path);
+	return result;
 }
 
 ///////////////////////////////////////
@@ -1190,44 +1255,38 @@ static int autoResume(void) {
 	sync();
 
 	// make sure rom still exists
-	char sd_path[256];
-	sprintf(sd_path, "%s%s", SDCARD_PATH, path);
-	if (!exists(sd_path)) return 0;
+	char *sd_path = path_format_alloc("%s%s", SDCARD_PATH, path);
+	if (!sd_path || !exists(sd_path)) {
+		free(sd_path);
+		return 0;
+	}
 
 	// make sure emu still exists
-	char emu_name[256];
-	getEmuName(sd_path, emu_name);
-
-	char emu_path[256];
-	getEmuPath(emu_name, emu_path);
-
-	if (!exists(emu_path)) return 0;
+	char emu_name[MAX_PATH];
+	char emu_path[MAX_PATH];
+	if (getEmuNameSafe(sd_path, emu_name, sizeof(emu_name)) != 0 ||
+		getEmuPathSafe(emu_name, emu_path, sizeof(emu_path)) != 0 || !exists(emu_path)) {
+		free(sd_path);
+		return 0;
+	}
 
 	// putFile(LAST_PATH, FAUX_RECENT_PATH); // saveLast() will crash here because top is NULL
-
-	char act[256];
-	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
-	system(act);
-
-	char cmd[256];
-	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
-	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
+	if (queueRomLaunch(emu_path, sd_path) != 0) {
+		free(sd_path);
+		return 0;
+	}
 	putInt(RESUME_SLOT_PATH, AUTO_RESUME_SLOT);
-	queueNext(cmd);
+	free(sd_path);
 	return 1;
 }
 
 static void openPak(char* path) {
-	// NOTE: escapeSingleQuotes() modifies the passed string
-	// so we need to save the path before we call that
 	// if (prefixMatch(ROMS_PATH, path)) {
 	// 	addRecent(path);
 	// }
 	saveLast(path);
 
-	char cmd[256];
-	sprintf(cmd, "'%s/launch.sh'", escapeSingleQuotes(path));
-	queueNext(cmd);
+	queuePakLaunch(path);
 }
 
 // Run the action bound to a user-assignable button (0 == FN1, 1 == FN2).
@@ -1244,12 +1303,11 @@ static int runFnAction(int index) {
 	const char* rel = action + prefix_len;
 	if (!rel[0]) return 0;
 
-	char pak_path[256];
-	snprintf(pak_path, sizeof(pak_path), "%s/Tools/%s/%s", SDCARD_PATH, PLATFORM, rel);
-
-	char launch_path[256];
-	snprintf(launch_path, sizeof(launch_path), "%s/launch.sh", pak_path);
-	if (!exists(launch_path)) return 0; // stale binding, eg. the pak was deleted
+	char pak_path[MAX_PATH];
+	char launch_path[MAX_PATH];
+	if (path_format(pak_path, sizeof(pak_path), "%s/Tools/%s/%s", SDCARD_PATH, PLATFORM, rel) != 0 ||
+		path_format(launch_path, sizeof(launch_path), "%s/launch.sh", pak_path) != 0 ||
+		!exists(launch_path)) return 0; // stale binding, eg. the pak was deleted
 
 	// unlike openPak() we save where the user *is*, not the pak itself, so exiting
 	// the pak comes back to the same spot in the list
@@ -1258,11 +1316,7 @@ static int runFnAction(int index) {
 		saveLast(entry->path);
 	}
 
-	char cmd[256];
-	// NOTE: escapeSingleQuotes() modifies pak_path in place
-	snprintf(cmd, sizeof(cmd), "'%s/launch.sh'", escapeSingleQuotes(pak_path));
-	queueNext(cmd);
-	return 1;
+	return queuePakLaunch(pak_path) == 0;
 }
 static void openRom(char* path, char* last) {
 	LOG_info("openRom(%s,%s)\n", path, last);
@@ -1312,20 +1366,13 @@ static void openRom(char* path, char* last) {
 	}
 	else putInt(RESUME_SLOT_PATH,8); // resume hidden default state
 
-	char emu_path[256];
-	getEmuPath(emu_name, emu_path);
+	char emu_path[MAX_PATH];
+	if (getEmuPathSafe(emu_name, emu_path, sizeof(emu_path)) != 0) return;
 
-	// NOTE: escapeSingleQuotes() modifies the passed string
-	// so we need to save the path before we call that
 	addRecent(recent_path, recent_alias); // yiiikes
 	saveLast(last==NULL ? sd_path : last);
-	char act[256];
-	sprintf(act, "gametimectl.elf start '%s'", escapeSingleQuotes(sd_path));
-	system(act);
-	char cmd[256];
-	// dont escape sd_path again because it was already escaped for gametimectl and function modifies input str aswell
-	sprintf(cmd, "'%s' '%s'", escapeSingleQuotes(emu_path), sd_path);
-	queueNext(cmd);
+	if (queueRomLaunch(emu_path, sd_path) != 0)
+		LOG_error("failed to launch ROM\n");
 }
 
 static bool isDirectSubdirectory(const Directory* parent, const char* child_path) {
@@ -1742,6 +1789,13 @@ static AnimTaskNode* animTtaskQueueTail = NULL;
 static SDL_mutex* bgqueueMutex = NULL;
 static SDL_mutex* thumbqueueMutex = NULL;
 static SDL_mutex* animqueueMutex = NULL;
+
+static void freeAnimTask(AnimTask* task) {
+	if (!task) return;
+	free(task->entry_name);
+	free(task);
+}
+
 static SDL_cond* bgqueueCond = NULL;
 static SDL_cond* thumbqueueCond = NULL;
 static SDL_cond* animqueueCond = NULL;
@@ -2053,98 +2107,71 @@ bool frameReady = true;
 bool pillanimdone = false;
 
 int animWorker(void* unused) {
-	  while (!SDL_AtomicGet(&workerThreadsShutdown)) {
- 		SDL_LockMutex(animqueueMutex);
-    while (!animTaskQueueHead && !SDL_AtomicGet(&workerThreadsShutdown)) {
-        SDL_CondWait(animqueueCond, animqueueMutex);
-    }
-    if (SDL_AtomicGet(&workerThreadsShutdown)) {
-        SDL_UnlockMutex(animqueueMutex);
-        break;
-    }
-    AnimTaskNode* node = animTaskQueueHead;
-    animTaskQueueHead = node->next;
-    if (!animTaskQueueHead) animTtaskQueueTail = NULL;
-		SDL_UnlockMutex(animqueueMutex);
-
-    AnimTask* task = node->task;
-		finishedTask* finaltask = (finishedTask*)malloc(sizeof(finishedTask));
-		int total_frames = task->frames;
-		for (int frame = 0; frame <= total_frames; frame++) {
-			// Check for shutdown at start of each frame
-			if (SDL_AtomicGet(&workerThreadsShutdown)) break;
-
-			float t = (float)frame / total_frames;
-			if (t > 1.0f) t = 1.0f;
-
-			int current_x = task->startX + (int)((task->targetX - task->startX) * t);
-			int current_y = task->startY + (int)(( task->targetY -  task->startY) * t);
-
-			SDL_Rect moveDst = { current_x, current_y, task->move_w, task->move_h };
-			finaltask->dst = moveDst;
-			finaltask->entry_name = task->entry_name;
-			finaltask->move_w = task->move_w;
-			finaltask->move_h = task->move_h;
-			finaltask->targetY = task->targetY;
-			finaltask->targetTextY = task->targetTextY;
-			finaltask->move_y = SCALE1(PADDING + task->targetY) + (task->targetTextY - task->targetY);
-			finaltask->done = 0;
-			if(frame >= total_frames) finaltask->done=1;
-			task->callback(finaltask);
-			SDL_LockMutex(frameMutex);
-			while (!frameReady && !SDL_AtomicGet(&workerThreadsShutdown)) {
-				SDL_CondWait(flipCond, frameMutex);
-			}
-			frameReady = false;
-			SDL_UnlockMutex(frameMutex);
-
-		}
+	while (!SDL_AtomicGet(&workerThreadsShutdown)) {
 		SDL_LockMutex(animqueueMutex);
+		while (!animTaskQueueHead && !SDL_AtomicGet(&workerThreadsShutdown)) SDL_CondWait(animqueueCond, animqueueMutex);
+		if (SDL_AtomicGet(&workerThreadsShutdown)) { SDL_UnlockMutex(animqueueMutex); break; }
+		AnimTaskNode* node = animTaskQueueHead;
+		animTaskQueueHead = node->next;
 		if (!animTaskQueueHead) animTtaskQueueTail = NULL;
-		currentAnimQueueSize--;  // <-- add this
+		currentAnimQueueSize--;
 		SDL_UnlockMutex(animqueueMutex);
 
+		AnimTask* task = node->task;
+		free(node);
+		finishedTask* finaltask = calloc(1, sizeof(*finaltask));
+		if (finaltask) {
+			int total_frames = task->frames > 0 ? task->frames : 1;
+			for (int frame = 0; frame <= total_frames && !SDL_AtomicGet(&workerThreadsShutdown); frame++) {
+				float t = (float)frame / total_frames;
+				finaltask->dst = (SDL_Rect){ task->startX + (int)((task->targetX - task->startX) * t), task->startY + (int)((task->targetY - task->startY) * t), task->move_w, task->move_h };
+				finaltask->entry_name = task->entry_name;
+				finaltask->move_w = task->move_w;
+				finaltask->move_h = task->move_h;
+				finaltask->targetY = task->targetY;
+				finaltask->targetTextY = task->targetTextY;
+				finaltask->move_y = SCALE1(PADDING + task->targetY) + (task->targetTextY - task->targetY);
+				finaltask->done = frame == total_frames;
+				if (task->callback) task->callback(finaltask);
+				SDL_LockMutex(frameMutex);
+				while (!frameReady && !SDL_AtomicGet(&workerThreadsShutdown)) SDL_CondWait(flipCond, frameMutex);
+				frameReady = false;
+				SDL_UnlockMutex(frameMutex);
+			}
+			free(finaltask);
+		}
+		freeAnimTask(task);
 		SDL_LockMutex(animMutex);
 		pillanimdone = true;
-		free(finaltask);
 		SDL_UnlockMutex(animMutex);
 	}
+	return 0;
 }
 
 void enqueueanmimtask(AnimTask* task) {
-    AnimTaskNode* node = (AnimTaskNode*)malloc(sizeof(AnimTaskNode));
-    node->task = task;
-    node->next = NULL;
-
-    SDL_LockMutex(animqueueMutex);
+	if (!task) return;
+	AnimTaskNode* node = malloc(sizeof(*node));
+	if (!node) { freeAnimTask(task); return; }
+	node->task = task;
+	node->next = NULL;
+	SDL_LockMutex(animqueueMutex);
 	pillanimdone = false;
-    // If queue is full, drop the oldest task (head)
-    if (currentAnimQueueSize >= 1) {
-        AnimTaskNode* oldNode = animTaskQueueHead;
-        if (oldNode) {
-            animTaskQueueHead = oldNode->next;
-            if (!animTaskQueueHead) {
-                animTtaskQueueTail = NULL;
-            }
-            if (oldNode->task) {
-                free(oldNode->task);  // Only if task was malloc'd
-            }
-            free(oldNode);
-            currentAnimQueueSize--;
-        }
-    }
-
-    // Enqueue the new task
-    if (animTtaskQueueTail) {
-        animTtaskQueueTail->next = node;
-        animTtaskQueueTail = node;
-    } else {
-        animTaskQueueHead = animTtaskQueueTail = node;
-    }
-
-    currentAnimQueueSize++;
-    SDL_CondSignal(animqueueCond);
-    SDL_UnlockMutex(animqueueMutex);
+	if (currentAnimQueueSize >= 1) {
+		AnimTaskNode* oldNode = animTaskQueueHead;
+		if (oldNode) {
+			animTaskQueueHead = oldNode->next;
+			if (!animTaskQueueHead) animTtaskQueueTail = NULL;
+			freeAnimTask(oldNode->task);
+			free(oldNode);
+			currentAnimQueueSize--;
+		}
+	}
+	if (animTtaskQueueTail) animTtaskQueueTail->next = node;
+	else animTaskQueueHead = node;
+	animTtaskQueueTail = node;
+	currentAnimQueueSize++;
+	SDL_CondSignal(animqueueCond);
+	SDL_UnlockMutex(animqueueMutex);
 }
 
 void animPill(AnimTask *task) {
@@ -2181,10 +2208,10 @@ void cleanupImageLoaderPool() {
 	SDL_AtomicSet(&workerThreadsShutdown, 1);
 
 	// Wake up all waiting threads
-	if (bgqueueCond) SDL_CondSignal(bgqueueCond);
-	if (thumbqueueCond) SDL_CondSignal(thumbqueueCond);
-	if (animqueueCond) SDL_CondSignal(animqueueCond);
-	if (flipCond) SDL_CondSignal(flipCond);  // Wake up animWorker if stuck waiting for frame flip
+	if (bgqueueCond) SDL_CondBroadcast(bgqueueCond);
+	if (thumbqueueCond) SDL_CondBroadcast(thumbqueueCond);
+	if (animqueueCond) SDL_CondBroadcast(animqueueCond);
+	if (flipCond) SDL_CondBroadcast(flipCond);  // Wake up animWorker if stuck waiting for frame flip
 
 	// Wait for all worker threads to finish
 	if (bgLoadThread) {
@@ -2199,6 +2226,17 @@ void cleanupImageLoaderPool() {
 		SDL_WaitThread(animWorkerThread, NULL);
 		animWorkerThread = NULL;
 	}
+
+	SDL_LockMutex(animqueueMutex);
+	while (animTaskQueueHead) {
+		AnimTaskNode* node = animTaskQueueHead;
+		animTaskQueueHead = node->next;
+		freeAnimTask(node->task);
+		free(node);
+	}
+	animTtaskQueueTail = NULL;
+	currentAnimQueueSize = 0;
+	SDL_UnlockMutex(animqueueMutex);
 
 	// Small delay to ensure llvmpipe/OpenGL threads have completed any pending operations
 	SDL_Delay(10);
@@ -2292,6 +2330,7 @@ int main (int argc, char *argv[]) {
 
 	// make sure we have no running games logged as active anymore (we might be launching back into the UI here)
 	system("gametimectl.elf stop_all");
+	unlink(ACTIVE_ROM_PATH);
 
 	GFX_setVsync(VSYNC_STRICT);
 	PWR_setCPUSpeed(CPU_SPEED_AUTO);

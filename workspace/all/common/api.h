@@ -845,7 +845,7 @@ bool PLAT_wifiConnected();
 // returns connection info, if currently connected.
 int PLAT_wifiConnection(struct WIFI_connection *connection_info);
 // returns true if we have stored credentials for this network (via wpa_supplicant)
-bool PLAT_wifiHasCredentials(char *ssid, WifiSecurityType sec);
+bool PLAT_wifiHasCredentials(const char *ssid, WifiSecurityType sec);
 // forgets the credentials for this SSID, if saved
 void PLAT_wifiForget(char *ssid, WifiSecurityType sec);
 // attempt to connect to this SSID, using, stored credentials.

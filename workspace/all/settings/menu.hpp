@@ -14,6 +14,7 @@ extern "C"
 #include <algorithm>
 #include <any>
 #include <numeric>
+#include <memory>
 #include <shared_mutex>
 
 // leftovers to port
@@ -153,7 +154,7 @@ protected:
     ValueResetCallback on_reset;
     // MenuListCallback on_change;
 
-    MenuList *submenu{nullptr};
+    std::unique_ptr<MenuList> submenu;
     bool deferred{false};
 
     virtual void initSelection() {}
@@ -169,9 +170,7 @@ public:
                      MenuList *submenu = nullptr)
         : type(type), name(name), desc(desc), on_get(on_get), on_set(on_set), 
         on_reset(on_reset), on_confirm(on_confirm), submenu(submenu) {}
-    ~AbstractMenuItem() {
-         // delete submenu;
-    }
+    virtual ~AbstractMenuItem();
 
     virtual const std::any getValue() const = 0;
     virtual const std::string getLabel() const = 0;
@@ -181,6 +180,7 @@ public:
     const std::string &getName() const { return name; }
     const std::string &getDesc() const { return desc; }
     void setDesc(const std::string &d) { desc = d; }
+    void clearName() { for (char &c : name) c = '\0'; name.clear(); }
     const ListItemType getType() const { return type; }
 
     virtual void drawCustomItem(SDL_Surface *surface, const SDL_Rect &dst, const AbstractMenuItem &item, bool selected) const {}
@@ -190,7 +190,7 @@ public:
 
     bool isDeferred() const { return deferred; }
     void defer(bool on) { deferred = on; }
-    MenuList *getSubMenu() { return submenu; }
+    MenuList *getSubMenu() { return submenu.get(); }
 };
 
 // A simple menu item visualizing a fixed label and value that is read-only.
@@ -321,10 +321,14 @@ protected:
     MenuListCallback on_confirm;
 
     std::shared_mutex itemLock;
+    void clearDynamicItems(size_t first) {
+        for (size_t i = first; i < items.size(); ++i) delete items[i];
+        items.resize(first);
+    }
 
 public:
     MenuList(MenuItemType type, const std::string &desc, std::vector<AbstractMenuItem*> items, MenuListCallback on_change = nullptr, MenuListCallback on_confirm = nullptr);
-    ~MenuList();
+    virtual ~MenuList();
     MenuList(MenuList &) = delete;
 
     static void showOverlay(const std::string& message, OverlayDismissMode dismissMode = OverlayDismissMode::None);
@@ -354,6 +358,8 @@ public:
     void drawMainItem(SDL_Surface *surface, const SDL_Rect &dst, const AbstractMenuItem &item, bool selected);
     virtual void drawCustom(SDL_Surface *surface, const SDL_Rect &dst, const SDL_Rect &dstTitle) {};
 };
+
+inline AbstractMenuItem::~AbstractMenuItem() = default;
 
 // Moved here to ensure MenuList is fully defined
 struct ScopedOverlay {

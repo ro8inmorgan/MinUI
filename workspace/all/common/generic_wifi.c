@@ -343,7 +343,7 @@ int PLAT_wifiConnection(struct WIFI_connection *connection_info)
 	return 0;
 }
 
-bool PLAT_wifiHasCredentials(char *ssid, WifiSecurityType sec)
+bool PLAT_wifiHasCredentials(const char *ssid, WifiSecurityType sec)
 {
     // Validate input SSID (reject tabs/newlines)
     for (int i = 0; ssid[i]; ++i) {

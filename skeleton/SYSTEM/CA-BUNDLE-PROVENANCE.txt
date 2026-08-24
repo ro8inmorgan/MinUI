@@ -1,0 +1,7 @@
+CA bundle provenance
+====================
+
+ca-certificates.crt is copied from Debian ca-certificates 20230311
+(/etc/ssl/certs/ca-certificates.crt), generated from Mozilla NSS certificate
+metadata. The certificate data is attributed to Mozilla Contributors and is
+licensed under MPL-2.0; the complete license text is CA-BUNDLE-MPL-2.0.txt.

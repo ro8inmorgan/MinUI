@@ -1,164 +1,109 @@
 ---
 name: CI
 
-# yamllint disable-line rule:truthy
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request: {}
 
 permissions:
-  attestations: write
   contents: read
-  id-token: write
 
 jobs:
-  prepare:
-    runs-on: ubuntu-24.04-arm
-    outputs:
-      next-tag: ${{ steps.next-tag.outputs.version }}
-      release-name: ${{ steps.release-name.outputs.RELEASE_NAME }}
+  verify:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Generate Release Name
-        id: release-name
-        run: |
-          echo "RELEASE_NAME=$(make name)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7.0.1
+      - run: sudo apt-get update && sudo apt-get install -y python3-yaml shellcheck
+      - name: Validate lock, remotes, assets, and core patch chains
+        run: python3 scripts/verify_lock.py --remotes --assets --patches
+      - name: Validate workflow YAML
+        run: python3 -c 'import sys, yaml; [yaml.safe_load(open(path)) for path in sys.argv[1:]]' .github/workflows/*.yaml
+      - name: ShellCheck all tracked shell
+        run: python3 scripts/run_shellcheck.py
+      - name: Host unit tests with ASan and UBSan
+        run: make host-test
+      - name: Host unit tests with TSAN
+        run: make -C tests SANITIZER=thread
 
   core-matrix:
+    needs: verify
     runs-on: ubuntu-24.04-arm
-    env:
-      PLATFORM: ${{ matrix.toolchain }}
-    outputs:
-      cores: ${{ steps.cores.outputs.cores }}
     strategy:
       fail-fast: true
       matrix:
-        toolchain:
-          - tg5040
-          - tg5050
-
+        toolchain: [tg5040, tg5050]
+    outputs:
+      cores: ${{ steps.cores.outputs.cores }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Generate cores matrix
-        id: cores
-        run: |
-          CORES="$(make cores-json)"
-          echo "cores=$CORES" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v7.0.1
+      - id: cores
+        env:
+          PLATFORM: ${{ matrix.toolchain }}
+        run: echo "cores=$(make cores-json)" >> "$GITHUB_OUTPUT"
 
   build-core:
     needs: core-matrix
     runs-on: ubuntu-24.04-arm
-    env:
-      PLATFORM: ${{ matrix.toolchain }}
     strategy:
       fail-fast: true
       matrix:
-        toolchain:
-          - tg5040
-          - tg5050
+        toolchain: [tg5040, tg5050]
         core: ${{ fromJson(needs.core-matrix.outputs.cores) }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Setup
-        run: make setup
-
-      - name: Build ${{ matrix.core }} core
-        run: make build-core CORE=${{ matrix.core }}
-
-      - name: Upload core
-        uses: actions/upload-artifact@v7.0.1
+      - uses: actions/checkout@v7.0.1
+      - run: make setup
+      - name: Build and verify ${{ matrix.core }}
+        env:
+          PLATFORM: ${{ matrix.toolchain }}
+        run: |
+          make build-core CORE="${{ matrix.core }}"
+          # shellcheck disable=SC2086 # intentional glob verifies the sole output.
+          set -- workspace/$PLATFORM/cores/output/*.so
+          test "$1" != "workspace/$PLATFORM/cores/output/*.so"
+          test "$#" -eq 1
+          test -s "$1"
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: core-${{ matrix.toolchain }}-${{ matrix.core }}.zip
-          path: workspace/${{ env.PLATFORM }}/cores/output/
+          path: workspace/${{ matrix.toolchain }}/cores/output/
 
   build:
-    needs:
-      - prepare
-      - build-core
+    needs: build-core
     runs-on: ubuntu-24.04-arm
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
     env:
-      RELEASE_NAME: ${{ needs.prepare.outputs.release-name }}
+      RELEASE_VERSION: ci-${{ github.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zipmerge
-
-      - name: Setup
-        run: make setup
-
-      - name: Download Cores (tg5040)
-        uses: actions/download-artifact@v8.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - run: make setup
+      - uses: actions/download-artifact@v8.0.1
         with:
           path: workspace/tg5040/cores/output/
           pattern: core-tg5040-*
           merge-multiple: true
-
-      - name: Build (tg5040)
-        run: make tg5040
+      - run: make tg5040
         env:
           PLATFORM: tg5040
-
-      - name: Download Cores (tg5050)
-        uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@v8.0.1
         with:
           path: workspace/tg5050/cores/output/
           pattern: core-tg5050-*
           merge-multiple: true
-
-      - name: Build (tg5050)
-        run: make tg5050
+      - run: make tg5050 special package
         env:
           PLATFORM: tg5050
-
-      - name: Special
-        run: make special
-
-      - name: Package
-        run: make package
-
-      - name: Upload All
-        uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.1
         with:
-          name: ${{ env.RELEASE_NAME }}-all.zip
-          path: releases/${{ env.RELEASE_NAME }}-all.zip
-
-      - name: Upload Base
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ${{ env.RELEASE_NAME }}-base.zip
-          path: releases/${{ env.RELEASE_NAME }}-base.zip
-
-      - name: Upload Extras
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ${{ env.RELEASE_NAME }}-extras.zip
-          path: releases/${{ env.RELEASE_NAME }}-extras.zip
-
-      - name: Skip Attest for PRs from forks
-        id: skip
-        if: github.ref != 'refs/heads/main'
-        run: |
-          echo '::warning title=Attest skipped::Attest action requires permissions and is performed only for main branch.'
-
-      - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v4.2.2
+          name: release-zips
+          path: releases/*.zip
+      - name: Attest main artifacts
         if: github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@v4.2.2
         with:
-          subject-path: |
-            releases/${{ env.RELEASE_NAME }}-all.zip
-            releases/${{ env.RELEASE_NAME }}-base.zip
-            releases/${{ env.RELEASE_NAME }}-extras.zip
+          subject-path: releases/*.zip

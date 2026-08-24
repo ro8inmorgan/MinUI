@@ -33,7 +33,12 @@ void PLAT_initInput(void) {
 		LOG_error("Failed initializing joysticks: %s\n", SDL_GetError());
 	num_joysticks = SDL_NumJoysticks();
     if (num_joysticks > 0) {
-        joysticks = (SDL_Joystick **)malloc(sizeof(SDL_Joystick *) * num_joysticks);
+        joysticks = malloc(sizeof(*joysticks) * num_joysticks);
+        if (!joysticks) {
+            LOG_error("Failed allocating joystick list\n");
+            num_joysticks = 0;
+            return;
+        }
         for (int i = 0; i < num_joysticks; i++) {
 			joysticks[i] = SDL_JoystickOpen(i);
 			LOG_info("Opening joystick %d: %s\n", i, SDL_JoystickName(joysticks[i]));
@@ -62,7 +67,13 @@ void PLAT_updateInput(const SDL_Event *event) {
         int device_index = event->jdevice.which;
         SDL_Joystick *new_joy = SDL_JoystickOpen(device_index);
         if (new_joy) {
-            joysticks = realloc(joysticks, sizeof(SDL_Joystick *) * (num_joysticks + 1));
+            SDL_Joystick **resized = realloc(joysticks, sizeof(*joysticks) * (num_joysticks + 1));
+            if (!resized) {
+                LOG_error("Failed growing joystick list\n");
+                SDL_JoystickClose(new_joy);
+                break;
+            }
+            joysticks = resized;
             joysticks[num_joysticks++] = new_joy;
             LOG_info("Joystick added at index %d: %s\n", device_index, SDL_JoystickName(new_joy));
         } else {
@@ -87,7 +98,8 @@ void PLAT_updateInput(const SDL_Event *event) {
                     free(joysticks);
                     joysticks = NULL;
                 } else {
-                    joysticks = realloc(joysticks, sizeof(SDL_Joystick *) * num_joysticks);
+                    SDL_Joystick **resized = realloc(joysticks, sizeof(*joysticks) * num_joysticks);
+                    if (resized) joysticks = resized;
                 }
                 break;
             }
@@ -233,7 +245,8 @@ void PLAT_powerOff(int reboot) {
 	if (CFG_getHaptics()) {
 		VIB_singlePulse(VIB_bootStrength, VIB_bootDuration_ms);
 	}
-	system("rm -f /tmp/nextui_exec && sync");
+	unlink("/tmp/nextui-runtime/nextui.exec");
+	sync();
 	sleep(2);
 
 	SetRawVolume(MUTE_VOLUME_RAW);

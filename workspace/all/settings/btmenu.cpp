@@ -16,7 +16,7 @@ typedef std::shared_lock<Lock> ReadLock;
 using namespace Bluetooth;
 using namespace std::placeholders;
 
-Menu::Menu(const int &globalQuit, int &globalDirty) : MenuList(MenuItemType::Fixed, "Network", {}), globalQuit(globalQuit), globalDirty(globalDirty)
+Menu::Menu(const int &, int &) : MenuList(MenuItemType::Fixed, "Network", {})
 {
     toggleItem = new MenuItem(ListItemType::Generic, "Bluetooth", "Enable/disable Bluetooth", {false, true}, {"Off", "On"},
                               std::bind(&Menu::getBtToggleState, this),
@@ -62,12 +62,11 @@ Menu::~Menu()
 
 InputReactionHint Menu::handleInput(int &dirty, int &quit)
 {
+    applySnapshot(dirty);
     auto ret = MenuList::handleInput(dirty, quit);
-    if (selectionDirty)
-    {
+    if (selectionDirty) {
+        selectionDirty = false;
         dirty = true;
-        selectionDirty = false; // handled
-        //LOG_info("collected selectionDirty\n");
     }
     return ret;
 }
@@ -119,129 +118,77 @@ void Menu::resetSamplerateMaximum()
     CFG_setBluetoothSamplingrateLimit(CFG_DEFAULT_BLUETOOTH_MAXRATE);
 }
 
-template <typename Map>
-bool key_compare(Map const &lhs, Map const &rhs)
+void Menu::applySnapshot(int &dirty)
 {
-    return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                                                  [](auto a, auto b)
-                                                  { return a.first == b.first; });
+    for (auto item : items)
+        if (item->isDeferred()) return;
+
+    ScanSnapshot latest;
+    {
+        std::lock_guard<std::mutex> lock(snapshotMutex);
+        if (!snapshotReady) return;
+        latest = std::move(snapshot);
+        snapshotReady = false;
+    }
+
+    const std::string selectedName = getSelectedItemName();
+    clearDynamicItems(3);
+    if (latest.enabled) {
+        for (const auto &device : latest.available)
+            items.push_back(new PairableItem{device, new MenuList(MenuItemType::List, "Options", {new PairNewItem(device, selectionDirty)})});
+        for (const auto &device : latest.paired) {
+            MenuList *options = device.is_connected
+                ? new MenuList(MenuItemType::List, "Options", {new DisconnectKnownItem(device, selectionDirty), new UnpairItem(device, selectionDirty)})
+                : new MenuList(MenuItemType::List, "Options", {new ConnectKnownItem(device, selectionDirty), new UnpairItem(device, selectionDirty)});
+            auto item = new PairedItem{device, options};
+            item->setDesc(std::string(device.remote_addr) + " | " + std::to_string(device.rssi));
+            items.push_back(item);
+        }
+    }
+    layout_called = false;
+    MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
+    selectByName(selectedName);
+    dirty = true;
 }
 
 void Menu::updater()
 {
-    int pollSecs = 15;
-
-    while (!quit && !globalQuit)
-    {
-        // TODO: pause when menu is not rendered
-        // TODO: improve repaint logic in a way that remembers selection
-        // Scan
-        if (BT_enabled())
-        {
-            if(!BT_discovering())
-                BT_discovery(true);
-
-            std::map<std::string, BT_devicePaired> pairedMap;
-            std::vector<BT_devicePaired> kl(SCAN_MAX_RESULTS);
-            int known = BT_pairedDevices(kl.data(), SCAN_MAX_RESULTS);
-            for (int i = 0; i < known; i++)
-                pairedMap.emplace(kl[i].remote_addr, kl[i]);  // Use MAC address as key (unique)
-
-            // grab list and compare it to previous result
-            // only relayout the menu if changes happended
-            std::map<std::string, BT_device> scanMap;
-            std::vector<BT_device> sr(SCAN_MAX_RESULTS);
-            int cnt = BT_availableDevices(sr.data(), SCAN_MAX_RESULTS);
-            for (int i = 0; i < cnt; i++)
-                scanMap.emplace(sr[i].name, sr[i]);
-
-            // dont repopulate if any submenu is open
-            bool menuOpen = false;
-            for (auto i : items)
-            {
-                if (i->isDeferred())
-                {
-                    menuOpen = true;
-                    break;
-                }
+    ScanSnapshot previous;
+    bool havePrevious = false;
+    while (!quit) {
+        ScanSnapshot latest;
+        bool success = true;
+        latest.enabled = BT_enabled();
+        if (latest.enabled) {
+            if (!BT_discovering()) BT_discovery(true);
+            std::vector<BT_devicePaired> paired(SCAN_MAX_RESULTS);
+            int pairedCount = BT_pairedDevices(paired.data(), SCAN_MAX_RESULTS);
+            std::vector<BT_device> available(SCAN_MAX_RESULTS);
+            int availableCount = pairedCount < 0 ? -1 : BT_availableDevices(available.data(), SCAN_MAX_RESULTS);
+            if (pairedCount < 0 || availableCount < 0) success = false;
+            else {
+                std::map<std::string, BT_devicePaired> uniquePaired;
+                std::map<std::string, BT_device> uniqueAvailable;
+                for (int i = 0; i < pairedCount; i++) uniquePaired.emplace(paired[i].remote_addr, paired[i]);
+                for (int i = 0; i < availableCount; i++) uniqueAvailable.emplace(available[i].name, available[i]);
+                for (const auto &entry : uniqueAvailable) latest.available.push_back(entry.second);
+                for (const auto &entry : uniquePaired) latest.paired.push_back(entry.second);
             }
-
-            // something changed?
-            if (!menuOpen)
-            {
-                // remember selection and restore
-                std::string selectedName;
-                bool selectionApplied = false;
-
-                {
-                    WriteLock w(itemLock);
-                    selectedName = getSelectedItemName();
-                    items.clear();
-                    items.push_back(toggleItem);
-                    items.push_back(diagItem);
-                    items.push_back(rateItem);
-                    layout_called = false;
-
-                    for (auto &[s, r] : scanMap)
-                    {
-                        MenuList *options;
-                        options = new MenuList(MenuItemType::List, "Options", {new PairNewItem(r, selectionDirty)});
-                        auto itm = new PairableItem{r, options};
-                        items.push_back(itm);
-                    }
-
-                    for (auto &[s, r] : pairedMap)
-                    {
-                        MenuList *options;
-                        if (r.is_connected)
-                        {
-                            options = new MenuList(MenuItemType::List, "Options", {
-                                                                                    new DisconnectKnownItem(r, selectionDirty),
-                                                                                    new UnpairItem(r, selectionDirty),
-                                                                                });
-                        }
-                        else
-                        {
-                            options = new MenuList(MenuItemType::List, "Options", {
-                                                                                    new ConnectKnownItem(r, selectionDirty),
-                                                                                    new UnpairItem(r, selectionDirty),
-                                                                                });
-                        }
-                        auto itm = new PairedItem{r, options};
-                        itm->setDesc(std::string(r.remote_addr) + " | " + std::to_string(r.rssi));
-                        items.push_back(itm);
-                    }
-                }
-                MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
-
-                // Attempt to restore prev selection
-                selectionApplied = selectByName(selectedName);
-                globalDirty |= selectionApplied;
-                // If selection was restored, we already called performLayout internally
-                selectionDirty |= !selectionApplied;
-            }
-            pollSecs = 2;
         }
-        else
-        {
-            WriteLock w(itemLock);
-            items.clear();
-            items.push_back(toggleItem);
-            items.push_back(diagItem);
-            items.push_back(rateItem);
-            layout_called = false;
-            selectionDirty = true;
-            pollSecs = 15;
+        if (success && (!havePrevious || latest.enabled != previous.enabled ||
+            latest.available.size() != previous.available.size() || latest.paired.size() != previous.paired.size() ||
+            !std::equal(latest.available.begin(), latest.available.end(), previous.available.begin(), [](const BT_device &a, const BT_device &b) {
+                return strcmp(a.addr, b.addr) == 0 && strcmp(a.name, b.name) == 0 && a.kind == b.kind;
+            }) || !std::equal(latest.paired.begin(), latest.paired.end(), previous.paired.begin(), [](const BT_devicePaired &a, const BT_devicePaired &b) {
+                return strcmp(a.remote_addr, b.remote_addr) == 0 && strcmp(a.remote_name, b.remote_name) == 0 && a.rssi == b.rssi && a.is_bonded == b.is_bonded && a.is_connected == b.is_connected;
+            }))) {
+            std::lock_guard<std::mutex> lock(snapshotMutex);
+            snapshot = latest;
+            snapshotReady = true;
+            previous = std::move(latest);
+            havePrevious = true;
         }
-
-        // reset selection scope (locks internally)
-        if (selectionDirty)
-        {
-            MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
-            selectionDirty = false;
-        }
-
-        std::this_thread::sleep_for(std::chrono::seconds(pollSecs));
+        for (int i = 0; i < (success ? 20 : 150) && !quit; i++) std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 

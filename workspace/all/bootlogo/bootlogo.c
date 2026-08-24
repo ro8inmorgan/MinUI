@@ -3,14 +3,18 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <msettings.h>
 
 #include "defines.h"
 #include "api.h"
 #include "utils.h"
 
-static bool quit = false;
+static volatile sig_atomic_t quit = 0;
 
 static void sigHandler(int sig)
 {
@@ -26,6 +30,90 @@ static void sigHandler(int sig)
 }
 
 static SDL_Surface *screen;
+
+static int run_program(const char *path, char *const argv[]) {
+    pid_t pid = fork();
+    int status;
+
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        execvp(path, argv);
+        _exit(127);
+    }
+    while (waitpid(pid, &status, 0) < 0) {
+        if (errno != EINTR) return -1;
+    }
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;
+    errno = EIO;
+    return -1;
+}
+
+static int copy_bootlogo(const char *source) {
+    static const char destination[] = "/mnt/boot/bootlogo.bmp";
+    char buffer[4096];
+    int input = open(source, O_RDONLY | O_NOFOLLOW);
+    int output;
+    struct stat st;
+
+    if (input < 0 || fstat(input, &st) != 0 || !S_ISREG(st.st_mode)) goto fail_input;
+    output = open(destination, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 420);
+    if (output < 0) goto fail_input;
+    for (;;) {
+        ssize_t read_size = read(input, buffer, sizeof(buffer));
+        if (read_size < 0) {
+            if (errno == EINTR) continue;
+            close(output);
+            unlink(destination);
+            goto fail_input;
+        }
+        if (read_size == 0) break;
+        for (ssize_t written = 0; written < read_size;) {
+            ssize_t result = write(output, buffer + written, (size_t)(read_size - written));
+            if (result < 0 && errno == EINTR) continue;
+            if (result <= 0) {
+                close(output);
+                unlink(destination);
+                goto fail_input;
+            }
+            written += result;
+        }
+    }
+    if (fsync(output) != 0) {
+        close(output);
+        unlink(destination);
+        goto fail_input;
+    }
+    int close_output = close(output);
+    int close_input = close(input);
+    if (close_output != 0 || close_input != 0) {
+        unlink(destination);
+        return -1;
+    }
+    return 0;
+
+fail_input:
+    if (input >= 0) close(input);
+    return -1;
+}
+
+static int apply_logo(const char *logo_path) {
+    static const char boot_path[] = "/mnt/boot/";
+    char *mount_argv[] = { "mount", "-t", "vfat", "/dev/mmcblk0p1", (char *)boot_path, NULL };
+    char *umount_argv[] = { "umount", (char *)boot_path, NULL };
+    char *reboot_argv[] = { "reboot", NULL };
+    struct stat st;
+
+    if ((mkdir(boot_path, S_IRWXU) != 0 && errno != EEXIST) ||
+        stat(boot_path, &st) != 0 || !S_ISDIR(st.st_mode) ||
+        run_program("mount", mount_argv) != 0) return -1;
+    if (copy_bootlogo(logo_path) != 0) {
+        run_program("umount", umount_argv);
+        return -1;
+    }
+    sync();
+    if (run_program("umount", umount_argv) != 0) return -1;
+    return run_program("reboot", reboot_argv);
+}
 
 SDL_Surface** images;
 char **image_paths;
@@ -56,11 +144,27 @@ int loadImages()
                 snprintf(path, sizeof(path), "%s%s", basepath, ent->d_name);
                 SDL_Surface *bmp = IMG_Load(path);
                 if (bmp) {
-                    count++;
-                    images = realloc(images, sizeof(SDL_Surface*) * count);
-                    images[count-1] = bmp;
-                    image_paths = realloc(image_paths, sizeof(char*) * count);
-                    image_paths[count-1] = strdup(path);
+                    SDL_Surface **new_images = realloc(images, sizeof(*images) * (count + 1));
+                    char **new_paths;
+                    char *new_path;
+                    if (!new_images) {
+                        SDL_FreeSurface(bmp);
+                        continue;
+                    }
+                    images = new_images;
+                    new_paths = realloc(image_paths, sizeof(*image_paths) * (count + 1));
+                    if (!new_paths) {
+                        SDL_FreeSurface(bmp);
+                        continue;
+                    }
+                    image_paths = new_paths;
+                    new_path = strdup(path);
+                    if (!new_path) {
+                        SDL_FreeSurface(bmp);
+                        continue;
+                    }
+                    images[count] = bmp;
+                    image_paths[count++] = new_path;
                 }
             }
         }
@@ -83,6 +187,11 @@ void unloadImages()
         SDL_FreeSurface(images[i]);
     }
     free(images);
+    for (int i = 0; i < count; i++) free(image_paths[i]);
+    free(image_paths);
+    images = NULL;
+    image_paths = NULL;
+    count = 0;
 }
 
 int main(int argc, char *argv[])
@@ -116,35 +225,24 @@ int main(int argc, char *argv[])
         }
         else
         {
-            if (PAD_justRepeated(BTN_LEFT))
+            if (count > 0 && PAD_justRepeated(BTN_LEFT))
             {
                 selected -= 1;
-                if (selected<0)
+                if (selected < 0)
                     selected = count - 1;
                 dirty = 1;
             }
-            else if (PAD_justRepeated(BTN_RIGHT))
+            else if (count > 0 && PAD_justRepeated(BTN_RIGHT))
             {
                 selected += 1;
-                if (selected>=count)
+                if (selected >= count)
                     selected = 0;
                 dirty = 1;
             }
-            else if (PAD_justPressed(BTN_A))
+            else if (count > 0 && PAD_justPressed(BTN_A))
             {
-                // apply with system calls
-                // BOOT_PATH=/mnt/boot/
-                // mkdir -p $BOOT_PATH
-                // mount -t vfat /dev/mmcblk0p1 $BOOT_PATH
-                // cp $LOGO_PATH $BOOT_PATH
-                // sync
-                // umount $BOOT_PATH
-                // reboot
-                char* boot_path = "/mnt/boot/";
-                char* logo_path = image_paths[selected];
-                char cmd[256]; 
-                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p1 %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
-                system(cmd);
+                if (apply_logo(image_paths[selected]) != 0)
+                    LOG_error("failed to apply boot logo: %s\n", strerror(errno));
             }
             else if (PAD_justPressed(BTN_B))
             {

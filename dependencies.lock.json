@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "core_repositories": {
+    "a2600": {"repo": "https://github.com/libretro/stella2014-libretro", "sha": "4a7da82595d27b8df7af1ecb467a64b642a41bc9"},
+    "a5200": {"repo": "https://github.com/libretro/a5200", "sha": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b"},
+    "a7800": {"repo": "https://github.com/libretro/prosystem-libretro", "sha": "8a88014287c7a01cd568067e5a557d0a2b2a051f"},
+    "handy": {"repo": "https://github.com/libretro/libretro-handy", "sha": "bc55d462f0b2d6b073ea93dc552ebd73cec60fd1"},
+    "c64": {"repo": "https://github.com/libretro/vice-libretro", "sha": "c8c242db75a559246d6d51017e6dd4ecd75d6a9f"},
+    "c128": {"repo": "https://github.com/libretro/vice-libretro", "sha": "c8c242db75a559246d6d51017e6dd4ecd75d6a9f"},
+    "fake-08": {"repo": "https://github.com/jtothebell/fake-08", "sha": "814991a2571ad3970e386cef48f3b148aa1c27b9"},
+    "fbneo": {"repo": "https://github.com/libretro/FBNeo", "sha": "87f78d3408c248b7bbfbcba2cffc5382b3060fa9"},
+    "fceumm": {"repo": "https://github.com/libretro/libretro-fceumm", "sha": "236ccdfc911e84c60fea6b9d0699c2d440a8de14"},
+    "gambatte": {"repo": "https://github.com/libretro/gambatte-libretro", "sha": "d9d6cd06382d1ced30de34d56d3609452323dab1"},
+    "gpsp": {"repo": "https://github.com/libretro/gpsp", "sha": "6b12231f03591e60deea389f7a122e594db61388"},
+    "libretro-cap32": {"repo": "https://github.com/libretro/libretro-cap32", "sha": "4abfb8be233bec630f369379fb6c1d92d31f1c7d"},
+    "libretro-uae": {"repo": "https://github.com/libretro/libretro-uae", "sha": "6636d5f3fd4417f4e57ab9144fdba35b77fa3a40"},
+    "mednafen_pce_fast": {"repo": "https://github.com/libretro/beetle-pce-fast-libretro", "sha": "bebe2b13a840fbfd45cb501f5cd0efe01bdb1735"},
+    "mednafen_supafaust": {"repo": "https://github.com/libretro/supafaust", "sha": "642d1d1b6684aa7e306a02a89885f3f5456a5157"},
+    "mednafen_vb": {"repo": "https://github.com/libretro/beetle-vb-libretro", "sha": "83ed42608601fb7b01d41e4f8fb2007a37b8c84e"},
+    "mgba": {"repo": "https://github.com/mgba-emu/mgba", "sha": "fa977ccbc815efc93aefad9acddc9af0577d7827"},
+    "pcsx_rearmed": {"repo": "https://github.com/libretro/pcsx_rearmed", "sha": "da2cb8ecd17fd0932ab6d94774c0522beebce6e3"},
+    "pet": {"repo": "https://github.com/libretro/vice-libretro", "sha": "c8c242db75a559246d6d51017e6dd4ecd75d6a9f"},
+    "picodrive": {"repo": "https://github.com/irixxxx/picodrive", "sha": "1ebf872d5f9cefad413d3a022201e578f66d45d3"},
+    "plus4": {"repo": "https://github.com/libretro/vice-libretro", "sha": "c8c242db75a559246d6d51017e6dd4ecd75d6a9f"},
+    "pokemini": {"repo": "https://github.com/libretro/PokeMini", "sha": "182e8b7592c144b1661130896bc520e0c4323ee5"},
+    "race": {"repo": "https://github.com/libretro/race", "sha": "c7810dd7f172827bfa2004813bc000b13786636b"},
+    "snes9x": {"repo": "https://github.com/libretro/snes9x", "sha": "890b5d445538fe790aa3add3d5702c80f551e0ae"},
+    "vic": {"repo": "https://github.com/libretro/vice-libretro", "sha": "c8c242db75a559246d6d51017e6dd4ecd75d6a9f"},
+    "prboom": {"repo": "https://github.com/libretro/libretro-prboom", "sha": "861959f30fe0d5d2192ff54c4850c62824299e58"},
+    "bluemsx": {"repo": "https://github.com/libretro/blueMSX-libretro", "sha": "e3086eb5d36d77fa11704cf53dc176686e70127d"},
+    "gearcoleco": {"repo": "https://github.com/drhelius/Gearcoleco.git", "sha": "e2f85230c1b2d75697f7f5d49fe477f217a48952"}
+  },
+  "build_repositories": {
+    "libretro-common": {"repo": "https://github.com/libretro/libretro-common", "sha": "09b55b683764d49ae1e640d7db5069931d6d2d40"},
+    "libchdr": {"repo": "https://github.com/rtissera/libchdr", "sha": "fa3304197ccb919fee4356caa30d67b16a820a20"},
+    "rcheevos": {"repo": "https://github.com/RetroAchievements/rcheevos", "sha": "f1417fbf2236936e8334533628b2948dfa4a46d0"},
+    "NextCommander": {"repo": "https://github.com/LoveRetro/NextCommander", "sha": "aa542cb714891b81dedb1e683067535d187d1eee"},
+    "evtest": {"repo": "https://github.com/freedesktop-unofficial-mirror/evtest", "sha": "b8343ec1124da18bdabcc04809a8731b9e39295d"},
+    "joyutils": {"repo": "https://github.com/datrh/joyutils", "sha": "b6703ebf04c839fc47f9e490b68c4d5d885f32f9"},
+    "unzip60": {"repo": "https://github.com/shauninman/unzip60", "sha": "f6389e3aafc0fc0d31209f7f2a33c4392f92342a"},
+    "tg5040-toolchain": {"repo": "https://github.com/LoveRetro/tg5040-toolchain", "sha": "d1a347d21745812f4c2c41a54d0402909c0dabbe"},
+    "tg5050-toolchain": {"repo": "https://github.com/LoveRetro/tg5050-toolchain", "sha": "dd9ca7c760f58e8b947d004801a7622789e113df"}
+  },
+  "toolchains": {
+    "tg5040": "ghcr.io/loveretro/tg5040-toolchain@sha256:f131c6af64029a8723d0ce8d3c2682642f5f091b04714f6beedda9bec18477ab",
+    "tg5050": "ghcr.io/loveretro/tg5050-toolchain@sha256:ed4aa21844feb84561abfeb05136c8a46f9c44d1d70c30f0984c11accb34a873"
+  },
+  "release_assets": {
+    "nextui.pak_store.pakz": {"url": "https://github.com/LoveRetro/nextui-pak-store/releases/download/v4.2.0/Pak.Store.pakz", "sha256": "60f318e1e662a6aae7f70b47bc6b932545f4af9b8aba3532a94b6cd3c758b001"},
+    "nextui.updater.pakz": {"url": "https://github.com/LoveRetro/nextui-updater-pak/releases/download/0.8.1/nextui.updater.pakz", "sha256": "b7ea4632a12dbe4fe2a674f77bf27d36f8eadf2c93e1feca5e7dc1033138a55c"}
+  }
+}

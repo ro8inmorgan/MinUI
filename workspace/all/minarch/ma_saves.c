@@ -47,29 +47,29 @@ static void SRAM_getPath(char* filename) {
 void SRAM_read(void) {
 	size_t sram_size = core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
 	if (!sram_size) return;
-
 	char filename[MAX_PATH];
 	SRAM_getPath(filename);
-	printf("sav path (read): %s\n", filename);
-
 	void* sram = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
-
+	void* saved = sram ? malloc(sram_size) : NULL;
+	if (!saved) return;
 #ifdef HAS_SRM
 	rzipstream_t* sram_file = rzipstream_open(filename, RETRO_VFS_FILE_ACCESS_READ);
-	if(!sram_file) return;
-
-	if (!sram || rzipstream_read(sram_file, sram, sram_size) < 0)
+	if (!sram_file) { free(saved); return; }
+	if (rzipstream_read(sram_file, saved, sram_size) != (int64_t)sram_size)
 		LOG_error("rzipstream: Error reading SRAM data\n");
-
+	else
+		memcpy(sram, saved, sram_size);
 	rzipstream_close(sram_file);
 #else
-	FILE *sram_file = fopen(filename, "r");
-	if (!sram_file) return;
-	if (!sram || !fread(sram, 1, sram_size, sram_file)) {
+	FILE *sram_file = fopen(filename, "rb");
+	if (!sram_file) { free(saved); return; }
+	if (fread(saved, 1, sram_size, sram_file) != sram_size)
 		LOG_error("Error reading SRAM data\n");
-	}
+	else
+		memcpy(sram, saved, sram_size);
 	fclose(sram_file);
 #endif
+	free(saved);
 }
 
 void SRAM_write(void) {
@@ -113,21 +113,19 @@ static void RTC_getPath(char* filename) {
 void RTC_read(void) {
 	size_t rtc_size = core.get_memory_size(RETRO_MEMORY_RTC);
 	if (!rtc_size) return;
-
 	char filename[MAX_PATH];
 	RTC_getPath(filename);
-	printf("rtc path (read): %s\n", filename);
-
-	FILE *rtc_file = fopen(filename, "r");
-	if (!rtc_file) return;
-
 	void* rtc = core.get_memory_data(RETRO_MEMORY_RTC);
-
-	if (!rtc || !fread(rtc, 1, rtc_size, rtc_file)) {
+	void* saved = rtc ? malloc(rtc_size) : NULL;
+	if (!saved) return;
+	FILE *rtc_file = fopen(filename, "rb");
+	if (!rtc_file) { free(saved); return; }
+	if (fread(saved, 1, rtc_size, rtc_file) != rtc_size)
 		LOG_error("Error reading RTC data\n");
-	}
-
+	else
+		memcpy(rtc, saved, rtc_size);
 	fclose(rtc_file);
+	free(saved);
 }
 void RTC_write(void) {
 	size_t rtc_size = core.get_memory_size(RETRO_MEMORY_RTC);
@@ -247,7 +245,8 @@ int State_read(void) { // from picoarch
 
 	// some cores report the wrong serialize size initially for some games, eg. mgba: Wario Land 4
 	// so we allow a size mismatch as long as the actual size fits in the buffer we've allocated
-	if (state_size < rzipstream_read(state_rzfile, state, state_size)) {
+	int64_t state_bytes = rzipstream_read(state_rzfile, state, state_size);
+	if (state_bytes < 0 || (uint64_t)state_bytes > state_size) {
 	  LOG_error("Error reading state data from file: %s (%s)\n", filename, strerror(errno));
 	  goto error;
 	}
@@ -282,7 +281,8 @@ error:
 
 	// some cores report the wrong serialize size initially for some games, eg. mgba: Wario Land 4
 	// so we allow a size mismatch as long as the actual size fits in the buffer we've allocated
-	if (state_size < fread(state, 1, state_size, state_file)) {
+	size_t state_bytes = fread(state, 1, state_size, state_file);
+	if (state_bytes > state_size || ferror(state_file)) {
 		LOG_error("Error reading state data from file: %s (%s)\n", filename, strerror(errno));
 		goto error;
 	}

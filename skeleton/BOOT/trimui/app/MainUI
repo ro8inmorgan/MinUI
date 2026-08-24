@@ -3,7 +3,7 @@
 # installer for trimuismart and tg5040/tg5050
 
 SDCARD_PATH=/mnt/SDCARD
-cd "$SDCARD_PATH/trimui/app"
+cd "$SDCARD_PATH/trimui/app" || exit 1
 
 # smart pro/brick/smart pro s
 if [ -f /usr/trimui/bin/runtrimui.sh ] && [ ! -f /usr/trimui/bin/runtrimui-original.sh ]; then

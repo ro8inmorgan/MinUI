@@ -28,19 +28,19 @@ KeyboardLayout keyboardLayoutSpecial = {
     {"°", "•", "·", "†", "‡", "¬", "¦", "¡", "\0", "\0", "\0", "\0", "\0", "\0"},
     {"shift", "space", "enter", "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0"}};
 
-KeyboardPrompt::KeyboardPrompt(const std::string &title, MenuListCallback on_confirm)
+KeyboardPrompt::KeyboardPrompt(const std::string &title, MenuListCallback on_confirm, bool secure_entry)
     : MenuList(MenuItemType::Custom, title, {}, nullptr, on_confirm)
 {
-    state = {
-        .redraw = true,
-        .quitting = false,
-        .exit_code = ExitCode::Uninitialized,
-        .keyboard = {
-            .display = true,
-            .row = 0,
-            .col = 0,
-            .layout = 0,
-            .title = title}};
+    state.redraw = true;
+    state.quitting = false;
+    state.exit_code = ExitCode::Uninitialized;
+    state.keyboard.display = true;
+    state.keyboard.row = 0;
+    state.keyboard.col = 0;
+    state.keyboard.layout = 0;
+    state.keyboard.secure_entry = secure_entry;
+    state.keyboard.reveal = false;
+    state.keyboard.title = title;
 }
 
 KeyboardPrompt::~KeyboardPrompt() {}
@@ -72,21 +72,36 @@ InputReactionHint KeyboardPrompt::handleInput(int &dirty, int &quit)
         state.exit_code = ExitCode::MenuButton;
 
         // todo: update quit and dirty flags
+        clearSensitiveText();
         return InputReactionHint::Exit;
     }
+
+    if (state.keyboard.secure_entry && PAD_justPressed(BTN_START))
+    {
+        state.keyboard.reveal = !state.keyboard.reveal;
+        state.redraw = true;
+        dirty |= state.redraw;
+        return InputReactionHint::NoOp;
+    }
+
 
     handleKeyboardInput(state);
     dirty |= state.redraw;
     quit |= state.quitting;
 
     if (state.exit_code == ExitCode::CancelButton) {
+        clearSensitiveText();
         return InputReactionHint::Exit;
     }
     else if (state.exit_code == ExitCode::Success) {
         if(on_confirm) {
             MenuItem tmp{ListItemType::Button, state.keyboard.final_text, ""};
-            return on_confirm(tmp);
+            InputReactionHint result = on_confirm(tmp);
+            tmp.clearName();
+            clearSensitiveText();
+            return result;
         }
+        clearSensitiveText();
         return InputReactionHint::Exit;
     }
     else {
@@ -315,7 +330,10 @@ void KeyboardPrompt::drawKeyboard(SDL_Surface *screen, const AppState &state)
     const auto key = currentLayout->at(state.keyboard.row).at(state.keyboard.col);
 
     // draw the button group on the button-right
-    char *hints[] = {(char *)("Y"), (char *)("EXIT"), (char *)("X"), ((char *)"ENTER"), NULL};
+    char *hints[] = {(char *)("Y"), (char *)("EXIT"), (char *)("X"), ((char *)"ENTER"),
+                     state.keyboard.secure_entry ? (char *)"START" : NULL,
+                     state.keyboard.secure_entry ? (char *)(state.keyboard.reveal ? "HIDE" : "SHOW") : NULL,
+                     NULL};
     GFX_blitButtonGroup(hints, 1, screen, 1);
 
     // draw keyboard title
@@ -334,7 +352,9 @@ void KeyboardPrompt::drawKeyboard(SDL_Surface *screen, const AppState &state)
     // draw input field with current text
     // todo: use TTF_SizeUTF8 to compute the width of the input field
     SDL_Surface *input_placeholder = TTF_RenderUTF8_Blended(font.medium, "p", COLOR_WHITE);
-    SDL_Surface *input = TTF_RenderUTF8_Blended(font.medium, state.keyboard.current_text.c_str(), COLOR_WHITE);
+    std::string display_text = state.keyboard.secure_entry && !state.keyboard.reveal
+        ? std::string(state.keyboard.current_text.size(), '*') : state.keyboard.current_text;
+    SDL_Surface *input = TTF_RenderUTF8_Blended(font.medium, display_text.c_str(), COLOR_WHITE);
     SDL_Rect input_pos = {
         (screen->w) / 2,
         input_placeholder->h * 2,

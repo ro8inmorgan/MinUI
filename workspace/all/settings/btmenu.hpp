@@ -1,7 +1,10 @@
 #pragma once
 
 #include "menu.hpp"
+#include <atomic>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 namespace Bluetooth
 {
@@ -9,18 +12,21 @@ namespace Bluetooth
 
     class Menu : public MenuList
     {
-        const int &globalQuit;
-        int &globalDirty;
-        // bt on/off
+        struct ScanSnapshot {
+            bool enabled = false;
+            std::vector<BT_device> available;
+            std::vector<BT_devicePaired> paired;
+        };
+
         MenuItem *toggleItem;
-        // diagnostics on/off
         MenuItem *diagItem;
-        // max sample rate
         MenuItem *rateItem;
-        
         std::thread worker;
-        bool quit = false;
+        std::atomic_bool quit{false};
         bool selectionDirty = false;
+        std::mutex snapshotMutex;
+        ScanSnapshot snapshot;
+        bool snapshotReady = false;
         
         PairingAgent* pairingAgent = nullptr;
     public:
@@ -42,6 +48,7 @@ namespace Bluetooth
         void setSamplerateMaximum(const std::any &on);
         void resetSamplerateMaximum();
 
+        void applySnapshot(int &dirty);
         void updater();
     };
 

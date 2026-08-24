@@ -14,11 +14,11 @@ ifeq ($(UNAME_S),Linux)
 	PREFIX=/usr
 endif
 ifeq ($(UNAME_S),Darwin)
-	# TODO: brew installs gcc to e.g. /opt/homebrew/bin/gcc-14, but none of our makefiles support the suffix. 
-	#       For now, just manually symlink all the build tools to a suffix-less path: sudo ./workspace/desktop/macos_create_gcc_symlinks.sh
-	#       and make with: make setup common PLATFORM=desktop
-	#       From brew we need at least: brew install sdl2_image sdl2_ttf gcc make libsamplerate sqlite
-	CROSS_COMPILE=/usr/local/bin/
+	# Run ./workspace/desktop/macos_create_gcc_symlinks.sh once after `brew install gcc`.
+	# It creates only repo-local wrappers; no sudo or /usr/local/bin mutation is needed.
+	GCC_WRAPPERS=$(CURDIR)/workspace/desktop/.toolchain
+	PATH:=$(GCC_WRAPPERS):$(PATH)
+	CROSS_COMPILE=$(GCC_WRAPPERS)/
 	PREFIX=/opt/homebrew
 endif
 PREFIX_LOCAL=/var/tmp/nextui
@@ -27,16 +27,16 @@ UNION_PLATFORM=desktop
 all: 
 	
 clean:
-	cd workspace && make clean
+	cd workspace && $(MAKE) clean
 	
 build: 
-	COMPILE_CORES=$(COMPILE_CORES) cd workspace && make
+	cd workspace && COMPILE_CORES=$(COMPILE_CORES) $(MAKE)
 
 build-cores: 
-    COMPILE_CORES=$(COMPILE_CORES) cd workspace && make cores
+	cd workspace && COMPILE_CORES=true $(MAKE) cores
 
 build-core:
 ifndef CORE
 	$(error CORE is not set)
 endif
-	COMPILE_CORES=$(COMPILE_CORES) CORE=$(CORE) cd workspace && make core
+	cd workspace && COMPILE_CORES=true CORE=$(CORE) $(MAKE) core

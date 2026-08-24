@@ -35,6 +35,7 @@
 #define CHANGE_DISC_PATH "/tmp/change_disc.txt"
 #define RESUME_SLOT_PATH "/tmp/resume_slot.txt"
 #define NOUI_PATH "/tmp/noui"
+#define ACTIVE_ROM_PATH "/tmp/nextui-runtime/active.rom"
 
 #define TRIAD_WHITE 		0xff,0xff,0xff
 #define TRIAD_BLACK 		0x00,0x00,0x00

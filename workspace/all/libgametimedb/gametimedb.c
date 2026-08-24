@@ -5,22 +5,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <defines.h>
+#include <path_helpers.h>
 #include <utils.h>
 #include <sqlite3.h>
 
 #include "gametimedb.h"
 
-#define CMD_TO_RUN "/tmp/next"
 #define ROM_NOT_FOUND -1
-
 #define GAMETIME_LOG_PATH SHARED_USERDATA_PATH
 #define GAMETIME_LOG_FILE GAMETIME_LOG_PATH "/game_logs.sqlite"
 
 sqlite3* play_activity_db_open(void)
 {
-    mkdir(GAMETIME_LOG_PATH, 0777);
+    mkdir(GAMETIME_LOG_PATH, S_IRWXU | S_IRWXG | S_IRWXO);
     bool db_exists = exists(GAMETIME_LOG_FILE);
     if (!db_exists)
         touch(GAMETIME_LOG_FILE);
@@ -69,6 +69,7 @@ void free_play_activities(PlayActivities *pa_ptr)
 
 void get_rom_image_path(char *rom_file, char *out_image_path)
 {
+    out_image_path[0] = '\0';
     if (suffixMatch(rom_file, ".p8") || suffixMatch(rom_file, ".png")) {
         snprintf(out_image_path, STR_MAX - 1, ROMS_PATH "/%s", rom_file);
     }
@@ -80,7 +81,7 @@ void get_rom_image_path(char *rom_file, char *out_image_path)
     // this assumes that roms in subfolders have corresponding game art in
     // a .media folder in the respective subfolder
     char rom_folder_path[MAX_PATH];
-    folderPath(rom_file, rom_folder_path);
+    if (folderPathSafe(rom_file, rom_folder_path, sizeof(rom_folder_path)) != 0) { free(clean_rom_name); return; }
 
     snprintf(out_image_path, STR_MAX - 1, ROMS_PATH "/%s/.media/%s.png", rom_folder_path, clean_rom_name);
     //LOG_debug("out_image_path: %s\n", out_image_path);
@@ -208,24 +209,21 @@ PlayActivities *play_activity_find_all(void)
     return play_activities;
 }
 
-void __ensure_rel_path(char *rel_path, const char *rom_path)
+void ensure_rel_path(char *rel_path, const char *rom_path)
 {
-    if (!pathRelativeTo(rel_path, ROMS_PATH, rom_path)) {
-        if (strstr(rom_path, "../../Roms/") != NULL) {
-            strcpy(rel_path, splitString(strdup((const char *)rom_path), "../../Roms/"));
-        }
-        else {
-            strcpy(rel_path, replaceString2(strdup((const char *)rom_path), ROMS_PATH "/", ""));
-        }
-    }
+    if (pathRelativeToSafe(rel_path, MAX_PATH, ROMS_PATH, rom_path) == 0) return;
+    const char *suffix = strstr(rom_path, "../../Roms/");
+    if (suffix) path_copy(rel_path, MAX_PATH, suffix + strlen("../../Roms/"));
+    else if (prefixMatch(ROMS_PATH "/", rom_path)) path_copy(rel_path, MAX_PATH, rom_path + strlen(ROMS_PATH "/"));
+    else rel_path[0] = '\0';
 }
 
-int __db_insert_rom(sqlite3* game_log_db, const char *rom_type, const char *rom_name, const char *file_path, const char *image_path)
+int db_insert_rom(sqlite3* game_log_db, const char *rom_type, const char *rom_name, const char *file_path, const char *image_path)
 {
     int rom_id = ROM_NOT_FOUND;
 
     char rel_path[MAX_PATH];
-    __ensure_rel_path(rel_path, file_path);
+    ensure_rel_path(rel_path, file_path);
 
     char *sql = sqlite3_mprintf("INSERT INTO rom(type, name, file_path, image_path) VALUES(%Q, %Q, %Q, %Q);",
                                 rom_type, rom_name, rel_path, image_path);
@@ -241,10 +239,10 @@ int __db_insert_rom(sqlite3* game_log_db, const char *rom_type, const char *rom_
     return rom_id;
 }
 
-void __db_update_rom(sqlite3* game_log_db, int rom_id, const char *rom_type, const char *rom_name, const char *file_path, const char *image_path)
+void db_update_rom(sqlite3* game_log_db, int rom_id, const char *rom_type, const char *rom_name, const char *file_path, const char *image_path)
 {
     char rel_path[MAX_PATH];
-    __ensure_rel_path(rel_path, file_path);
+    ensure_rel_path(rel_path, file_path);
 
     char *sql = sqlite3_mprintf("UPDATE rom SET type = %Q, name = %Q, file_path = %Q, image_path = %Q WHERE id = %d;",
                                 rom_type, rom_name, rel_path, image_path, rom_id);
@@ -252,7 +250,7 @@ void __db_update_rom(sqlite3* game_log_db, int rom_id, const char *rom_type, con
     sqlite3_free(sql);
 }
 
-int __db_get_orphan_rom_id(sqlite3* game_log_db, const char *rom_path)
+int db_get_orphan_rom_id(sqlite3* game_log_db, const char *rom_path)
 {
     int rom_id = ROM_NOT_FOUND;
     char *_file_name = strdup(rom_path);
@@ -274,12 +272,12 @@ int __db_get_orphan_rom_id(sqlite3* game_log_db, const char *rom_path)
     return rom_id;
 }
 
-int __db_get_rom_id_by_path(sqlite3* game_log_db, const char *rom_path)
+int db_get_rom_id_by_path(sqlite3* game_log_db, const char *rom_path)
 {
     int rom_id = ROM_NOT_FOUND;
 
     char rel_path[MAX_PATH];
-    __ensure_rel_path(rel_path, rom_path);
+    ensure_rel_path(rel_path, rom_path);
 
     char *sql = sqlite3_mprintf("SELECT id FROM rom WHERE file_path=%Q LIMIT 1;", rel_path);
     sqlite3_stmt *stmt = play_activity_db_prepare(game_log_db, sql);
@@ -294,15 +292,15 @@ int __db_get_rom_id_by_path(sqlite3* game_log_db, const char *rom_path)
     return rom_id;
 }
 
-int __db_rom_find_by_file_path(sqlite3* game_log_db, const char *rom_path, bool create_or_update)
+int db_rom_find_by_file_path(sqlite3* game_log_db, const char *rom_path, bool create_or_update)
 {
     //LOG_info("rom_find_by_file_path('%s')\n", rom_path);
 
     bool update_orphan = false;
-    int rom_id = __db_get_rom_id_by_path(game_log_db, rom_path);
+    int rom_id = db_get_rom_id_by_path(game_log_db, rom_path);
 
     if (rom_id == ROM_NOT_FOUND) {
-        rom_id = __db_get_orphan_rom_id(game_log_db, rom_path);
+        rom_id = db_get_orphan_rom_id(game_log_db, rom_path);
         if (rom_id != ROM_NOT_FOUND) {
             update_orphan = true;
         }
@@ -310,12 +308,12 @@ int __db_rom_find_by_file_path(sqlite3* game_log_db, const char *rom_path, bool 
 
     if (update_orphan) {
         char *rom_name = removeExtension(baseName(rom_path));
-        __db_update_rom(game_log_db, rom_id, "", rom_name, rom_path, "");
+        db_update_rom(game_log_db, rom_id, "", rom_name, rom_path, "");
         free(rom_name);
     }
     else if (rom_id == ROM_NOT_FOUND && create_or_update) {
         char *rom_name = removeExtension(baseName(rom_path));
-        rom_id = __db_insert_rom(game_log_db, "", rom_name, rom_path, "");
+        rom_id = db_insert_rom(game_log_db, "", rom_name, rom_path, "");
         free(rom_name);
     }
 
@@ -326,7 +324,7 @@ int play_activity_transaction_rom_find_by_file_path(const char *rom_path, bool c
 {
     int retval;
     sqlite3* game_log_db = play_activity_db_open();
-    retval = __db_rom_find_by_file_path(game_log_db, rom_path, create_or_update);
+    retval = db_rom_find_by_file_path(game_log_db, rom_path, create_or_update);
     play_activity_db_close(game_log_db);
     return retval;
 }
@@ -335,7 +333,7 @@ int play_activity_get_play_time(const char *rom_path)
 {
     int play_time = 0;
     sqlite3* game_log_db = play_activity_db_open();
-    int rom_id = __db_rom_find_by_file_path(game_log_db, rom_path, false);
+    int rom_id = db_rom_find_by_file_path(game_log_db, rom_path, false);
     if (rom_id != ROM_NOT_FOUND) {
         char *sql = sqlite3_mprintf("SELECT SUM(play_time) FROM play_activity WHERE rom_id = %d;", rom_id);
         sqlite3_stmt *stmt = play_activity_db_prepare(game_log_db, sql);
@@ -349,40 +347,36 @@ int play_activity_get_play_time(const char *rom_path)
     return play_time;
 }
 
-bool _get_active_rom_path(char *rom_path_out)
+bool get_active_rom_path(char *rom_path_out)
 {
-    char *ptr;
-    char cmd[STR_MAX];
-    getFile(CMD_TO_RUN, cmd, STR_MAX);
-    trimTrailingNewlines(cmd);
-
-    if (strlen(cmd) == 0) {
+    struct stat status;
+    int fd = open(ACTIVE_ROM_PATH, O_RDONLY | O_NOFOLLOW);
+    if (fd < 0 || fstat(fd, &status) != 0 || !S_ISREG(status.st_mode) ||
+        status.st_uid != geteuid() || (status.st_mode & 63) != 0) {
+        if (fd >= 0) close(fd);
         return false;
     }
-
-    if ((ptr = strrchr(cmd, '\'')) != NULL) {
-        *ptr = '\0';
+    FILE *file = fdopen(fd, "r");
+    if (!file || !fgets(rom_path_out, STR_MAX, file) || fclose(file) != 0) {
+        if (file == NULL) close(fd);
+        return false;
     }
-
-    if ((ptr = strrchr(cmd, '\'')) != NULL) {
-        strncpy(rom_path_out, ptr + 1, STR_MAX);
-        return true;
-    }
-    return false;
+    trimTrailingNewlines(rom_path_out);
+    return rom_path_out[0] != '\0';
 }
 
-int __db_get_active_closed_activity(sqlite3* game_log_db)
+int db_get_active_closed_activity(sqlite3* game_log_db)
 {
     int rom_id = ROM_NOT_FOUND;
 
     char rom_path[STR_MAX];
-    if (!_get_active_rom_path(rom_path)) {
+    if (!get_active_rom_path(rom_path)) {
         return ROM_NOT_FOUND;
     }
 
     //printf("Last closed active rom: %s\n", rom_path);
 
-    if ((rom_id = __db_rom_find_by_file_path(game_log_db, rom_path, false)) == ROM_NOT_FOUND) {
+    if ((rom_id = db_rom_find_by_file_path(game_log_db, rom_path, false)) == ROM_NOT_FOUND) {
         return ROM_NOT_FOUND;
     }
 
@@ -416,7 +410,7 @@ void play_activity_resume(void)
 {
     //LOG_info("\n:: play_activity_resume()");
     sqlite3* game_log_db = play_activity_db_open();
-    int rom_id = play_activity_db_transaction(game_log_db, __db_get_active_closed_activity);
+    int rom_id = play_activity_db_transaction(game_log_db, db_get_active_closed_activity);
     play_activity_db_close(game_log_db);
     if (rom_id == ROM_NOT_FOUND) {
         printf("Error: no active rom\n");
