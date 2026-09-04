@@ -2,21 +2,10 @@
 # MinUI.pak for Anbernic RG XX / Allwinner H700
 
 export PLATFORM="h700"
-REAL_SDCARD_PATH="/mnt/sdcard"
-COMPAT_SDCARD_PATH="/mnt/SDCARD"
+# Load beside the launcher: /mnt/SDCARD may not be available until mounted below.
+. "$(dirname "$0")/../../bin/h700-init.sh"
 
-mkdir -p "$REAL_SDCARD_PATH"
-if ! mountpoint -q "$REAL_SDCARD_PATH"; then
-	mount -t vfat -o rw,utf8,noatime /dev/mmcblk1p1 "$REAL_SDCARD_PATH" 2>/dev/null || true
-fi
-
-if ! mountpoint -q "$COMPAT_SDCARD_PATH" && [ ! -L "$COMPAT_SDCARD_PATH" ]; then
-	if [ -e "$COMPAT_SDCARD_PATH" ]; then
-		mount --bind "$REAL_SDCARD_PATH" "$COMPAT_SDCARD_PATH" 2>/dev/null || true
-	else
-		ln -s "$REAL_SDCARD_PATH" "$COMPAT_SDCARD_PATH" 2>/dev/null || true
-	fi
-fi
+h700_mount_sdcard
 
 export SDCARD_PATH="$COMPAT_SDCARD_PATH"
 export BIOS_PATH="$SDCARD_PATH/Bios"
@@ -32,58 +21,14 @@ export HOOKS_PATH="$USERDATA_PATH/.hooks"
 export HOME="$USERDATA_PATH"
 LAUNCH_LOG="$LOGS_PATH/launch.txt"
 
+# H700 needs the bundled runtime even for the early poweroff/reboot checks.
 # Prefer bundled tools (including curl, absent from vanilla stock OS) and
 # libraries, especially the patched SDL2 used by this port.
 export PATH="$SYSTEM_PATH/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export LD_LIBRARY_PATH="$SYSTEM_PATH/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
-# Use the bundled CA certificates for curl's HTTPS verification.
-export CURL_CA_BUNDLE="$SYSTEM_PATH/etc/ssl/certs/ca-certificates.crt"
-# Select the stock OS graphics/audio backends explicitly.
-export SDL_VIDEODRIVER="mali"
-export SDL_AUDIODRIVER="alsa"
-# Stock OS has no udev service; disable SDL's udev-based joystick discovery.
-export SDL_JOYSTICK_DISABLE_UDEV=1
-export SDL_HIDAPI_JOYSTICK_DISABLE_UDEV=1
+h700_setup_runtime
 
-for egl_path in /usr/lib/libEGL.so /usr/lib/libEGL.so.1 /usr/lib/libEGL.so.1.4.0 /usr/lib/aarch64-linux-gnu/libEGL.so /usr/lib/aarch64-linux-gnu/libEGL.so.1; do
-	if [ -e "$egl_path" ]; then
-		export SDL_VIDEO_EGL_DRIVER="$egl_path"
-		break
-	fi
-done
-for gles_path in /usr/lib/libGLESv2.so /usr/lib/libGLESv2.so.2 /usr/lib/libGLESv2.so.2.1.0 /usr/lib/aarch64-linux-gnu/libGLESv2.so /usr/lib/aarch64-linux-gnu/libGLESv2.so.2; do
-	if [ -e "$gles_path" ]; then
-		export SDL_VIDEO_GL_DRIVER="$gles_path"
-		break
-	fi
-done
-
-log_runtime_state() {
-	echo "launch: runtime state $(date)" >> "$LAUNCH_LOG"
-	echo "launch: DEVICE=$DEVICE RGXX_MODEL=$RGXX_MODEL" >> "$LAUNCH_LOG"
-	echo "launch: LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "$LAUNCH_LOG"
-	ldd "$SYSTEM_PATH/bin/nextui.elf" >> "$LAUNCH_LOG" 2>&1 || true
-	ldd "$SYSTEM_PATH/lib/libSDL2-2.0.so.0" >> "$LAUNCH_LOG" 2>&1 || true
-	ls -l /usr/lib/libEGL.so* /usr/lib/libGLESv2.so* /usr/lib/aarch64-linux-gnu/libEGL.so* /usr/lib/aarch64-linux-gnu/libGLESv2.so* >> "$LAUNCH_LOG" 2>&1 || true
-}
-
-ensure_system_dbus() {
-	[ -S /run/dbus/system_bus_socket ] && return 0
-	command -v dbus-daemon >/dev/null 2>&1 || return 1
-
-	mkdir -p /run/dbus
-	if [ ! -s /run/machine-id ] && command -v dbus-uuidgen >/dev/null 2>&1; then
-		dbus-uuidgen > /run/machine-id 2>/dev/null || true
-	fi
-	dbus-daemon --system >/dev/null 2>&1 || true
-
-	dbus_tries=0
-	while [ ! -S /run/dbus/system_bus_socket ] && [ "$dbus_tries" -lt 20 ]; do
-		sleep 0.1 2>/dev/null || sleep 1
-		dbus_tries=$((dbus_tries + 1))
-	done
-	[ -S /run/dbus/system_bus_socket ]
-}
+#######################################
 
 if [ -f "/tmp/poweroff" ]; then
 	poweroff_next || poweroff
@@ -94,8 +39,16 @@ if [ -f "/tmp/reboot" ]; then
 	exit 0
 fi
 
-mkdir -p "$BIOS_PATH" "$ROMS_PATH" "$SAVES_PATH" "$CHEATS_PATH"
-mkdir -p "$USERDATA_PATH" "$LOGS_PATH" "$HOOKS_PATH" "$SHARED_USERDATA_PATH/.minui"
+#######################################
+
+mkdir -p "$BIOS_PATH"
+mkdir -p "$ROMS_PATH"
+mkdir -p "$SAVES_PATH"
+mkdir -p "$CHEATS_PATH"
+mkdir -p "$USERDATA_PATH"
+mkdir -p "$LOGS_PATH"
+mkdir -p "$HOOKS_PATH"
+mkdir -p "$SHARED_USERDATA_PATH/.minui"
 echo "launch: starting $(date)" > "$LAUNCH_LOG"
 
 . "$SYSTEM_PATH/bin/h700-device.sh"
@@ -106,41 +59,29 @@ fi
 export IS_NEXT="yes"
 log_runtime_state
 
-if [ -f /mnt/vendor/muos1.ini ] || [ -f /mnt/vendor/muos2.ini ]; then
-	echo "stockmod muOS override files are present; stock boot target must be selected for TF1 dmenu.bin autoboot." > "$LOGS_PATH/stockmod-warning.txt"
-fi
+#######################################
 
-killall brightCtrl.bin cexpert 2>/dev/null || true
-systemctl stop NetworkManager 2>/dev/null || true
-if loginctl show-logind >/dev/null 2>&1; then
-	mkdir -p /run/systemd/logind.conf.d /run/systemd/system 2>/dev/null || true
-	cat > /run/systemd/logind.conf.d/nextui-h700.conf << EOF
-[Login]
-HandlePowerKey=ignore
-HandlePowerKeyLongPress=ignore
-EOF
-	systemctl restart systemd-logind 2>/dev/null || true
-fi
+h700_prepare_stock_os
 
-if [ -f "$SYSTEM_PATH/dat/dmenu.bin" ] && mountpoint -q /mnt/mmc; then
-	if ! cmp -s "$SYSTEM_PATH/dat/dmenu.bin" /mnt/mmc/dmenu.bin 2>/dev/null; then
-		cp "$SYSTEM_PATH/dat/dmenu.bin" /mnt/mmc/dmenu.bin 2>/dev/null || true
-		sync
-	fi
-fi
-
+# clear shadercache unconditionally, until it properly invalidates itself
 rm -rf "$SDCARD_PATH/.shadercache"
-echo 0 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
+
+h700_init_leds
+
+#######################################
 
 sh "$SYSTEM_PATH/bin/governor.sh" "auto"
 
 keymon.elf > "$LOGS_PATH/keymon.txt" 2>&1 &
 batmon.elf > "$LOGS_PATH/batmon.txt" 2>&1 &
 
+# start fresh, will be populated on the next connect
 rm -f "$USERDATA_PATH/.asoundrc"
 ensure_system_dbus || echo "launch: system D-Bus unavailable; audio device monitoring may be disabled" >> "$LAUNCH_LOG"
 audiomon.elf > "$LOGS_PATH/audiomon.txt" 2>&1 &
 
+# BT handling
+# on by default, disable based on systemval setting
 bluetoothon=$(nextval.elf bluetooth | sed -n 's/.*"bluetooth": \([0-9]*\).*/\1/p')
 if [ "$bluetoothon" = "0" ]; then
 	"$SYSTEM_PATH/etc/bluetooth/bt_init.sh" stop > /dev/null 2>&1 &
@@ -148,6 +89,8 @@ else
 	"$SYSTEM_PATH/etc/bluetooth/bt_init.sh" start > /dev/null 2>&1 &
 fi
 
+# wifi handling
+# on by default, disable based on systemval setting
 wifion=$(nextval.elf wifi | sed -n 's/.*"wifi": \([0-9]*\).*/\1/p')
 if [ "$wifion" = "0" ]; then
 	"$SYSTEM_PATH/etc/wifi/wifi_init.sh" stop > /dev/null 2>&1 &
@@ -155,14 +98,20 @@ else
 	"$SYSTEM_PATH/etc/wifi/wifi_init.sh" start > /dev/null 2>&1 &
 fi
 
+#######################################
+
 AUTO_PATH="$USERDATA_PATH/auto.sh"
 if [ -f "$AUTO_PATH" ]; then
 	"$AUTO_PATH"
 fi
+
+# Composable boot hooks (run after auto.sh for backward compatibility)
 "$SYSTEM_PATH/bin/run_hooks.sh" boot.d
 
 cd "$(dirname "$0")"
-killall -9 show2.elf > /dev/null 2>&1 || true
+
+#######################################
+# Hook system
 
 parse_hook_cmd() {
 	HOOK_CMD="$1"
@@ -178,6 +127,11 @@ parse_hook_cmd() {
 	[ -f /tmp/last.txt ] && HOOK_LAST=$(cat /tmp/last.txt) || HOOK_LAST=""
 	export HOOK_CMD HOOK_EMU_PATH HOOK_TYPE HOOK_ROM_PATH HOOK_LAST
 }
+
+#######################################
+
+# kill show2.elf if running
+killall -9 show2.elf > /dev/null 2>&1 || true
 
 EXEC_PATH="/tmp/nextui_exec"
 NEXT_PATH="/tmp/next"
@@ -198,6 +152,7 @@ while [ -f "$EXEC_PATH" ]; do
 	else
 		CRASH_COUNT=0
 	fi
+	# default launched paks to performance, they can change it themselves after launch if they want
 	sh "$SYSTEM_PATH/bin/governor.sh" "performance"
 
 	if [ -f "$NEXT_PATH" ]; then
@@ -207,6 +162,7 @@ while [ -f "$EXEC_PATH" ]; do
 		eval "$CMD"
 		"$SYSTEM_PATH/bin/run_hooks.sh" post-launch.d
 		rm -f "$NEXT_PATH"
+		# reset to performance when exiting, UI will reset to auto if needed
 		sh "$SYSTEM_PATH/bin/governor.sh" "performance"
 	fi
 
