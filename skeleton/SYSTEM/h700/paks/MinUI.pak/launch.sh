@@ -32,11 +32,16 @@ export HOOKS_PATH="$USERDATA_PATH/.hooks"
 export HOME="$USERDATA_PATH"
 LAUNCH_LOG="$LOGS_PATH/launch.txt"
 
+# Prefer bundled tools (including curl, absent from vanilla stock OS) and
+# libraries, especially the patched SDL2 used by this port.
 export PATH="$SYSTEM_PATH/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export LD_LIBRARY_PATH="$SYSTEM_PATH/lib:/usr/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+# Use the bundled CA certificates for curl's HTTPS verification.
 export CURL_CA_BUNDLE="$SYSTEM_PATH/etc/ssl/certs/ca-certificates.crt"
+# Select the stock OS graphics/audio backends explicitly.
 export SDL_VIDEODRIVER="mali"
 export SDL_AUDIODRIVER="alsa"
+# Stock OS has no udev service; disable SDL's udev-based joystick discovery.
 export SDL_JOYSTICK_DISABLE_UDEV=1
 export SDL_HIDAPI_JOYSTICK_DISABLE_UDEV=1
 
