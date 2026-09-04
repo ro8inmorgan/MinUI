@@ -135,23 +135,12 @@ killall -9 show2.elf > /dev/null 2>&1 || true
 
 EXEC_PATH="/tmp/nextui_exec"
 NEXT_PATH="/tmp/next"
-CRASH_COUNT=0
 touch "$EXEC_PATH" && sync
 while [ -f "$EXEC_PATH" ]; do
 	echo "launch: starting nextui.elf $(date)" >> "$LAUNCH_LOG"
 	nextui.elf > "$LOGS_PATH/nextui.txt" 2>&1
 	EXIT_CODE=$?
 	echo "launch: nextui.elf exited $EXIT_CODE $(date)" >> "$LAUNCH_LOG"
-	if [ "$EXIT_CODE" != "0" ]; then
-		CRASH_COUNT=$((CRASH_COUNT + 1))
-		if [ "$CRASH_COUNT" -ge 5 ]; then
-			echo "launch: crash limit reached; powering off" >> "$LAUNCH_LOG"
-			rm -f "$EXEC_PATH"
-			continue
-		fi
-	else
-		CRASH_COUNT=0
-	fi
 	# default launched paks to performance, they can change it themselves after launch if they want
 	sh "$SYSTEM_PATH/bin/governor.sh" "performance"
 
