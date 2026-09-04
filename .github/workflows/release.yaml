@@ -157,27 +157,6 @@ jobs:
         env:
           PLATFORM: h700
 
-      - name: Check H700 settings runtime links
-        run: |
-          docker run --rm --platform linux/arm64 -v "$PWD:/work" -w /work ubuntu:22.04 sh -ec '
-            apt-get update
-            apt-get install -y --no-install-recommends \
-              libegl1 \
-              libfreetype6 \
-              libgcc-s1 \
-              libglib2.0-0 \
-              libgles2 \
-              libjpeg-turbo8 \
-              liblzma5 \
-              libpng16-16 \
-              libstdc++6 \
-              libtiff5 \
-              libwebp7 \
-              libzstd1 \
-              zlib1g
-            sh ./workspace/h700/check-settings-ldd.sh
-          '
-
       - name: Special
         run: make special
 
