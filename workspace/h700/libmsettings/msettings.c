@@ -255,7 +255,7 @@ int GetDisplayCalBlueGain(void)
 {
 	return settings->displaycal_blue_gain;
 }
-// monitored and set by thread in keymon
+// TODO: wire up headphone-jack detection in H700 keymon.
 int GetJack(void) {
 	return settings->jack;
 }
@@ -340,7 +340,7 @@ void SetVolume(int value) // 0-20
 		settings->speaker = value;
 	SaveSettings();
 }
-// monitored and set by thread in keymon
+// TODO: wire up headphone-jack detection in H700 keymon.
 void SetJack(int value) {
 	settings->jack = value;
 	SetVolume(GetVolume());
