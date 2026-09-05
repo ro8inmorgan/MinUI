@@ -26,8 +26,11 @@ SOURCE = $(TARGET).c ../common/utils.c ../common/api.c ../common/config.c ../com
 CC = $(CROSS_COMPILE)gcc
 CFLAGS  += $(OPT)
 CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
-ifneq (,$(wildcard ../../$(PLATFORM)/platform/bootlogo.h))
-CFLAGS += -DHAS_BOOTLOGO_CONFIG
+ifeq ($(PLATFORM),h700)
+# H700 stores bootlogo.bmp on partition 2 and groups presets by panel resolution.
+CFLAGS += -DBOOTLOGO_PARTITION=\"/dev/mmcblk0p2\" -DBOOTLOGO_RESOLUTION_DIRS=1
+# Rotate RG28XX previews to match its portrait-mounted panel at boot.
+CFLAGS += -DBOOTLOGO_PREVIEW_ROTATE_CW=needs_portrait_sdl
 endif
 LDFLAGS	 += -lmsettings
 

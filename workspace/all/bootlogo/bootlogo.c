@@ -13,10 +13,6 @@
 #include "api.h"
 #include "utils.h"
 
-#ifdef HAS_BOOTLOGO_CONFIG
-#include "bootlogo.h"
-#endif
-
 static bool quit = false;
 
 static void sigHandler(int sig)
