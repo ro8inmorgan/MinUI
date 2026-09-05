@@ -26,6 +26,9 @@ SOURCE = $(TARGET).c ../common/utils.c ../common/api.c ../common/config.c ../com
 CC = $(CROSS_COMPILE)gcc
 CFLAGS  += $(OPT)
 CFLAGS  += $(INCDIR) -DPLATFORM=\"$(PLATFORM)\" -std=gnu99
+ifneq (,$(wildcard ../../$(PLATFORM)/platform/bootlogo.h))
+CFLAGS += -DHAS_BOOTLOGO_CONFIG
+endif
 LDFLAGS	 += -lmsettings
 
 PRODUCT= build/$(PLATFORM)/$(TARGET).elf
