@@ -171,6 +171,9 @@ void InitSettings(void) {
 		loadSettings();
 	}
 	// printf("brightness: %i\nspeaker: %i \n", settings->brightness, settings->speaker);
+	// Log mixer state before changing routing to help diagnose Bluetooth/USB DAC issues.
+	system("amixer");
+
 	// Make sure the H700 codec is routed to speaker/lineout before NextUI owns volume.
 	if(GetAudioSink() == AUDIO_SINK_DEFAULT) {
 		system("amixer -q sset 'SPK' on >/dev/null 2>&1");
