@@ -28,13 +28,11 @@ Menu::Menu(const int &globalQuit, int &globalDirty) : MenuList(MenuItemType::Fix
                               std::bind(&Menu::resetBtDiagnosticsState, this));
     items.push_back(toggleItem);
     items.push_back(diagItem);
-#ifndef NO_BT_AUDIO
     rateItem = new MenuItem(ListItemType::Generic, "Maximum sampling rate", "44100 Hz: better compatibility\n48000 Hz: better quality", {44100, 48000}, {"44100 Hz", "48000 Hz"},
                               std::bind(&Menu::getSamplerateMaximum, this),
                               std::bind(&Menu::setSamplerateMaximum, this, std::placeholders::_1),
                               std::bind(&Menu::resetSamplerateMaximum, this));
     items.push_back(rateItem);
-#endif
 
     // best effort layout based on the platform defines, user should really call performLayout manually
     MenuList::performLayout((SDL_Rect){0, 0, FIXED_WIDTH, FIXED_HEIGHT});
