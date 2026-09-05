@@ -1,10 +1,12 @@
 $(PLATFORM):
+	# Boot file for the initial manual install onto the stock OS card.
 	mkdir -p ./build/BASE/h700
 	cp ./workspace/$@/boot/output/dmenu.bin ./build/BASE/h700/
 
 	# installer
 	cp ./workspace/$@/install/boot.sh ./build/BOOT/common/$@.sh
 	cp ./workspace/$@/install/update.sh ./build/SYSTEM/$@/bin/install.sh
+	# Ship the updated boot file in MinUI.zip to replace the initial-install copy.
 	mkdir -p ./build/SYSTEM/$@/dat
 	cp ./workspace/$@/boot/output/dmenu.bin ./build/SYSTEM/$@/dat/
 	mkdir -p ./build/BOOT/common/$@/
