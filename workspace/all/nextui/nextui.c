@@ -2255,15 +2255,11 @@ int main (int argc, char *argv[]) {
 	simple_mode = exists(SIMPLE_MODE_PATH);
 
 	LOG_info("NextUI\n");
-	LOG_info("InitSettings\n");
 	InitSettings();
 
-	LOG_info("GFX_init\n");
 	screen = GFX_init(MODE_MAIN);
-	LOG_info("GFX_init done\n");
 // LOG_info("- graphics init: %lu\n", SDL_GetTicks() - main_begin);
 
-	LOG_info("PAD_init\n");
 	PAD_init();
 	// LOG_info("- input init: %lu\n", SDL_GetTicks() - main_begin);
 	VIB_init();
