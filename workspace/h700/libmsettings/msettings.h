@@ -58,9 +58,6 @@ void SetAudioSink(int value);
 int GetHDMI(void);
 void SetHDMI(int value); // 0-1
 
-int GetMute(void);
-void SetMute(int value); // 0-1
-
 // unused
 inline int GetFanSpeed(void) {
     return 0;
@@ -69,40 +66,40 @@ inline void SetFanSpeed(int value) {
     // do nothing
 }
 
-// custom mute mode persistence layer
-
-int GetMutedBrightness(void);
-int GetMutedColortemp(void);
-int GetMutedContrast(void);
-int GetMutedSaturation(void);
-int GetMutedExposure(void);
-int GetMutedVolume(void);
-int GetMuteDisablesDpad(void);
-int GetMuteEmulatesJoystick(void);
-int GetMuteTurboA(void);
-int GetMuteTurboB(void);
-int GetMuteTurboX(void);
-int GetMuteTurboY(void);
-int GetMuteTurboL1(void);
-int GetMuteTurboL2(void);
-int GetMuteTurboR1(void);
-int GetMuteTurboR2(void);
-
-void SetMutedBrightness(int);
-void SetMutedColortemp(int);
-void SetMutedContrast(int);
-void SetMutedSaturation(int);
-void SetMutedExposure(int);
-void SetMutedVolume(int);
-void SetMuteDisablesDpad(int);
-void SetMuteEmulatesJoystick(int);
-void SetMuteTurboA(int);
-void SetMuteTurboB(int);
-void SetMuteTurboX(int);
-void SetMuteTurboY(int);
-void SetMuteTurboL1(int);
-void SetMuteTurboL2(int);
-void SetMuteTurboR1(int);
-void SetMuteTurboR2(int);
+// H700 has no FN switch. Shared UI code still references this API.
+static inline int GetMute(void) { return 0; }
+static inline void SetMute(int value) { (void)value; }
+static inline int GetMutedBrightness(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedBrightness(int value) { (void)value; }
+static inline int GetMutedColortemp(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedColortemp(int value) { (void)value; }
+static inline int GetMutedContrast(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedContrast(int value) { (void)value; }
+static inline int GetMutedSaturation(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedSaturation(int value) { (void)value; }
+static inline int GetMutedExposure(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedExposure(int value) { (void)value; }
+static inline int GetMutedVolume(void) { return SETTINGS_DEFAULT_MUTE_NO_CHANGE; }
+static inline void SetMutedVolume(int value) { (void)value; }
+static inline int GetMuteDisablesDpad(void) { return 0; }
+static inline void SetMuteDisablesDpad(int value) { (void)value; }
+static inline int GetMuteEmulatesJoystick(void) { return 0; }
+static inline void SetMuteEmulatesJoystick(int value) { (void)value; }
+static inline int GetMuteTurboA(void) { return 0; }
+static inline void SetMuteTurboA(int value) { (void)value; }
+static inline int GetMuteTurboB(void) { return 0; }
+static inline void SetMuteTurboB(int value) { (void)value; }
+static inline int GetMuteTurboX(void) { return 0; }
+static inline void SetMuteTurboX(int value) { (void)value; }
+static inline int GetMuteTurboY(void) { return 0; }
+static inline void SetMuteTurboY(int value) { (void)value; }
+static inline int GetMuteTurboL1(void) { return 0; }
+static inline void SetMuteTurboL1(int value) { (void)value; }
+static inline int GetMuteTurboL2(void) { return 0; }
+static inline void SetMuteTurboL2(int value) { (void)value; }
+static inline int GetMuteTurboR1(void) { return 0; }
+static inline void SetMuteTurboR1(int value) { (void)value; }
+static inline int GetMuteTurboR2(void) { return 0; }
+static inline void SetMuteTurboR2(int value) { (void)value; }
 
 #endif  // __msettings_h__

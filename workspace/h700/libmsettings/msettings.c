@@ -18,228 +18,38 @@
 
 ///////////////////////////////////////
 
-// Legacy MinUI settings
-typedef struct SettingsV3 {
-	int version; // future proofing
-	int brightness;
-	int headphones;
-	int speaker;
-	int mute;
-	int unused[2];
-	int jack;
-} SettingsV3;
-
-// First NextUI settings format
-typedef struct SettingsV4 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature; // 0-20
-	int headphones;
-	int speaker;
-	int mute;
-	int unused[2];
-	int jack; 
-} SettingsV4;
-
-// Second NextUI settings format
-typedef struct SettingsV5 {
+// First H700 settings format. Prerelease formats intentionally reset to defaults.
+typedef struct SettingsV1 {
 	int version; // future proofing
 	int brightness;
 	int colortemperature;
 	int headphones;
 	int speaker;
-	int mute;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-} SettingsV5;
-
-// Third NextUI settings format
-typedef struct SettingsV6 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
 	int contrast;
 	int saturation;
 	int exposure;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-} SettingsV6;
-
-typedef struct SettingsV7 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
-	int contrast;
-	int saturation;
-	int exposure;
-	int mutedbrightness;
-	int mutedcolortemperature;
-	int mutedcontrast;
-	int mutedsaturation;
-	int mutedexposure;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-} SettingsV7;
-
-typedef struct SettingsV8 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
-	int contrast;
-	int saturation;
-	int exposure;
-	int toggled_brightness;
-	int toggled_colortemperature;
-	int toggled_contrast;
-	int toggled_saturation;
-	int toggled_exposure;
-	int toggled_volume;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-} SettingsV8;
-
-typedef struct SettingsV9 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
-	int contrast;
-	int saturation;
-	int exposure;
-	int toggled_brightness;
-	int toggled_colortemperature;
-	int toggled_contrast;
-	int toggled_saturation;
-	int toggled_exposure;
-	int toggled_volume;
-	int disable_dpad_on_mute;
-	int emulate_joystick_on_mute;
-	int turbo_a;
-	int turbo_b;
-	int turbo_x;
-	int turbo_y;
-	int turbo_l1;
-	int turbo_l2;
-	int turbo_r1;
-	int turbo_r2;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-} SettingsV9;
-
-typedef struct SettingsV10 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
-	int contrast;
-	int saturation;
-	int exposure;
-	int toggled_brightness;
-	int toggled_colortemperature;
-	int toggled_contrast;
-	int toggled_saturation;
-	int toggled_exposure;
-	int toggled_volume;
-	int disable_dpad_on_mute;
-	int emulate_joystick_on_mute;
-	int turbo_a;
-	int turbo_b;
-	int turbo_x;
-	int turbo_y;
-	int turbo_l1;
-	int turbo_l2;
-	int turbo_r1;
-	int turbo_r2;
-	int unused[2]; // for future use
-	// NOTE: doesn't really need to be persisted but still needs to be shared
-	int jack; 
-	int audiosink; // was bluetooth true/false before
-} SettingsV10;
-
-typedef struct SettingsV11 {
-	int version; // future proofing
-	int brightness;
-	int colortemperature;
-	int headphones;
-	int speaker;
-	int mute;
-	int contrast;
-	int saturation;
-	int exposure;
-	int toggled_brightness;
-	int toggled_colortemperature;
-	int toggled_contrast;
-	int toggled_saturation;
-	int toggled_exposure;
-	int toggled_volume;
-	int disable_dpad_on_mute;
-	int emulate_joystick_on_mute;
-	int turbo_a;
-	int turbo_b;
-	int turbo_x;
-	int turbo_y;
-	int turbo_l1;
-	int turbo_l2;
-	int turbo_r1;
-	int turbo_r2;
 	int unused[2]; // for future use
 	// NOTE: doesn't really need to be persisted but still needs to be shared
 	int jack;
-	int audiosink; // was bluetooth true/false before
+	int audiosink; // AUDIO_SINK_*
 	int displaycal_enabled;
 	int displaycal_red_gain;
 	int displaycal_green_gain;
 	int displaycal_blue_gain;
-} SettingsV11;
+} SettingsV1;
 
-// When incrementing SETTINGS_VERSION, update the Settings typedef and add
-// backwards compatibility to InitSettings!
-#define SETTINGS_VERSION 11
-typedef SettingsV11 Settings;
+// Future format changes must update this version and the loader together.
+#define SETTINGS_VERSION 1
+typedef SettingsV1 Settings;
 static Settings DefaultSettings = {
 	.version = SETTINGS_VERSION,
 	.brightness = SETTINGS_DEFAULT_BRIGHTNESS,
 	.colortemperature = SETTINGS_DEFAULT_COLORTEMP,
 	.headphones = SETTINGS_DEFAULT_HEADPHONE_VOLUME,
 	.speaker = SETTINGS_DEFAULT_VOLUME,
-	.mute = 0,
 	.contrast = SETTINGS_DEFAULT_CONTRAST,
 	.saturation = SETTINGS_DEFAULT_SATURATION,
 	.exposure = SETTINGS_DEFAULT_EXPOSURE,
-	.toggled_brightness = SETTINGS_DEFAULT_MUTE_NO_CHANGE,
-	.toggled_colortemperature = SETTINGS_DEFAULT_MUTE_NO_CHANGE,
-	.toggled_contrast = SETTINGS_DEFAULT_MUTE_NO_CHANGE,
-	.toggled_saturation = SETTINGS_DEFAULT_MUTE_NO_CHANGE,
-	.toggled_exposure = SETTINGS_DEFAULT_MUTE_NO_CHANGE,
-	.toggled_volume = 0, // mute is default
-	.disable_dpad_on_mute = 0,
-	.emulate_joystick_on_mute = 0,
-	.turbo_a = 0,
-	.turbo_b = 0,
-	.turbo_x = 0,
-	.turbo_y = 0,
-	.turbo_l1 = 0,
-	.turbo_l2 = 0,
-	.turbo_r1 = 0,
-	.turbo_r2 = 0,
 	.jack = 0,
 	.audiosink = AUDIO_SINK_DEFAULT,
 	.displaycal_enabled = DISPLAYCAL_DEFAULT_ENABLED,
@@ -261,17 +71,6 @@ int scaleContrast(int);
 int scaleSaturation(int);
 int scaleExposure(int);
 int scaleVolume(int);
-
-void disableDpad(int);
-void emulateJoystick(int);
-void turboA(int);
-void turboB(int);
-void turboX(int);
-void turboY(int);
-void turboL1(int);
-void turboL2(int);
-void turboR1(int);
-void turboR2(int);
 
 int getInt(char* path) {
 	int i = 0;
@@ -303,16 +102,6 @@ int exactMatch(char* str1, char* str2) {
 	int len1 = strlen(str1);
 	if (len1!=strlen(str2)) return 0;
 	return (strncmp(str1,str2,len1)==0);
-}
-
-int peekVersion(const char *filename) {
-	int version = 0;
-	FILE *file = fopen(filename, "r");
-	if (file) {
-		fread(&version, sizeof(int), 1, file);
-		fclose(file);
-	}
-	return version;
 }
 
 static int prefixMatch(char* pre, char* str) {
@@ -347,8 +136,20 @@ static void applyDisplayCalDefaultsForDevice(Settings *target) {
 	target->displaycal_blue_gain = defaults.blue_gain;
 }
 
+// Accept only a complete V1 record; old prerelease and damaged files use defaults.
+static void loadSettings(void) {
+	FILE *file = fopen(SettingsPath, "rb");
+	if (!file) return;
+
+	Settings saved;
+	if (fread(&saved, sizeof(saved), 1, file) == 1 &&
+		saved.version == SETTINGS_VERSION && fgetc(file) == EOF && !ferror(file)) {
+		memcpy(settings, &saved, sizeof(saved));
+	}
+	fclose(file);
+}
+
 void InitSettings(void) {
-	int seed_displaycal = 0;
 	sprintf(SettingsPath, "%s/msettings.bin", getenv("USERDATA_PATH"));
 	
 	shm_fd = shm_open(SHM_KEY, O_RDWR | O_CREAT | O_EXCL, 0644); // see if it exists
@@ -364,191 +165,9 @@ void InitSettings(void) {
 		ftruncate(shm_fd, shm_size);
 		settings = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-		// peek the first int from fd, it's the version
-		int version = peekVersion(SettingsPath);
-		if(version > 0) {
-			int fd = open(SettingsPath, O_RDONLY);
-			if (fd>=0) {
-				if (version == SETTINGS_VERSION) {
-					read(fd, settings, shm_size);
-				}
-				else {
-					// initialize with defaults
-					memcpy(settings, &DefaultSettings, shm_size);
-					// no displaycal fields before v11, seed device defaults
-					seed_displaycal = 1;
-
-					// overwrite with migrated data
-					if(version==10) {
-						printf("Found settings v10.\n");
-						SettingsV10 old;
-						read(fd, &old, sizeof(SettingsV10));
-
-						memcpy(settings, &old, sizeof(SettingsV10));
-						settings->version = SETTINGS_VERSION;
-					}
-					else if(version==9) {
-						printf("Found settings v9.\n");
-						SettingsV9 old;
-						read(fd, &old, sizeof(SettingsV9));
-
-						settings-> disable_dpad_on_mute = old.disable_dpad_on_mute;
-						settings-> emulate_joystick_on_mute = old.emulate_joystick_on_mute;
-						settings-> turbo_a = old.turbo_a;
-						settings-> turbo_b = old.turbo_b;
-						settings-> turbo_x = old.turbo_x;
-						settings-> turbo_y = old.turbo_y;
-						settings-> turbo_l1 = old.turbo_l1;
-						settings-> turbo_l2 = old.turbo_l2;
-						settings-> turbo_r1 = old.turbo_r1;
-						settings-> turbo_r2 = old.turbo_r2;
-
-						settings->toggled_volume = old.toggled_volume;
-
-						settings->toggled_brightness = old.toggled_brightness;
-						settings->toggled_colortemperature = old.toggled_colortemperature;
-						settings->toggled_contrast = old.toggled_contrast;
-						settings->toggled_exposure = old.toggled_exposure;
-						settings->toggled_saturation = old.toggled_saturation;
-
-						settings->saturation = old.saturation;
-						settings->contrast = old.contrast;
-						settings->exposure = old.exposure;
-
-						settings->colortemperature = old.colortemperature;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==8) {
-						printf("Found settings v8.\n");
-						SettingsV8 old;
-						read(fd, &old, sizeof(SettingsV8));
-
-						settings->toggled_volume = old.toggled_volume;
-
-						settings->toggled_brightness = old.toggled_brightness;
-						settings->toggled_colortemperature = old.toggled_colortemperature;
-						settings->toggled_contrast = old.toggled_contrast;
-						settings->toggled_exposure = old.toggled_exposure;
-						settings->toggled_saturation = old.toggled_saturation;
-
-						settings->saturation = old.saturation;
-						settings->contrast = old.contrast;
-						settings->exposure = old.exposure;
-
-						settings->colortemperature = old.colortemperature;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==7) {
-						printf("Found settings v7.\n");
-						SettingsV7 old;
-						read(fd, &old, sizeof(SettingsV7));
-
-						// muted* -> toggled*
-						settings->toggled_brightness = old.mutedbrightness;
-						settings->toggled_colortemperature = old.mutedcolortemperature;
-						settings->toggled_contrast = old.mutedcontrast;
-						settings->toggled_exposure = old.mutedexposure;
-						settings->toggled_saturation = old.mutedsaturation;
-
-						settings->saturation = old.saturation;
-						settings->contrast = old.contrast;
-						settings->exposure = old.exposure;
-
-						settings->colortemperature = old.colortemperature;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==6) {
-						printf("Found settings v6.\n");
-						SettingsV6 old;
-						read(fd, &old, sizeof(SettingsV6));
-
-						settings->saturation = old.saturation;
-						settings->contrast = old.contrast;
-						settings->exposure = old.exposure;
-
-						settings->colortemperature = old.colortemperature;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==5) {
-						printf("Found settings v5.\n");
-						SettingsV5 old;
-						read(fd, &old, sizeof(SettingsV5));
-
-						settings->colortemperature = old.colortemperature;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==4) {
-						printf("Found settings v4.\n");
-						SettingsV4 old;
-						read(fd, &old, sizeof(SettingsV4));
-
-						// colortemp was 0-20 here
-						settings->colortemperature = old.colortemperature * 2;
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else if(version==3) {
-						printf("Found settings v3.\n");
-						SettingsV3 old;
-						read(fd, &old, sizeof(SettingsV3));
-
-						settings->brightness = old.brightness;
-						settings->headphones = old.headphones;
-						settings->speaker = old.speaker;
-						settings->mute = old.mute;
-						settings->jack = old.jack;
-					}
-					else {
-						printf("Found unsupported settings version: %i.\n", version);
-					}
-				}
-				
-				close(fd);
-			}
-			else {
-				// load defaults
-				memcpy(settings, &DefaultSettings, shm_size);
-				seed_displaycal = 1;
-			}
-		}
-		else {
-			// load defaults
-			memcpy(settings, &DefaultSettings, shm_size);
-			seed_displaycal = 1;
-		}
-		
-		// these shouldn't be persisted
-		// settings->jack = 0;
-		settings->mute = 0;
+		memcpy(settings, &DefaultSettings, shm_size);
+		applyDisplayCalDefaultsForDevice(settings);
+		loadSettings();
 	}
 	// printf("brightness: %i\nspeaker: %i \n", settings->brightness, settings->speaker);
 	// Make sure the H700 codec is routed to speaker/lineout before NextUI owns volume.
@@ -559,12 +178,15 @@ void InitSettings(void) {
 		system("amixer -q sset 'OutputR Mixer DACR' on >/dev/null 2>&1");
 	}
 
-	// only the host seeds displaycal defaults, and only when the persisted
-	// settings predate them — a clean current-version load keeps user values
-	if (is_host && seed_displaycal) applyDisplayCalDefaultsForDevice(settings);
-
-	// This will implicitly update all other settings based on FN switch state
-	SetMute(settings->mute);
+	// Apply the current hardware settings without TrimUI FN-switch overrides.
+	SetVolume(GetVolume());
+	SetBrightness(GetBrightness());
+	SetColortemp(GetColortemp());
+	SetContrast(GetContrast());
+	SetSaturation(GetSaturation());
+	SetExposure(GetExposure());
+	if (settings->displaycal_enabled)
+		SetRawDisplayCal(1, settings->displaycal_red_gain, settings->displaycal_green_gain, settings->displaycal_blue_gain);
 }
 int InitializedSettings(void) {
 	return (settings != NULL);
@@ -574,7 +196,7 @@ void QuitSettings(void) {
 	if (is_host) shm_unlink(SHM_KEY);
 }
 static inline void SaveSettings(void) {
-	int fd = open(SettingsPath, O_CREAT|O_WRONLY, 0644);
+	int fd = open(SettingsPath, O_CREAT|O_WRONLY|O_TRUNC, 0644);
 	if (fd>=0) {
 		write(fd, settings, shm_size);
 		close(fd);
@@ -590,21 +212,12 @@ static inline void applyDisplayCalSettings(void) {
 ///////// Getters exposed in public API
 
 int GetBrightness(void) { // 0-10
-	if (settings->mute && GetMutedBrightness() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedBrightness();
-
 	return settings->brightness;
 }
 int GetColortemp(void) { // 0-10
-	if (settings->mute && GetMutedColortemp() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedColortemp();
-
 	return settings->colortemperature;
 }
 int GetVolume(void) { // 0-20
-	if (settings->mute && GetMutedVolume() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedVolume();
-	
 	if(settings->jack || settings->audiosink != AUDIO_SINK_DEFAULT)
 		return settings->headphones;
 
@@ -612,23 +225,14 @@ int GetVolume(void) { // 0-20
 }
 int GetContrast(void)
 {
-	if (settings->mute && GetMutedContrast() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedContrast();
-
 	return settings->contrast;
 }
 int GetSaturation(void)
 {
-	if (settings->mute && GetMutedSaturation() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedSaturation();
-
 	return settings->saturation;
 }
 int GetExposure(void)
 {
-	if (settings->mute && GetMutedExposure() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return GetMutedExposure();
-
 	return settings->exposure;
 }
 int GetDisplayCalEnabled(void)
@@ -666,112 +270,29 @@ int GetHDMI(void) {
 	return 0;
 };
 
-int GetMute(void) {
-	return settings->mute;
-}
-int GetMutedBrightness(void)
-{
-	return settings->toggled_brightness;
-}
-int GetMutedColortemp(void)
-{
-	return settings->toggled_colortemperature;
-}
-int GetMutedContrast(void)
-{
-	return settings->toggled_contrast;
-}
-int GetMutedSaturation(void)
-{
-	return settings->toggled_saturation;
-}
-int GetMutedExposure(void)
-{
-	return settings->toggled_exposure;
-}
-int GetMutedVolume(void)
-{
-	return settings->toggled_volume;
-}
-int GetMuteDisablesDpad(void)
-{
-	return settings->disable_dpad_on_mute;
-}
-int GetMuteEmulatesJoystick(void)
-{
-	return settings->emulate_joystick_on_mute;
-}
-int GetMuteTurboA(void)
-{
-	return settings->turbo_a;
-}
-int GetMuteTurboB(void)
-{
-	return settings->turbo_b;
-}
-int GetMuteTurboX(void)
-{
-	return settings->turbo_x;
-}
-int GetMuteTurboY(void)
-{
-	return settings->turbo_y;
-}
-int GetMuteTurboL1(void)
-{
-	return settings->turbo_l1;
-}
-int GetMuteTurboL2(void)
-{
-	return settings->turbo_l2;
-}
-int GetMuteTurboR1(void)
-{
-	return settings->turbo_r1;
-}
-int GetMuteTurboR2(void)
-{
-	return settings->turbo_r2;
-}
-
 ///////// Setters exposed in public API
 
 void SetBrightness(int value) {
-	if (settings->mute && GetMutedBrightness() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawBrightness(scaleBrightness(GetMutedBrightness()));
-
 	SetRawBrightness(scaleBrightness(value));
 	settings->brightness = value;
 	SaveSettings();
 }
 void SetColortemp(int value) {
-	if (settings->mute && GetMutedColortemp() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawColortemp(scaleColortemp(GetMutedColortemp()));
-
 	SetRawColortemp(scaleColortemp(value));
 	settings->colortemperature = value;
 	SaveSettings();
 }
 void SetContrast(int value) {
-	if (settings->mute && GetMutedContrast() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawContrast(scaleContrast(GetMutedContrast()));
-
 	SetRawContrast(scaleContrast(value));
 	settings->contrast = value;
 	SaveSettings();
 }
 void SetSaturation(int value) {
-	if (settings->mute && GetMutedSaturation() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawSaturation(scaleSaturation(GetMutedSaturation()));
-
 	SetRawSaturation(scaleSaturation(value));
 	settings->saturation = value;
 	SaveSettings();
 }
 void SetExposure(int value){
-	if (settings->mute && GetMutedExposure() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawExposure(scaleExposure(GetMutedExposure()));
-
 	SetRawExposure(scaleExposure(value));
 	settings->exposure = value;
 	SaveSettings();
@@ -808,9 +329,6 @@ void SetDisplayCalBlueGain(int value) {
 }
 void SetVolume(int value) // 0-20
 {
-	if (settings->mute && GetMutedVolume() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		return SetRawVolume(scaleVolume(GetMutedVolume()));
-	
 	SetRawVolume(scaleVolume(value));
 	if (settings->jack || settings->audiosink != AUDIO_SINK_DEFAULT)
 		settings->headphones = value;
@@ -1073,155 +591,6 @@ void SetHDMI(int value) {
 	setHDMIAudioRoute(value);
 }
 
-void SetMute(int value) {
-	settings->mute = value;
-
-	SetVolume(GetVolume());
-	SetBrightness(GetBrightness());
-	SetColortemp(GetColortemp());
-	SetContrast(GetContrast());
-	SetSaturation(GetSaturation());
-	SetExposure(GetExposure());
-	applyDisplayCalSettings();
-
-	if(GetMuteTurboA())
-		turboA(settings->mute);
-	if(GetMuteTurboB())
-		turboB(settings->mute);
-	if(GetMuteTurboX())
-		turboX(settings->mute);
-	if(GetMuteTurboY())
-		turboY(settings->mute);
-	if(GetMuteTurboL1())
-		turboL1(settings->mute);
-	if(GetMuteTurboL2())
-		turboL2(settings->mute);
-	if(GetMuteTurboR1())
-		turboR1(settings->mute);
-	if(GetMuteTurboR2())
-		turboR2(settings->mute);
-}
-
-void SetMutedBrightness(int value)
-{
-	settings->toggled_brightness = value;
-	SaveSettings();
-}
-
-void SetMutedColortemp(int value)
-{
-	settings->toggled_colortemperature = value;
-	SaveSettings();
-}
-
-void SetMutedContrast(int value)
-{
-	settings->toggled_contrast = value;
-	SaveSettings();
-}
-
-void SetMutedSaturation(int value)
-{
-	settings->toggled_saturation = value;
-	SaveSettings();
-}
-
-void SetMutedExposure(int value)
-{
-	settings->toggled_exposure = value;
-	SaveSettings();
-}
-
-void SetMutedVolume(int value)
-{
-	settings->toggled_volume = value;
-	SaveSettings();
-}
-
-void SetMuteDisablesDpad(int value)
-{
-	settings->disable_dpad_on_mute = value;
-	SaveSettings();
-}
-void SetMuteEmulatesJoystick(int value)
-{
-	settings->emulate_joystick_on_mute = value;
-	SaveSettings();
-}
-
-void SetMuteTurboA(int value)
-{
-	settings->turbo_a = value;
-	SaveSettings();
-}
-
-void SetMuteTurboB(int value)
-{
-	settings->turbo_b = value;
-	SaveSettings();
-}
-
-void SetMuteTurboX(int value)
-{
-	settings->turbo_x = value;
-	SaveSettings();
-}
-
-void SetMuteTurboY(int value)
-{
-	settings->turbo_y = value;
-	SaveSettings();
-}
-
-void SetMuteTurboL1(int value)
-{
-	settings->turbo_l1 = value;
-	SaveSettings();
-}
-
-void SetMuteTurboL2(int value)
-{
-	settings->turbo_l2 = value;
-	SaveSettings();
-}
-
-void SetMuteTurboR1(int value)
-{
-	settings->turbo_r1 = value;
-	SaveSettings();
-}
-
-void SetMuteTurboR2(int value)
-{
-	settings->turbo_r2 = value;
-	SaveSettings();
-}
-
-///////// H700 has no stock input daemon modifiers yet.
-
-void disableDpad(int value) {
-}
-
-void emulateJoystick(int value) {
-}
-
-void turboA(int value) {
-}
-void turboB(int value) {
-}
-void turboX(int value) {
-}
-void turboY(int value) {
-}
-void turboL1(int value) {
-}
-void turboL2(int value) {
-}
-void turboR1(int value) {
-}
-void turboR2(int value) {
-}
-
 ///////// Platform specific scaling
 
 int scaleVolume(int value) {
@@ -1452,9 +821,6 @@ static int get_audiocodec_card_num() {
 }
 
 void SetRawVolume(int val) { // in: 0-100
-	if (settings->mute && GetMutedVolume() != SETTINGS_DEFAULT_MUTE_NO_CHANGE)
-		val = scaleVolume(GetMutedVolume());
-
     if (GetAudioSink() == AUDIO_SINK_BLUETOOTH) {
         // bluealsa is a mixer plugin, not exposed as a separate card
         char ctl_name[128] = {0};
