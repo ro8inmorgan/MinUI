@@ -6,7 +6,7 @@ index 581ee84..d9db102 100644
  	PLATFORM_DEFINES := -DCC_RESAMPLER -DCC_RESAMPLER_NO_HIGHPASS
  	CFLAGS += -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
  	CXXFLAGS += $(CFLAGS)
-+# TrimUI Brick/Smart Pro
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

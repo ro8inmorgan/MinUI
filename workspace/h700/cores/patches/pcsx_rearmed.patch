@@ -6,7 +6,7 @@ index 2197946c..df72d03d
          fpic := -fPIC
          CFLAGS += -march=armv8-a+crc+simd -mtune=cortex-a72 -ftree-vectorize
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

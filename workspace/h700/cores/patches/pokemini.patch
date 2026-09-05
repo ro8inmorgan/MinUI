@@ -6,7 +6,7 @@ index ef2f9e7d1c6041bea8e2c8a61cdd363ed73a7482..ada8785f566af89cc77f5ab2dd9e670b
  	CFLAGS += -ffast-math -fomit-frame-pointer -march=mips32 -mtune=mips32 -mhard-float
  	CFLAGS += -DDINGUX
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

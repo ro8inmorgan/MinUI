@@ -6,7 +6,7 @@ index 088c344..9573f27 100644
      SHARED := -shared -Wl,--no-undefined -Wl,-version-script=$(LIBRETRO_DIR)/link.T
      FLAGS += -DDINGUX -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
  
-+# target platform h700 trimUI brick
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

@@ -6,7 +6,7 @@ index 0d1dc08f81a11cef6b3b7238367b1ff27fcf1ead..1f87c76c3242023c4095f0c9087c5276
  	HAVE_ARMv6 = 0
  	LOW_MEMORY = 1
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

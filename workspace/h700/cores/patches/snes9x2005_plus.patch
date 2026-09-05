@@ -6,7 +6,7 @@ index 07d5368a8e78a020813732239ec369d83e931ede..009f13b8e61c634de4cb83e97785a10b
  	FLAGS += -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
  	FLAGS += -DFAST_ALIGNED_LSB_WORD_ACCESS -fno-unroll-loops
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

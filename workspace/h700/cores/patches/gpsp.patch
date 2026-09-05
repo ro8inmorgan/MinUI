@@ -6,7 +6,7 @@ index dc4b60dec7f70a153dbc2eb849cd5acfc90f9d4d..94c7f8dd037284153b6858730a10b6aa
  	ARCH = arm
  	BUILTIN_GPU = neon
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

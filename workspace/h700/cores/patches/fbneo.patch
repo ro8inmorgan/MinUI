@@ -8,7 +8,7 @@ index 0b7d646c7..2784aa150
  	CFLAGS += $(PLATFORM_FLAGS)
  	CXXFLAGS += $(PLATFORM_FLAGS)
  
-+# target platform h700 trimUI brick
++# Anbernic H700
 +else ifneq (,$(findstring h700,$(platform)))
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CXX=$(CROSS_COMPILE)g++

@@ -6,7 +6,7 @@ index 6f412c7..9a8a14a 100644
  	LDFLAGS += -marm -mcpu=cortex-a35 -mfpu=neon-fp-armv8 -mfloat-abi=hard -Ofast -flto -fuse-linker-plugin
  #######################################
  
-+# (Trimui Brick/Smart Pro) ###
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

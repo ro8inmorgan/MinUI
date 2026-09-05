@@ -6,7 +6,7 @@ index 5b54403d915e46cb0df8f428355665fbe26e05b4..f72733d9689aa78795ce8b9d777b0ab9
     CXXFLAGS += -std=c++11
     CFLAGS += -std=gnu11
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +   TARGET := $(TARGET_NAME)_libretro.so
 +   CC = $(CROSS_COMPILE)gcc

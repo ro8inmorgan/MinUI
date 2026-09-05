@@ -6,7 +6,7 @@ index a22eb5d..c55c8cf 100644
  	FLAGS += -fomit-frame-pointer -march=armv5te -mtune=arm926ej-s
  	fpic := -fPIC
  
-+# target platform h700 trimUI brick
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
 +	CC = $(CROSS_COMPILE)gcc

@@ -6,7 +6,7 @@ index 62cb321..e50aa6e 100644
     endif
     CFLAGS += -DARM -marm -DALIGN_DWORD -mthumb-interwork -falign-functions=16 -pipe -fstack-protector
  
-+# TrimUI Brick
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +   TARGET := $(TARGET_NAME)_libretro.so
 +   fpic := -fPIC

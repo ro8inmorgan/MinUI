@@ -6,7 +6,7 @@ index c3d5d3b30d71a8f9ed332482fa2af1c21b02605d..5e710154e499ddd7b1ae699122c38753
     endif
     FLAGS += -D__PS3__
  
-+# TRIMUI SMART PRO
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +   TARGET := $(TARGET_NAME)_libretro.so
 +   CC = $(CROSS_COMPILE)gcc

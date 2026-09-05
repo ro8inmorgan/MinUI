@@ -6,7 +6,7 @@ index 7e5ff625..d0e5bdf9 100644
        endif
     endif
  
-+# TrimUI Brick
++# Anbernic H700
 +else ifeq ($(platform), h700)
 +   TARGET := $(TARGET_NAME)_libretro.so
 +   SHARED := -shared -Wl,--version-script=$(CORE_DIR)/libretro/link.T -Wl,--no-undefined
