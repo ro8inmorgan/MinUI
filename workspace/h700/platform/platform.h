@@ -181,6 +181,9 @@ extern int needs_portrait_sdl; // DEVICE=rg28xx: SDL rotates onto the portrait p
 #define SDCARD_PATH "/mnt/SDCARD"
 #define MUTE_VOLUME_RAW 0
 
+// Stock H700 audio must be closed before suspend to avoid a long stall on wake.
+#define SND_CLOSE_ON_SLEEP 1
+
 #define SCREEN_FPS 60.0
 // ceiling, not the count: only rg40xxh/v and rgcubexx have RGB LEDs, and
 // the V populates one bank where the others populate two. PLAT_getNumLeds()

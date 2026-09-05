@@ -4260,10 +4260,14 @@ void PWR_powerOff(int reboot)
 
 static void PWR_enterSleep(void)
 {
-	// Fully close the audio device before sleeping: a PCM that stays open
+#if defined(SND_CLOSE_ON_SLEEP) && SND_CLOSE_ON_SLEEP
+	// On H700, fully close the audio device before sleeping: a PCM left open
 	// across suspend-to-RAM ends up in a state SDL takes ~10s to close on
 	// wake, freezing the UI. PWR_exitSleep reopens it via SND_resetAudio.
 	SND_quit();
+#else
+	SND_pauseAudio(true);
+#endif
 	LEDS_pushProfileOverride(LIGHT_PROFILE_SLEEP);
 	if (GetHDMI())
 	{
