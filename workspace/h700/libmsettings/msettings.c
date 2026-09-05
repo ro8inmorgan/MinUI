@@ -913,26 +913,15 @@ void SetRawVolume(int val) { // in: 0-100
 	}
 }
 
+// H700 lacks the enhance_* controls. TODO: implement these through the display LUT.
 void SetRawContrast(int val){
-	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_contrast", "w");
-	if (fd) {
-		fprintf(fd, "%i", val);
-		fclose(fd);
-	}
+	(void)val;
 }
 void SetRawSaturation(int val){
-	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_saturation", "w");
-	if (fd) {
-		fprintf(fd, "%i", val);
-		fclose(fd);
-	}
+	(void)val;
 }
 void SetRawExposure(int val){
-	FILE *fd = fopen("/sys/class/disp/disp/attr/enhance_bright", "w");
-	if (fd) {
-		fprintf(fd, "%i", val);
-		fclose(fd);
-	}
+	(void)val;
 }
 void SetRawDisplayCal(int enabled, int red_gain, int green_gain, int blue_gain) {
 	int ret = enabled
