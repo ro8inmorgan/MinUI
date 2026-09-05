@@ -28,17 +28,6 @@ static void sigHandler(int sig)
     }
 }
 
-// the stock OS reads bootlogo.bmp from this vfat partition at power-on
-#ifndef BOOTLOGO_PARTITION
-#define BOOTLOGO_PARTITION "/dev/mmcblk0p1"
-#endif
-
-// platforms whose bootloader blits the logo panel-native onto a rotated panel
-// set this so previews are rotated to match the boot-time appearance
-#ifndef BOOTLOGO_PREVIEW_ROTATE_CW
-#define BOOTLOGO_PREVIEW_ROTATE_CW 0
-#endif
-
 static SDL_Surface *screen;
 
 SDL_Surface** images;
@@ -74,24 +63,21 @@ static SDL_Surface* rotatePreviewCW(SDL_Surface* src)
 int loadImages()
 {
     char* device = getenv("DEVICE");
-#ifdef BOOTLOGO_RESOLUTION_DIRS
-    // presets are shared between devices with the same panel resolution
-    char* folder = "640x480";
-    if (exactMatch("rg28xx", device)) folder = "480x640";
-    else if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
-		|| exactMatch("rgsp", device)) folder = "720x480";
-    else if (exactMatch("rgcubexx", device)) folder = "720x720";
-    snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/%s/", TOOLS_PATH, folder);
-#else
-    // This needs to get a bit more flexible down the line, but for now we either expect the files
-    // in the pak root directory or in the "brick" subfolder.
-    if(exactMatch("brick", device) || exactMatch("brickpro", device)) {
+    if (exactMatch("h700", PLATFORM)) {
+        // H700 presets are shared between devices with the same panel resolution.
+        char* folder = "640x480";
+        if (exactMatch("rg28xx", device)) folder = "480x640";
+        else if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
+            || exactMatch("rgsp", device)) folder = "720x480";
+        else if (exactMatch("rgcubexx", device)) folder = "720x720";
+        snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/%s/", TOOLS_PATH, folder);
+    }
+    else if (exactMatch("brick", device) || exactMatch("brickpro", device)) {
         snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/brick/", TOOLS_PATH);
     }
     else {
         snprintf(basepath, sizeof(basepath), "%s/Bootlogo.pak/smartpro/", TOOLS_PATH);
     }
-#endif
 
     // grab all bmp files in the directory and load them with IMG_Load,
     // keep them in an array of SDL_Surface pointers
@@ -108,7 +94,8 @@ int loadImages()
                     LOG_error("failed to load %s: %s\n", path, IMG_GetError());
                     continue;
                 }
-                if (BOOTLOGO_PREVIEW_ROTATE_CW)
+                // RG28XX presets are panel-native; rotate previews to match their boot appearance.
+                if (exactMatch("h700", PLATFORM) && exactMatch("rg28xx", device))
                     bmp = rotatePreviewCW(bmp);
                 count++;
                 images = realloc(images, sizeof(SDL_Surface*) * count);
@@ -196,12 +183,13 @@ int main(int argc, char *argv[])
                 char* boot_path = "/mnt/boot/";
                 char* logo_path = image_paths[selected];
                 char cmd[1024];
-#ifdef BOOTLOGO_RESOLUTION_DIRS
-                // back up the stock logo as a restorable preset before the first overwrite
-                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat " BOOTLOGO_PARTITION " %s && ([ -f \"%soriginal.bmp\" ] || cp %sbootlogo.bmp \"%soriginal.bmp\"; cp \"%s\" %sbootlogo.bmp && sync && umount %s && reboot)", boot_path, boot_path, basepath, boot_path, basepath, logo_path, boot_path, boot_path);
-#else
-                snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat " BOOTLOGO_PARTITION " %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
-#endif
+                if (exactMatch("h700", PLATFORM)) {
+                    // H700 uses partition 2; preserve the stock logo as a restorable preset.
+                    snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p2 %s && ([ -f \"%soriginal.bmp\" ] || cp %sbootlogo.bmp \"%soriginal.bmp\"; cp \"%s\" %sbootlogo.bmp && sync && umount %s && reboot)", boot_path, boot_path, basepath, boot_path, basepath, logo_path, boot_path, boot_path);
+                }
+                else {
+                    snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p1 %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
+                }
                 system(cmd);
             }
             else if (PAD_justPressed(BTN_B))
