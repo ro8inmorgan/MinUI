@@ -150,6 +150,8 @@ static void loadSettings(void) {
 }
 
 void InitSettings(void) {
+	applyDisplayCalDefaultsForDevice(&DefaultSettings);
+
 	sprintf(SettingsPath, "%s/msettings.bin", getenv("USERDATA_PATH"));
 	
 	shm_fd = shm_open(SHM_KEY, O_RDWR | O_CREAT | O_EXCL, 0644); // see if it exists
@@ -166,7 +168,6 @@ void InitSettings(void) {
 		settings = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
 		memcpy(settings, &DefaultSettings, shm_size);
-		applyDisplayCalDefaultsForDevice(settings);
 		loadSettings();
 	}
 	// printf("brightness: %i\nspeaker: %i \n", settings->brightness, settings->speaker);
