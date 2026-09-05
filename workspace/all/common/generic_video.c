@@ -615,10 +615,7 @@ SDL_Surface* PLAT_initVideo(void) {
 #endif
 	SDL_LogSetOutputFunction(sdl_log_stdout, NULL);
 	//SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
-	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) {
-		LOG_error("SDL_InitSubSystem(SDL_INIT_VIDEO) failed: %s\n", SDL_GetError());
-		exit(1);
-	}
+	SDL_InitSubSystem(SDL_INIT_VIDEO);
 	SDL_ShowCursor(0);
 
 //	SDL_version compiled;
