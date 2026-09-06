@@ -882,8 +882,7 @@ ConnectionStrength PLAT_connectionStrength(void) {
 
 int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	char cmd[512];
-	int n = snprintf(cmd, sizeof(cmd), "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
-	if (n < 0 || n >= (int)sizeof(cmd)) return -1;
+	sprintf(cmd, "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
 	system(cmd);
 	return 0; // why does this return an int?
 }
