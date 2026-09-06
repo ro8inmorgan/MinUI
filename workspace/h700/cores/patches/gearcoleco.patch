@@ -2,10 +2,10 @@ diff --git a/platforms/libretro/Makefile b/platforms/libretro/Makefile
 index 581ee84..d9db102 100644
 --- a/platforms/libretro/Makefile
 +++ b/platforms/libretro/Makefile
-@@ -274,6 +274,24 @@ else ifeq ($(platform), miyoo)
+@@ -287,6 +287,24 @@ else ifeq ($(platform), miyoo)
  	PLATFORM_DEFINES := -DCC_RESAMPLER -DCC_RESAMPLER_NO_HIGHPASS
  	CFLAGS += -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
- 	CXXFLAGS += $(CFLAGS)
+ 	CXXFLAGS := $(CXXFLAGS) $(CFLAGS)
 +# Anbernic H700
 +else ifeq ($(platform), h700)
 +	TARGET := $(TARGET_NAME)_libretro.so
