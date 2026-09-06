@@ -358,6 +358,13 @@ int PLAT_getNumLeds(void) {
 	return is_brickpro ? 5 : is_brick ? 4 : 3;
 }
 
+const char *PLAT_getLedSettingsFile(void) {
+	PLAT_initPlatform();
+	if (is_brick) return "ledsettings_brick.txt";
+	if (is_brickpro) return "ledsettings_brickpro.txt";
+	return "ledsettings.txt";
+}
+
 void PLAT_initDefaultLeds() {
 	PLAT_initPlatform();
 	if(is_brickpro) {
@@ -385,16 +392,7 @@ void PLAT_initDefaultLeds() {
 void PLAT_initLeds(LightSettings *lights) 
 {
 	PLAT_initDefaultLeds();
-	FILE *file;
-	if(is_brick) {
-		file = PLAT_OpenSettings("ledsettings_brick.txt");
-	}
-	else if(is_brickpro) {
-		file = PLAT_OpenSettings("ledsettings_brickpro.txt");
-	}
-	else {
-		file = PLAT_OpenSettings("ledsettings.txt");
-	}
+	FILE *file = PLAT_OpenSettings(PLAT_getLedSettingsFile());
 
     if (file == NULL)
     {
