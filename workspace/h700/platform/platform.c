@@ -786,66 +786,6 @@ int PLAT_shouldWake(void) {
 
 ///////////////////////////////
 
-double get_time_sec() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9; // Convert to seconds
-}
-double get_process_cpu_time_sec() {
-	// this gives cpu time in nanoseconds needed to accurately calculate cpu usage in very short time frames. 
-	// unfortunately about 20ms between meassures seems the lowest i can go to get accurate results
-	// maybe in the future i will find and even more granual way to get cpu time, but might just be a limit of C or Linux alltogether
-    struct timespec ts;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9; // Convert to seconds
-}
-
-static pthread_mutex_t currentcpuinfo;
-// a roling average for the display values of about 2 frames, otherwise they are unreadable jumping too fast up and down and stuff to read
-#define ROLLING_WINDOW 120  
-
-void *PLAT_cpu_monitor(void *arg) {
-    if (!Perf_tryBeginCPUMonitor()) return NULL;
-
-    double prev_real_time = get_time_sec();
-    double prev_cpu_time = get_process_cpu_time_sec();
-
-    double cpu_usage_history[ROLLING_WINDOW] = {0};
-    int history_index = 0;
-    int history_count = 0;
-
-    while (Perf_isCPUMonitorEnabled()) {
-        double curr_real_time = get_time_sec();
-        double curr_cpu_time = get_process_cpu_time_sec();
-
-        double elapsed_real_time = curr_real_time - prev_real_time;
-        double elapsed_cpu_time = curr_cpu_time - prev_cpu_time;
-
-        if (elapsed_real_time > 0) {
-            double cpu_usage = (elapsed_cpu_time / elapsed_real_time) * 100.0;
-
-            pthread_mutex_lock(&currentcpuinfo);
-
-            cpu_usage_history[history_index] = cpu_usage;
-            history_index = (history_index + 1) % ROLLING_WINDOW;
-            if (history_count < ROLLING_WINDOW) history_count++;
-
-            double sum_cpu_usage = 0;
-            for (int i = 0; i < history_count; i++) sum_cpu_usage += cpu_usage_history[i];
-            perf.cpu_usage = sum_cpu_usage / history_count;
-
-            pthread_mutex_unlock(&currentcpuinfo);
-        }
-
-        prev_real_time = curr_real_time;
-        prev_cpu_time = curr_cpu_time;
-        usleep(100000);
-    }
-
-    Perf_endCPUMonitor();
-    return NULL;
-}
-
 void PLAT_setCPUSpeed(int speed) {
 	const char* mode;
 	switch (speed) {
