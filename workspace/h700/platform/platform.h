@@ -14,7 +14,6 @@
 extern int panel_w;
 extern int panel_h;
 extern double panel_fps;
-extern int hdmi_active;
 extern int dev_has_lstick;
 extern int dev_has_rstick;
 extern int dev_has_rgb;
@@ -146,9 +145,9 @@ extern int needs_portrait_sdl; // DEVICE=rg28xx: SDL rotates onto the portrait p
 
 // While an HDMI cable is connected the whole app runs at 1280x720 (the fb is
 // hardware-scaled to a 1080p60 signal by the display engine — see SetHDMI in
-// libmsettings). hdmi_active and panel_w/panel_h are latched once per process
-// in PLAT_initPlatform; the existing hotplug quit-and-relaunch plumbing
-// restarts apps on cable changes.
+// libmsettings). GFX_init latches hdmi_active, and PLAT_initPlatform detects
+// panel_w/panel_h. The existing hotplug quit-and-relaunch plumbing restarts
+// apps on cable changes.
 // Values must match HDMI_LOGICAL_* in libmsettings/msettings.c.
 #define HAS_HDMI		1
 #define HDMI_WIDTH		1280

@@ -30,7 +30,6 @@ int panel_w = 640;
 int panel_h = 480;
 double panel_fps = 60.0;
 int needs_portrait_sdl = 0;
-int hdmi_active = 0;
 int dev_has_lstick = 0;
 int dev_has_rstick = 0;
 int dev_has_rgb = 0;
@@ -260,15 +259,6 @@ static void detect_device(void) {
 
 void PLAT_initPlatform(void) {
 	detect_device();
-
-	// GFX_init() runs this before PLAT_initVideo(), so the output switch (and
-	// the fb resize it implies) happens while no EGL surface exists — the mali
-	// winsys then latches the new fb geometry when SDL video comes up. SetHDMI
-	// is idempotent, so every app start converges the output to the cable
-	// state; hotplug while running is handled by the existing GFX_hdmiChanged
-	// quit-and-relaunch plumbing landing back here.
-	hdmi_active = GetHDMI();
-	SetHDMI(hdmi_active);
 
 	// NOTE: should_rotate must stay 0 even on the RG28XX. Its portrait panel is
 	// handled entirely by the mali SDL driver (SDL_ROTATION=1 in launch.sh), so

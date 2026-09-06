@@ -91,6 +91,8 @@ static struct GFX_Context
 	int vsync;
 } gfx;
 
+int hdmi_active = 0;
+
 static SDL_Rect asset_rects[ASSET_COUNT];
 static uint32_t asset_rgbs[ASSET_COLORS];
 static SDL_Rect input_rects[INPUT_COUNT];
@@ -351,9 +353,15 @@ int GFX_updateColors(void)
 
 SDL_Surface *GFX_init(int mode)
 {
+	// Platform init may use the active output to select panel rotation.
+	hdmi_active = GetHDMI();
+
 	// Platform-specific init
 	// This might affect FIXED_SCALE, so do it first
 	PLAT_initPlatform();
+	// Switch output before SDL creates its video surface and reads the geometry.
+	SetHDMI(hdmi_active);
+
 	// The refresh rate can depend on the detected panel and active output.
 	current_fps = SCREEN_FPS;
 

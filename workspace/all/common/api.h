@@ -113,6 +113,7 @@ extern int currentshaderdsth;
 extern int currentshadertexw;
 extern int currentshadertexh;
 extern int should_rotate;
+extern int hdmi_active; // output selected at GFX_init; apps restart on HDMI changes
 enum {
 	ASSET_WHITE_PILL,
 	ASSET_BLACK_PILL,
