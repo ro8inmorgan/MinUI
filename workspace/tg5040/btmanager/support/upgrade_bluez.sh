@@ -1,7 +1,7 @@
 #! /bin/sh
 
-if [ "$PLATFORM" = "h700" ]; then
-	echo "Skipping tg5040 BlueZ update on h700"
+if [ "$PLATFORM" != "tg5040" ]; then
+	echo "Skipping tg5040 BlueZ update on $PLATFORM"
 	exit 0
 fi
 
