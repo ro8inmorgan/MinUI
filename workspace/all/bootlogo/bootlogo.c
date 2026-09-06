@@ -185,10 +185,18 @@ int main(int argc, char *argv[])
                 char cmd[1024];
                 if (exactMatch("h700", PLATFORM)) {
                     // H700 uses partition 2; preserve the stock logo as a restorable preset.
-                    snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p2 %s && ([ -f \"%soriginal.bmp\" ] || cp %sbootlogo.bmp \"%soriginal.bmp\"; cp \"%s\" %sbootlogo.bmp && sync && umount %s && reboot)", boot_path, boot_path, basepath, boot_path, basepath, logo_path, boot_path, boot_path);
+                    snprintf(cmd, sizeof(cmd),
+                        "mkdir -p %s && mount -t vfat /dev/mmcblk0p2 %s && "
+                        "([ -f \"%soriginal.bmp\" ] || cp %sbootlogo.bmp \"%soriginal.bmp\"; "
+                        "cp \"%s\" %sbootlogo.bmp && sync && umount %s && reboot)",
+                        boot_path, boot_path, basepath, boot_path, basepath,
+                        logo_path, boot_path, boot_path);
                 }
                 else {
-                    snprintf(cmd, sizeof(cmd), "mkdir -p %s && mount -t vfat /dev/mmcblk0p1 %s && cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot", boot_path, boot_path, logo_path, boot_path, boot_path);
+                    snprintf(cmd, sizeof(cmd),
+                        "mkdir -p %s && mount -t vfat /dev/mmcblk0p1 %s && "
+                        "cp \"%s\" %s/bootlogo.bmp && sync && umount %s && reboot",
+                        boot_path, boot_path, logo_path, boot_path, boot_path);
                 }
                 system(cmd);
             }
