@@ -880,18 +880,6 @@ ConnectionStrength PLAT_connectionStrength(void) {
 
 //////////////////////////////////////////////
 
-bool PLAT_canTurbo(void) { return false; }
-
-int PLAT_toggleTurbo(int btn_id)
-{
-	return 0;
-}
-
-void PLAT_clearTurbo() {
-}
-
-//////////////////////////////////////////////
-
 int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	char cmd[512];
 	int n = snprintf(cmd, sizeof(cmd), "date -s '%d-%d-%d %d:%d:%d'; hwclock -u -w", y,m,d,h,i,s);
