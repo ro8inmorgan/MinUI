@@ -380,7 +380,7 @@ void PLAT_setCPUSpeed(int speed) {
 
 #define RUMBLE_PATH "/sys/class/gpio/gpio20/value"
 void PLAT_setRumble(int strength) {
-	if (GetHDMI()) return; // assume we're using a controller?
+	if (PLAT_onHDMI()) return; // assume we're using a controller?
 	putInt(RUMBLE_PATH, strength?1:0);
 }
 
