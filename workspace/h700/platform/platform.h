@@ -13,6 +13,7 @@
 
 extern int panel_w;
 extern int panel_h;
+extern double panel_fps;
 extern int hdmi_active;
 extern int dev_has_lstick;
 extern int dev_has_rstick;
@@ -184,7 +185,7 @@ extern int needs_portrait_sdl; // DEVICE=rg28xx: SDL rotates onto the portrait p
 // Stock H700 audio must be closed before suspend to avoid a long stall on wake.
 #define SND_CLOSE_ON_SLEEP 1
 
-#define SCREEN_FPS 60.0
+#define SCREEN_FPS (hdmi_active ? 60.0 : panel_fps)
 // ceiling, not the count: only rg40xxh/v and rgcubexx have RGB LEDs, and
 // the V populates one bank where the others populate two. PLAT_getNumLeds()
 // reports what the running device actually has.

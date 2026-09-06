@@ -28,6 +28,7 @@
 
 int panel_w = 640;
 int panel_h = 480;
+double panel_fps = 60.0;
 int needs_portrait_sdl = 0;
 int hdmi_active = 0;
 int dev_has_lstick = 0;
@@ -194,6 +195,19 @@ static void apply_hat_axis(int neg_id, int pos_id, int value, uint32_t tick) {
 
 static void detect_device(void) {
 	char *device = getenv("DEVICE");
+
+	// Nominal panel rates derived from stock DTB timings; verify on hardware.
+	// HDMI uses its separate 60 Hz mode through SCREEN_FPS.
+	panel_fps = 60.0;
+	if (exactMatch("rg28xx", device)) panel_fps = 57.732;
+	else if (exactMatch("rg34xx", device) || exactMatch("rg34xxsp", device)
+		|| exactMatch("rgsp", device)) panel_fps = 59.155;
+	else if (exactMatch("rg35xxplus", device)) panel_fps = 59.256;
+	else if (exactMatch("rg35xxh", device) || exactMatch("rg35xxpro", device)) panel_fps = 59.032;
+	else if (exactMatch("rg35xxsp", device)) panel_fps = 59.524;
+	else if (exactMatch("rg40xxh", device) || exactMatch("rg40xxv", device)) panel_fps = 59.710;
+	else if (exactMatch("rgcubexx", device)) panel_fps = 59.593;
+
 	if (!device) device = "rg35xxplus";
 
 	// App framebuffer size. RG28XX's panel is physically 480x640 portrait, but
