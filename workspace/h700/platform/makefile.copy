@@ -18,8 +18,6 @@ $(PLATFORM):
 	cp -a ./workspace/$@/other/sdl2/output/libSDL2*.so* ./build/SYSTEM/$@/lib/
 	cp -a ./workspace/$@/other/sdl2/output/libtinyalsa.so* ./build/SYSTEM/$@/lib/ 2>/dev/null || true
 	cp -a ./workspace/$@/other/sdl2/output/libpng12.so* ./build/SYSTEM/$@/lib/
-	# rfkill
-	cp ./workspace/$@/rfkill/rfkill.elf ./build/SYSTEM/$@/bin/
 	cp ./workspace/$@/other/evtest/evtest ./build/SYSTEM/$@/bin/
 	cp ./workspace/$@/other/jstest/jstest ./build/SYSTEM/$@/bin/
 	# Private curl runtime for stock Anbernic OS, which does not ship curl.

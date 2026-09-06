@@ -69,7 +69,7 @@ stop_dhcp() {
 start() {
 	systemctl stop NetworkManager 2>/dev/null || true
 	systemctl stop wpa_supplicant "wpa_supplicant@$WIFI_INTERFACE.service" 2>/dev/null || true
-	rfkill.elf unblock wifi 2>/dev/null || rfkill unblock wifi 2>/dev/null || true
+	rfkill unblock wifi 2>/dev/null || true
 	ip link set "$WIFI_INTERFACE" up 2>/dev/null || true
 	write_default_config
 	write_action_script
@@ -88,7 +88,7 @@ stop() {
 	killall wpa_supplicant 2>/dev/null || true
 	stop_dhcp
 	ip link set "$WIFI_INTERFACE" down 2>/dev/null || true
-	rfkill.elf block wifi 2>/dev/null || rfkill block wifi 2>/dev/null || true
+	rfkill block wifi 2>/dev/null || true
 }
 
 case "$1" in

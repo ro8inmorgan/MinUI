@@ -59,19 +59,11 @@ acquire_lock() {
 }
 
 unblock_bt() {
-	if command -v rfkill.elf >/dev/null 2>&1; then
-		rfkill.elf unblock bluetooth >> "$LOG_FILE" 2>&1 || true
-	else
-		rfkill unblock bluetooth >> "$LOG_FILE" 2>&1 || true
-	fi
+	rfkill unblock bluetooth >> "$LOG_FILE" 2>&1 || true
 }
 
 block_bt() {
-	if command -v rfkill.elf >/dev/null 2>&1; then
-		rfkill.elf block bluetooth >> "$LOG_FILE" 2>&1 || true
-	else
-		rfkill block bluetooth >> "$LOG_FILE" 2>&1 || true
-	fi
+	rfkill block bluetooth >> "$LOG_FILE" 2>&1 || true
 }
 
 run_btctl_bounded() {
