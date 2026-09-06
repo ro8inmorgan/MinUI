@@ -12,10 +12,9 @@
 //
 // with checksum = sum(preceding bytes) & 0xFF, written as raw bytes.
 //
-//     mode 1     solid, payload 8x(R,G,B) for one bank then 8x(R,G,B) for the
-//                other -- 16 LED positions in two banks of 8, and the only
-//                mode with per-bank colour
-//     mode 2/3/4 breath fast/med/slow, payload 16x(R,G,B), one colour for all
+//     mode 1     solid, payload 8x(R,G,B) for the right bank then 8x(R,G,B)
+//                for the left -- 16 LED positions in two banks of 8
+//     mode 2/3/4 breath fast/med/slow, same per-bank colour payload as solid
 //     mode 5/6   rainbow mono/multi, payload <1> <1> <speed 0-255>
 //
 // The MCU animates on its own, exactly like the led_anim kernel driver does on
@@ -24,8 +23,8 @@
 //
 // Hardware limits that shape the design: one brightness byte per frame (global,
 // not per zone) and a single effect for the whole strip. Zone 0 governs the
-// effect and speed; brightness is the max across zones; colour is per-bank in
-// solid mode and zone 0's colour everywhere else.
+// effect and speed; brightness is the max across zones. Solid and breath modes
+// scale each bank's colour for its own brightness. Rainbow brightness is global.
 
 #include <termios.h>
 #include <sys/file.h>
@@ -45,20 +44,6 @@
 #define LED_PIXELS 16				  // addressable positions, two banks of 8
 #define LED_BANK (LED_PIXELS / 2)	  // positions per bank
 #define LED_FRAME_MAX (2 + LED_PIXELS * 3 + 1) // mode + brightness + payload + checksum
-
-// muOS sends the right-hand bank first, and we follow it.
-//
-// This only matters on the H and the CubeXX: the RG40XXV has one populated bank
-// and gets the same colour in both halves regardless. Testing on a V showed its
-// single (left) stick lit by the *first* bank, which looks like a contradiction
-// -- but a one-bank device says nothing about how a two-bank one is ordered, and
-// the far likelier reading is that the only populated channel is wired to
-// channel 1 whichever stick it belongs to. muOS's ordering was written against
-// hardware that actually has both banks, so it wins here.
-//
-// If an H or CubeXX ever turns up with left and right swapped, this is the only
-// line that changes.
-#define H700_LED_RIGHT_FIRST 1
 
 // NextUI effect ids are a shared, TrimUI-derived space (see api.h). We expose
 // the subset the MCU can render and translate the rest to the nearest mode.
@@ -124,11 +109,24 @@ static int LED_modeForEffect(int effect, int speed) {
 	}
 }
 
-static void LED_putColor(uint8_t *buf, int *n, uint32_t color, int repeat) {
-	uint8_t r = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = color & 0xFF;
-	for (int i = 0; i < repeat; i++) {
+static void LED_putBank(uint8_t *buf, int *n, const LedZone *zone, int brightness) {
+	int level = zone->brightness;
+	if (level < 0) level = 0;
+	if (level > brightness) level = brightness;
+
+	// The MCU brightness applies to both banks; dim this bank through its RGB.
+	uint8_t r = (zone->color >> 16) & 0xFF;
+	uint8_t g = (zone->color >> 8) & 0xFF;
+	uint8_t b = zone->color & 0xFF;
+	if (brightness > 0) {
+		r = r * level / brightness;
+		g = g * level / brightness;
+		b = b * level / brightness;
+	}
+	else {
+		r = g = b = 0;
+	}
+	for (int i = 0; i < LED_BANK; i++) {
 		buf[(*n)++] = r;
 		buf[(*n)++] = g;
 		buf[(*n)++] = b;
@@ -154,11 +152,6 @@ static int LED_buildFrame(uint8_t *buf) {
 				   ? MCU_SOLID
 				   : LED_modeForEffect(led.zone[0].effect, led.zone[0].speed);
 
-	uint32_t color_a = brightness == 0 ? 0 : led.zone[0].color;
-	// with a single populated bank we send the same colour to both, so the
-	// frame is correct either way round
-	uint32_t color_b = (brightness == 0 || count < 2) ? color_a : led.zone[1].color;
-
 	int n = 0;
 	buf[n++] = mode;
 	buf[n++] = (brightness * 255) / 100;
@@ -171,18 +164,10 @@ static int LED_buildFrame(uint8_t *buf) {
 		buf[n++] = 1;
 		buf[n++] = (speed * 255) / 4900;
 	}
-	else if (mode == MCU_SOLID) {
-#if H700_LED_RIGHT_FIRST
-		LED_putColor(buf, &n, color_b, LED_BANK); // right bank
-		LED_putColor(buf, &n, color_a, LED_BANK); // left bank
-#else
-		LED_putColor(buf, &n, color_a, LED_BANK);
-		LED_putColor(buf, &n, color_b, LED_BANK);
-#endif
-	}
 	else {
-		// breath modes take one colour for the whole strip
-		LED_putColor(buf, &n, color_a, LED_PIXELS);
+		// Right bank first, as on muOS and KNULLI. Mirror the single bank on RG40XX V.
+		LED_putBank(buf, &n, &led.zone[count > 1 ? 1 : 0], brightness);
+		LED_putBank(buf, &n, &led.zone[0], brightness);
 	}
 
 	int sum = 0;
