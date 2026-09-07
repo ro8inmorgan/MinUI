@@ -4337,6 +4337,7 @@ static void PWR_enterSleep(void)
 	{
 		PLAT_clearVideo(gfx.screen);
 		PLAT_flip(gfx.screen, 0);
+		PLAT_enableBacklight(0);
 	}
 	else
 	{
@@ -4367,7 +4368,7 @@ static void PWR_exitSleep(void)
 
 	if (GetHDMI())
 	{
-		// buh
+		PLAT_enableBacklight(1);
 	}
 	else
 	{

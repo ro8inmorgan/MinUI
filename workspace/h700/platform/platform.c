@@ -694,8 +694,11 @@ int PLAT_isUSBConnected(void)
 }
 
 void PLAT_enableBacklight(int enable) {
+	// The power LED follows sleep/wake even when HDMI owns the display.
+	putInt("/sys/class/power_supply/axp2202-battery/work_led", enable ? 1 : 0);
+	if (GetHDMI()) return;
+
 	if (enable) {
-		putInt("/sys/class/power_supply/axp2202-battery/work_led", 0);
 		putInt("/sys/class/graphics/fb0/blank", 0);
 		SetBrightness(GetBrightness());
 		// the suspend script drops mcu_pwr while we sleep, so the MCU comes
@@ -705,7 +708,6 @@ void PLAT_enableBacklight(int enable) {
 	else {
 		SetRawBrightness(0);
 		putInt("/sys/class/graphics/fb0/blank", 1);
-		putInt("/sys/class/power_supply/axp2202-battery/work_led", 1);
 	}
 }
 

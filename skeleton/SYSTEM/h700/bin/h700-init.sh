@@ -102,7 +102,7 @@ EOF
 
 }
 
-# Turn off the stock battery work LED before starting NextUI daemons.
+# Keep the power LED lit when NextUI takes over from the stock OS.
 h700_init_leds() {
-	echo 0 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
+	echo 1 > /sys/class/power_supply/axp2202-battery/work_led 2>/dev/null || true
 }
